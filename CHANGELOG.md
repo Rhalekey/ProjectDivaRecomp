@@ -17,6 +17,7 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 - Fixed the HUD jumping around in songs with a full-screen 2D background, in windows of other shapes.
 - **Note timing** in Options moves when a press counts as on time, from -100 to +300 ms, leaving the notes and the song as they are. Each song measures how late or early your presses were and the row shows it, so setting it right reads as "on time".
 - Buttons are read about once a millisecond instead of every 16 or more, and a press between two of the game's reads is no longer lost.
+- Fixed songs with a full-screen 2D background, such as Levan Polkka, stuttering at high resolutions in windows the background does not fill. The blurred copy behind a picture is now drawn only around it.
 - The run log says how long sound waits before it reaches the sound card, and what each song measured.
 
 ## 2026-11-06: first public version
