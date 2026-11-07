@@ -1,0 +1,188 @@
+# Words inside the game's pictures. See Tools/lang_images.py.
+# picture | name | where the words start | style | text
+
+menu_basic.png | basic_btninfo_kettei.png | 18 | button | OK
+menu_basic.png | basic_btninfo_modoru.png | 18 | button | Zurück
+menu_basic.png | basic_btninfo_yes.png | 18 | button+12 | Ja
+menu_basic.png | basic_btninfo_no.png | 18 | button+12 | Nein
+menu_basic.png | basic_btninfo_saisikou.png | 18 | button | Nochmal
+
+menu_basic02.png | basic_sp_sentaku01.png | 15 | hint | Wahl
+menu_basic02.png | basic_sp_sentaku02.png | 15 | hint | Auswahl
+menu_basic02.png | basic_batsu_modoru.png | 14 | hint | Zurück
+menu_basic02.png | basic_batsu_sakujyo.png | 15 | hint | Lösch.
+menu_basic02.png | basic_batsu_cancel.png | 15 | hint | Abbruch
+menu_basic02.png | basic_shikaku_layoutc.png | 15 | hint | Layout
+menu_basic02.png | basic_shikaku_preview.png | 15 | hint | Vorschau
+menu_basic02.png | basic_shikaku_sityou.png | 15 | hint | Start
+menu_basic02.png | basic_shikaku_info.png | 15 | hint | Info
+menu_basic02.png | basic_shikaku_play.png | 15 | hint | Start
+menu_basic02.png | basic_shikaku_lrhanten.png | 14 | hint | L/R spiegeln
+menu_basic02.png | basic_shikaku_copy.png | 15 | hint | Kopie
+menu_basic02.png | basic_shikaku_zoomout.png | 15 | hint | Zoom -
+menu_basic02.png | basic_cursor_idou.png | 15 | hint | Kamera
+menu_basic02.png | basic_tri_savedel.png | 15 | hint | Löschen
+menu_basic02.png | basic_tri_musicplay.png | 15 | hint | Metronom
+menu_basic02.png | basic_tri_updownrev.png | 14 | hint | O/U spiegeln
+menu_basic02.png | basic_tri_zoomin.png | 15 | hint | Zoom +
+menu_basic02.png | basic_tri_paste.png | 15 | hint | Einfügen
+menu_basic02.png | basic_tri_pvappr.png | 15 | hint | PV
+menu_basic02.png | basic_tri_bgmappr.png | 15 | hint | BGM
+menu_basic02.png | basic_cross_pre.png | 15 | hint | Links/Rechts: Preset
+menu_basic02.png | basic_cross_4idou.png | 15 | hint | 4 Takte
+menu_basic02.png | basic_cross_bpm.png | 15 | hint | BPM
+menu_basic02.png | basic_cross_idou.png | 15 | hint | Bewegen
+menu_basic02.png | basic_cross_cameraidou.png | 15 | hint | Kamera
+menu_basic02.png | basic_cross_time.png | 15 | hint | Zeit
+menu_basic02.png | basic_cross_koumoku.png | 11 | hint | Punkt
+menu_basic02.png | basic_cross_rhythm.png | 15 | hint | Schlag
+menu_basic02.png | basic_cross_preset.png | 15 | hint | Preset
+menu_basic02.png | basic_randl_change.png | 15 | hint | Ändern
+menu_basic02.png | basic_4btn_target.png | 51 | hint | Rhythmus
+menu_basic02.png | basic_lr_targetidou.png | 31 | hint | Ziel bewegen
+menu_basic02.png | basic_lr_change.png | 31 | hint | Wechseln
+menu_basic02.png | basic_lr_rhythmidou.png | 31 | hint | Takt
+menu_basic02.png | basic_sele_test.png | 34 | hint | Testspiel
+menu_basic02.png | basic_sele_modoru.png | 33 | hint | Zurück
+menu_basic02.png | basic_start_kettei.png | 30 | hint | OK
+menu_basic02.png | basic_start_system.png | 30 | hint | System
+menu_basic02.png | basic_start_menu.png | 30 | hint | Menü
+menu_basic02.png | basic_cursor_kidou.png | 34 | hint | Pfad
+menu_basic02.png | basic_sp_kakunin.png | 15 | hint | OK
+menu_basic02.png | basic_lcro_centeridou.png | 32 | hint | Mitte
+
+menu_title_home.png | title_home_title.png | 36 | title | MENÜ
+menu_title_edit.png | title_edit_title.png | 36 | title | RHYTHMUS-EDITOR
+menu_title_gallery.p | title_gallery_title.png | 36 | title | GALERIE
+menu_title_myroom.pn | title_myroom_title.png | 36 | title | MIKUS ZIMMER
+menu_title_adhok.png | title_adhok_title.png | 36 | title | AD HOC
+
+edit_button.png | @314,115,60,11 | 0 | plate | ENDE
+edit_button.png | @391,133,74,14 | 0 | plate | ENDE
+# Edit mode. The stack of buttons on the left is one picture, so each row is named by position.
+edit_button.png | @411,162,89,24 | 0 | wide | Rhythmus
+edit_button.png | @411,190,89,24 | 0 | wide | Ziele
+edit_button.png | @411,218,89,24 | 0 | wide | Bühne
+edit_button.png | @2,228,89,24 | 0 | wide | Modell
+edit_button.png | @2,256,89,24 | 0 | wide | Mimik
+edit_button.png | @2,284,89,24 | 0 | wide | Bewegung
+edit_button.png | @2,312,89,24 | 0 | wide | Szene
+edit_button.png | @2,340,89,24 | 0 | wide | Kamera
+edit_button.png | @247,131,65,13 | 0 | plate | Vorschau
+edit_button.png | @254,152,70,13 | 0 | plate | Vorschau
+edit_button.png | @5,174,46,11 | 0 | plate | Takt 1
+edit_button.png | @256,174,46,11 | 0 | plate | Takt 200
+edit_button.png | @5,191,56,11 | 0 | plate | Takt 1
+edit_button.png | @344,191,56,11 | 0 | plate | Takt 200
+edit_button.png | @5,210,56,11 | 0 | plate | Takt 1
+edit_button.png | @346,210,58,11 | 0 | plate | Takt 200
+edit_button.png | @98,229,46,11 | 0 | plate | Takt 1
+edit_button.png | @266,229,46,11 | 0 | plate | Takt 200
+edit_button.png | cameramd_info_nowstart.png | 0 | plate | Start setzen
+edit_button.png | @308,172,90,14 | 0 | clear | Ende setzen
+edit_button.png | @93,284,211,24 | 0 | clear | Kreis drücken, um die
+edit_button.png | @93,308,211,24 | 0 | clear | Startposition zu setzen.
+edit_button.png | @93,332,211,24 | 0 | clear | Kreis drücken, um die
+edit_button.png | @93,356,211,24 | 0 | clear | Endposition zu setzen.
+edit.png | @305,169,49,14 | 3 | plate | Kapazität
+edit.png | @305,207,49,14 | 3 | plate | Last
+
+# The results screen.
+menu_result.png | @38,2,70,16 | 0 | plate | ERGEBNIS
+menu_result.png | @375,54,53,13 | 0 | plate | Punkt
+menu_result.png | @444,54,32,13 | 0 | plate | Wahl
+
+# The card before each song: the words every card has, in the same place on all of them.
+pv_start_* | @0,359,96,18 | 0 | clear | Highscore
+pv_start_* | @0,386,96,18 | 0 | clear | Max. Kombo
+pv_start_* | @0,414,96,18 | 0 | clear | Geschafft
+pv_start_* | @96,368,128,16 | 0 | clear | PV ansehen
+pv_start_* | @96,384,128,16 | 0 | clear | Edit spielen
+pv_start_* | @96,416,50,16 | 0 | clear | Taste
+pv_start_* | @96,432,50,16 | 0 | clear | Taste
+
+# The question on the BPM screen, lit and not.
+edit_rhythm.png | @147,372,88,32 | 0 | plate | Was ist BPM?
+edit_rhythm.png | @147,418,88,30 | 0 | plate | Was ist BPM?
+
+# The name of the song and who made it, on each card before a song.
+pv_start_01.png | @0,272,480,34 | 0 | clearbig | Koi wa Sensou
+pv_start_01.png | @0,306,480,36 | 0 | clear | Text & Musik: ryo
+pv_start_02.png | @0,272,480,34 | 0 | clearbig | World Is Mine
+pv_start_02.png | @0,306,480,36 | 0 | clear | Text & Musik: ryo
+pv_start_03.png | @0,272,480,34 | 0 | clearbig | Sono Ichibyou Slow Motion
+pv_start_03.png | @0,306,480,36 | 0 | clear | Text & Musik: ryo
+pv_start_04.png | @0,272,480,34 | 0 | clearbig | Hinekuremono
+pv_start_04.png | @0,306,480,36 | 0 | clear | Text & Musik: ryo
+pv_start_05.png | @0,272,480,34 | 0 | clearbig | Melt
+pv_start_05.png | @0,306,480,36 | 0 | clear | Text & Musik: ryo
+pv_start_06.png | @0,306,480,36 | 0 | clear | Text & Musik: kz
+pv_start_07.png | @0,272,480,34 | 0 | clearbig | Strobe Nights
+pv_start_07.png | @0,306,480,18 | 0 | clear | Musik & Arr.: kz
+pv_start_07.png | @0,324,480,18 | 0 | clear | Text: yae
+pv_start_08.png | @0,306,480,36 | 0 | clear | Text & Musik: kz
+pv_start_09.png | @0,306,480,36 | 0 | clear | Text & Musik: kz
+pv_start_10.png | @0,306,480,36 | 0 | clear | Text & Musik: kz
+pv_start_11.png | @0,272,480,34 | 0 | clearbig | Ame nochi Sweet*Drops
+pv_start_11.png | @0,306,480,36 | 0 | clear | Text & Musik: OSTER project
+pv_start_12.png | @0,272,480,34 | 0 | clearbig | Marginal
+pv_start_12.png | @0,306,480,36 | 0 | clear | Text & Musik: OSTER project
+pv_start_13.png | @0,272,480,34 | 0 | clearbig | Fukigen Waltz
+pv_start_13.png | @0,306,480,36 | 0 | clear | Text & Musik: OSTER project
+pv_start_14.png | @0,272,480,34 | 0 | clearbig | Miracle Paint
+pv_start_14.png | @0,306,480,36 | 0 | clear | Text & Musik: OSTER project
+pv_start_15.png | @0,272,480,34 | 0 | clearbig | Dreaming Leaf -Yumemiru Kotonoha-
+pv_start_15.png | @0,306,480,36 | 0 | clear | Text & Musik: OSTER project
+pv_start_16.png | @0,272,480,34 | 0 | clearbig | Koisuru VOC@LOID
+pv_start_16.png | @0,306,480,36 | 0 | clear | Text & Musik: OSTER project
+pv_start_17.png | @0,272,480,34 | 0 | clearbig | Kouya to Mori to Mahou no Uta
+pv_start_17.png | @0,306,480,36 | 0 | clear | Text & Musik: Travolta
+pv_start_18.png | @0,272,480,34 | 0 | clearbig | Inochi no Uta
+pv_start_18.png | @0,306,480,36 | 0 | clear | Text & Musik: Travolta
+pv_start_19.png | @0,272,480,34 | 0 | clearbig | Hato
+pv_start_19.png | @0,306,480,36 | 0 | clear | Text & Musik: Hatano P
+pv_start_20.png | @0,306,480,18 | 0 | clear | Musik & Arr.: iroha(sasaki)
+pv_start_20.png | @0,324,480,18 | 0 | clear | Text: Hatsuka+iroha(sasaki)
+pv_start_21.png | @0,272,480,34 | 0 | clearbig | Mikumiku-kin ni Gochuui♪
+pv_start_21.png | @0,306,480,36 | 0 | clear | Text & Musik: Hayaya
+pv_start_22.png | @0,306,480,18 | 0 | clear | Text: Hata Aki   Musik & Arr.: Kouzaki Satoru
+pv_start_22.png | @0,324,480,18 | 0 | clear | Manipulator: Otomania
+pv_start_23.png | @0,306,480,18 | 0 | clear | Text: Hata Aki   Musik & Arr.: Kouzaki Satoru
+pv_start_23.png | @0,324,480,18 | 0 | clear | Manipulator: Deadball P
+pv_start_24.png | @0,272,480,34 | 0 | clearbig | Birodo Arabesque
+pv_start_24.png | @0,306,480,18 | 0 | clear | Text & Musik: Hata Aki   Arr.: Namiki Kouichi
+pv_start_24.png | @0,324,480,18 | 0 | clear | Manipulator: Yasuo
+pv_start_25.png | @0,272,480,34 | 0 | clearbig | Love List Koushinchuu?
+pv_start_25.png | @0,306,480,18 | 0 | clear | Text & Musik: Hata Aki   Arr.: Namiki Kouichi
+pv_start_25.png | @0,324,480,18 | 0 | clear | Manipulator: Otomania
+pv_start_26.png | @0,272,480,34 | 0 | clearbig | Sakura no Ame - standard edit -
+pv_start_26.png | @0,306,480,18 | 0 | clear | Text & Musik: Mori Haruyoshi
+pv_start_26.png | @0,324,480,18 | 0 | clear | Arr.: absorb
+pv_start_27.png | @0,306,480,18 | 0 | clear | Finnisches Volkslied
+pv_start_27.png | @0,324,480,18 | 0 | clear | Arr.: Otomania
+pv_start_28.png | @0,272,480,34 | 0 | clearbig | Miku Miku ni Shite Ageru♪ [Shite Yan yo]
+pv_start_28.png | @0,306,480,36 | 0 | clear | Text & Musik: ika_mo
+pv_start_29.png | @0,272,480,34 | 0 | clearbig | Kin no Seiya Soosetsu ni Kuchite
+pv_start_29.png | @0,306,480,36 | 0 | clear | Text & Musik: Deadball P
+pv_start_30.png | @0,272,480,34 | 0 | clearbig | Electric Angel
+pv_start_30.png | @0,306,480,36 | 0 | clear | Text & Musik: Yasuo
+pv_start_31.png | @0,272,480,34 | 0 | clearbig | Anata no Utahime
+pv_start_31.png | @0,306,480,36 | 0 | clear | Text & Musik: azuma
+pv_start_32.png | @0,272,480,34 | 0 | clearbig | Hatsune Miku no Shoushitsu
+pv_start_32.png | @0,306,480,36 | 0 | clear | Text & Musik: cosMo@Bousou-P
+pv_start_33.png | @0,272,480,34 | 0 | clearbig | Kouya to Mori to Mahou no Uta (Rin ver.)
+pv_start_33.png | @0,306,480,36 | 0 | clear | Text & Musik: Travolta
+pv_start_34.png | @0,272,480,34 | 0 | clearbig | Inochi no Uta (Rin ver.)
+pv_start_34.png | @0,306,480,36 | 0 | clear | Text & Musik: Travolta
+pv_start_35.png | @0,272,480,34 | 0 | clearbig | Kouya to Mori to Mahou no Uta (Len ver.)
+pv_start_35.png | @0,306,480,36 | 0 | clear | Text & Musik: Travolta
+pv_start_36.png | @0,272,480,34 | 0 | clearbig | Inochi no Uta (Len ver.)
+pv_start_36.png | @0,306,480,36 | 0 | clear | Text & Musik: Travolta
+pv_start_06.png | @0,272,480,34 | 0 | clearbig | Far Away
+pv_start_08.png | @0,272,480,34 | 0 | clearbig | Star Story
+pv_start_09.png | @0,272,480,34 | 0 | clearbig | Last Night, Good Night
+pv_start_10.png | @0,272,480,34 | 0 | clearbig | Packaged
+pv_start_20.png | @0,272,480,34 | 0 | clearbig | moon
+pv_start_22.png | @0,272,480,34 | 0 | clearbig | The secret garden
+pv_start_23.png | @0,272,480,34 | 0 | clearbig | Dear cocoa girls
+pv_start_27.png | @0,272,480,34 | 0 | clearbig | Ievan Polkka
