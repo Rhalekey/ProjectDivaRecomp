@@ -97,5 +97,5 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 - Ad hoc play does not work, and system dialogs and the save slot list are not shown.
 - The frame rate cannot be chosen: the game's speed follows its refresh rate, so it stays at 60. Other rates would need interpolation or changes to the game.
 - The original art outside the redrawn pieces is still at the game's own resolution.
-- Some frame drops and sound gaps remain in transitions, such as at the end of a song.
+- Moving between screens can drop a few frames, and now and then cuts the sound for a moment. Songs themselves hold about 60 fps.
 - Japanese versions of the vector pieces do not exist yet, so Japanese uses the game's own.
