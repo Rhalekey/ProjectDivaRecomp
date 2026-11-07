@@ -65,7 +65,7 @@ Buttons go by position, not by what is printed on them. The bottom button is alw
 
 ## 5. Options
 
-- **Options**, in the main menu: volume, language, song names and lyrics in romaji, the confirm button, and changing keys and buttons.
+- **Options**, in the main menu: volume, language, song names and lyrics in romaji, the confirm button, and changing keys and buttons. Each button can have a second key, which helps with fast repeated notes.
 - **Graphics**, in the main menu: display mode, resolution, smoothing, image shape and the frame rate counter.
 
 The opening movie does not play in this version, and ad hoc play does not work. This is expected.

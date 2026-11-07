@@ -11,6 +11,7 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 - OK, Back and Retry are centred on their buttons, with their signs.
 - Test switches moved to a developer's own `dev.ini`, and are all off without it.
 - The test bot is gone, as there is nothing left for it to collect.
+- Each button can have a second key, to alternate on fast repeated notes.
 
 ## 2026-11-06: first public version
 

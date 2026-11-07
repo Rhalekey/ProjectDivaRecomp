@@ -124,6 +124,7 @@ void controls_start(const char *disc) {
     g_disc = disc;
     for (int i = 0; i < PSP_BIND_COUNT; i++) {
         if (g_options.keys[i] >= 0) psp_window_set_key(i, g_options.keys[i]);
+        if (g_options.keys2[i] >= 0) psp_window_set_key2(i, g_options.keys2[i]);
         if (g_options.pads[i] >= 0) psp_window_set_pad(i, (uint32_t)g_options.pads[i]);
     }
     controls_apply();
@@ -222,10 +223,12 @@ static const wchar_t *const BUTTON_NAME[UI_COUNT][PSP_BIND_COUNT] = {
     [UI_GERMAN] = {L"Hoch", L"Rechts", L"Runter", L"Links", L"Kreuz \x00d7", L"Kreis \x25cb", L"Quadrat \x25a1", L"Dreieck \x25b3", L"L", L"R", L"Start", L"Select"},
 };
 static const wchar_t *const WORD_KEYBOARD[UI_COUNT] = {L"Keyboard", L"\x30ad\x30fc\x30dc\x30fc\x30c9", L"Tastatur"};
+static const wchar_t *const WORD_KEYBOARD2[UI_COUNT] = {L"Second key", L"\x7b2c\xff12\x30ad\x30fc", L"Zweite Taste"};
 static const wchar_t *const WORD_CONTROLLER[UI_COUNT] = {L"Controller", L"\x30b3\x30f3\x30c8\x30ed\x30fc\x30e9\x30fc", L"Controller"};
 static const wchar_t *const WORD_RESET[UI_COUNT] = {L"Back to how they were", L"\x521d\x671f\x8a2d\x5b9a\x306b\x623b\x3059", L"Zur\x00fc\x0063ksetzen"};
 static const wchar_t *const WORD_DONE[UI_COUNT] = {L"Done", L"\x7d42\x4e86", L"Fertig"};
 static const wchar_t *const WORD_PRESS[UI_COUNT] = {L"Press the new one, or wait to keep it as it is", L"\x65b0\x3057\x3044\x30dc\x30bf\x30f3\x3092\x62bc\x3057\x3066\x304f\x3060\x3055\x3044", L"Neue Taste dr\x00fc\x0063ken, oder warten"};
+static const wchar_t *const WORD_PRESS2[UI_COUNT] = {L"Press the new one, or the same one to take it off", L"\x65b0\x3057\x3044\x30ad\x30fc\x3092\x62bc\x3057\x3066\x304f\x3060\x3055\x3044\xff08\x540c\x3058\x30ad\x30fc\x3067\x89e3\x9664\xff09", L"Neue Taste dr\x00fc\x0063ken, gleiche Taste entfernt sie"};
 static const wchar_t *const WORD_HELP[UI_COUNT] = {L"Arrows or d-pad: move    Enter, A or B: change", L"\x65b9\x5411\x30ad\x30fc\xff1a\x79fb\x52d5    Enter\x30fb\x30dc\x30bf\x30f3\xff1a\x5909\x66f4", L"Pfeile oder Steuerkreuz: bewegen    Enter, A oder B: \x00e4ndern"};
 
 /* Where the buttons are, not what is printed on them, so that it holds for every controller. */
@@ -274,13 +277,17 @@ static void pad_name(uint32_t mask, wchar_t *out, size_t size) {
 #define LIST_ROW_H 22
 #define LIST_ROW_GAP 2
 #define NAME_X 16
-#define KEY_X 210
-#define PAD_X 480
+#define KEY_X 190
+#define KEY2_X 340
+#define PAD_X 490
+/* What can be changed on a row. */
+enum { COLUMN_KEY, COLUMN_KEY2, COLUMN_PAD, COLUMN_COUNT };
 
 static void draw_buttons(int row, int column, int waiting, int ui) {
     kit_clear();
-    kit_text(LIST_X + KEY_X, KIT_TOP + 8, 20, 1, column == 0 ? 0x6EFAB9 : 0xC3D7E4, WORD_KEYBOARD[ui], 0);
-    kit_text(LIST_X + PAD_X, KIT_TOP + 8, 20, 1, column == 1 ? 0x6EFAB9 : 0xC3D7E4, WORD_CONTROLLER[ui], 0);
+    kit_text(LIST_X + KEY_X, KIT_TOP + 8, 20, 1, column == COLUMN_KEY ? 0x6EFAB9 : 0xC3D7E4, WORD_KEYBOARD[ui], 0);
+    kit_text(LIST_X + KEY2_X, KIT_TOP + 8, 20, 1, column == COLUMN_KEY2 ? 0x6EFAB9 : 0xC3D7E4, WORD_KEYBOARD2[ui], 0);
+    kit_text(LIST_X + PAD_X, KIT_TOP + 8, 20, 1, column == COLUMN_PAD ? 0x6EFAB9 : 0xC3D7E4, WORD_CONTROLLER[ui], 0);
     for (int i = 0; i < ROWS_TOTAL; i++) {
         const int y = LIST_TOP + i * (LIST_ROW_H + LIST_ROW_GAP);
         kit_row(LIST_X, y, LIST_W, LIST_ROW_H, 6, i == row);
@@ -291,21 +298,52 @@ static void draw_buttons(int row, int column, int waiting, int ui) {
         wchar_t name[64];
         kit_text(LIST_X + NAME_X, y + 2, 17, 1, 0xF5F8FC, BUTTON_NAME[ui][i], 0);
         key_name(psp_window_get_key(i), name, 64);
-        kit_text(LIST_X + KEY_X, y + 2, 17, 0, i == row && column == 0 ? 0xFFFFFF : 0xC3D7E4, name, 0);
+        kit_text(LIST_X + KEY_X, y + 2, 17, 0, i == row && column == COLUMN_KEY ? 0xFFFFFF : 0xC3D7E4, name, 0);
+        key_name(psp_window_get_key2(i), name, 64);
+        kit_text(LIST_X + KEY2_X, y + 2, 17, 0, i == row && column == COLUMN_KEY2 ? 0xFFFFFF : 0xC3D7E4, name, 0);
         pad_name(psp_window_get_pad(i), name, 64);
-        kit_text(LIST_X + PAD_X, y + 2, 17, 0, i == row && column == 1 ? 0xFFFFFF : 0xC3D7E4, name, 0);
+        kit_text(LIST_X + PAD_X, y + 2, 17, 0, i == row && column == COLUMN_PAD ? 0xFFFFFF : 0xC3D7E4, name, 0);
     }
-    kit_text(KIT_CANVAS_W / 2, KIT_BOTTOM + 12, 20, waiting, waiting ? 0x6EFAB9 : 0xC3D7E4, waiting ? WORD_PRESS[ui] : WORD_HELP[ui], 1);
+    kit_text(KIT_CANVAS_W / 2, KIT_BOTTOM + 12, 20, waiting, waiting ? 0x6EFAB9 : 0xC3D7E4, !waiting ? WORD_HELP[ui] : column == COLUMN_KEY2 ? WORD_PRESS2[ui] : WORD_PRESS[ui], 1);
 }
 
-/* The other button that had this one gets what the changed button had, so that no button is
- * ever left without one and none does two things. */
-static void set_key(int button, int vk) {
-    const int had = psp_window_get_key(button);
-    for (int i = 0; i < PSP_BIND_COUNT; i++) {
-        if (i != button && psp_window_get_key(i) == vk) psp_window_set_key(i, had);
+static int key_of(int button, int second) {
+    return second ? psp_window_get_key2(button) : psp_window_get_key(button);
+}
+
+static void put_key(int button, int second, int vk) {
+    if (second) psp_window_set_key2(button, vk);
+    else psp_window_set_key(button, vk);
+}
+
+/* The other button that had this key gets what it replaced, so that no key does two things. If it
+ * replaced nothing, that button goes on with the key it has left, and if it has no other, the key
+ * stays where it is, so that no button is ever left without one. The same second key again takes
+ * it off. */
+static void set_key(int button, int second, int vk) {
+    const int had = key_of(button, second);
+    if (vk == had) {
+        if (second) put_key(button, 1, 0);
+        return;
     }
-    psp_window_set_key(button, vk);
+    if (vk == key_of(button, !second)) return;
+    for (int i = 0; i < PSP_BIND_COUNT; i++) {
+        if (i == button) continue;
+        for (int slot = 0; slot < 2; slot++) {
+            if (key_of(i, slot) != vk) continue;
+            if (had) {
+                put_key(i, slot, had);
+            } else if (slot) {
+                put_key(i, 1, 0);
+            } else if (key_of(i, 1)) {
+                put_key(i, 0, key_of(i, 1));
+                put_key(i, 1, 0);
+            } else {
+                return;
+            }
+        }
+    }
+    put_key(button, second, vk);
 }
 
 static void set_pad(int button, int id) {
@@ -326,11 +364,11 @@ static void capture(int button, int column) {
     const ULONGLONG until = GetTickCount64() + CAPTURE_MS;
     while (GetTickCount64() < until) {
         kit_frame();
-        if (column == 0) {
+        if (column != COLUMN_PAD) {
             /* Past the mouse buttons, and without Shift and such, which have a left and a right. */
             for (int vk = 0x08; vk <= 0xFE; vk++) {
                 if (vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU || !key_down(vk)) continue;
-                if (vk != VK_ESCAPE) set_key(button, vk);
+                if (vk != VK_ESCAPE) set_key(button, column == COLUMN_KEY2, vk);
                 return;
             }
         } else {
@@ -350,6 +388,7 @@ static void capture(int button, int column) {
 static void remember_buttons(void) {
     for (int i = 0; i < PSP_BIND_COUNT; i++) {
         g_options.keys[i] = psp_window_get_key(i);
+        g_options.keys2[i] = psp_window_get_key2(i);
         g_options.pads[i] = (int)psp_window_get_pad(i);
     }
 }
@@ -366,7 +405,8 @@ void controls_change_buttons(void) {
         int changed = 1;
         if (in.up && !was.up) row = (row + ROWS_TOTAL - 1) % ROWS_TOTAL;
         else if (in.down && !was.down) row = (row + 1) % ROWS_TOTAL;
-        else if ((in.left && !was.left) || (in.right && !was.right)) column = !column;
+        else if (in.left && !was.left) column = (column + COLUMN_COUNT - 1) % COLUMN_COUNT;
+        else if (in.right && !was.right) column = (column + 1) % COLUMN_COUNT;
         else changed = 0;
         const int ok = in.ok && !was.ok, back = in.back && !was.back;
         was = in;

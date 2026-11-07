@@ -15,6 +15,7 @@ diva_options g_options = {
     {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
     {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
     0, 0, -1, 2,
+    {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
 };
 
 static void folder(const char *data_dir, char *out, size_t cap) {
@@ -54,6 +55,8 @@ int options_load(const char *data_dir) {
             g_options.confirm_cross = number != 0;
         } else if (sscanf(line, "key %d = %d", &button, &number) == 2 && button >= 0 && button < PSP_BIND_COUNT) {
             g_options.keys[button] = number;
+        } else if (sscanf(line, "key2 %d = %d", &button, &number) == 2 && button >= 0 && button < PSP_BIND_COUNT) {
+            g_options.keys2[button] = number;
         } else if (sscanf(line, "pad %d = %d", &button, &number) == 2 && button >= 0 && button < PSP_BIND_COUNT) {
             g_options.pads[button] = number;
         }
@@ -87,6 +90,7 @@ void options_save(const char *data_dir) {
     if (g_options.confirm_cross >= 0) fprintf(f, "confirm_cross = %d\n", g_options.confirm_cross);
     for (int i = 0; i < PSP_BIND_COUNT; i++) {
         if (g_options.keys[i] >= 0) fprintf(f, "key %d = %d\n", i, g_options.keys[i]);
+        if (g_options.keys2[i] >= 0) fprintf(f, "key2 %d = %d\n", i, g_options.keys2[i]);
         if (g_options.pads[i] >= 0) fprintf(f, "pad %d = %d\n", i, g_options.pads[i]);
     }
     fclose(f);
