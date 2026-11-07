@@ -4,10 +4,13 @@
  * channels. Each channel gets a queue here, and a thread adds the queues together
  * and feeds them to the sound card with waveOut, which needs no extra libraries.
  *
- * Latency is the point to watch in a rhythm game. The buffers below add about
- * 46 ms and the preroll about 35 ms more, and a queue that drifts ahead of the
- * card is trimmed rather than left to delay everything after it. A queue that runs
- * dry waits for its preroll again: one longer gap sounds better than many short. */
+ * Latency is the point to watch in a rhythm game. The buffers below add about 46 ms.
+ * A queue grows by itself: the card's clock is not the computer's, so the game hands
+ * over a little more than is played, and whatever time a queue spends empty stays
+ * added to it for good. One measured run reached 186 ms in 14 minutes. So a queue past
+ * QUEUE_TARGET plays one frame more in each buffer, a change of 0.2% that cannot be
+ * heard, and one far past it is trimmed at once. A queue that runs dry waits for its
+ * preroll again: one longer gap sounds better than many short. */
 
 #include "audio_out.h"
 
@@ -20,9 +23,10 @@
 #define RATE          44100
 #define SLOTS         16
 #define QUEUE_FRAMES  44100
-#define MAX_QUEUED    8192     /* past this a queue has drifted: trim it */
-#define KEEP_QUEUED   2048
-#define PREROLL       1536     /* hold a queue back until it has this much */
+#define MAX_QUEUED    4096     /* past this a queue has drifted too far: trim it */
+#define KEEP_QUEUED   1536
+#define QUEUE_TARGET  1024     /* past this a queue is played off a little faster */
+#define PREROLL       1024     /* hold a queue back until it has this much */
 #define BUFFERS       4
 #define BUFFER_FRAMES 512
 
@@ -82,12 +86,16 @@ static void mix(int16_t *out, uint32_t frames) {
             short_of_data = 1;
             q->primed = 0;
         }
+        /* The `used` frames go smoothly into the `take` to play, and a frame more when it is long. */
+        const uint32_t used = take == frames && q->count > QUEUE_TARGET ? frames + 1 : take;
         for (uint32_t i = 0; i < take; i++) {
-            const uint32_t at = (q->head + i) % QUEUE_FRAMES;
-            sum[i * 2] += q->pcm[at * 2];
-            sum[i * 2 + 1] += q->pcm[at * 2 + 1];
+            const uint32_t place = i * (used - 1) * 256 / (take > 1 ? take - 1 : 1);
+            const uint32_t next = place >> 8, part = place & 255;
+            const uint32_t at = (q->head + next) % QUEUE_FRAMES, after = (at + (next + 1 < used)) % QUEUE_FRAMES;
+            sum[i * 2] += (q->pcm[at * 2] * (int32_t)(256 - part) + q->pcm[after * 2] * (int32_t)part) >> 8;
+            sum[i * 2 + 1] += (q->pcm[at * 2 + 1] * (int32_t)(256 - part) + q->pcm[after * 2 + 1] * (int32_t)part) >> 8;
         }
-        queue_drop(q, take);
+        queue_drop(q, used);
     }
     LeaveCriticalSection(&g_lock);
 
