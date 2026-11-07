@@ -327,6 +327,7 @@ int main(int argc, char **argv) {
             psp_render_gl_set_wide_view(g_options.wide_view);
         }
         psp_render_gl_set_present_filter(g_settings.present_linear);
+        if (g_settings.extras) psp_render_gl_set_background_dim(g_options.background_dim);
         /* DIVA_SAVE_TEXTURES saves what is still at the game's own resolution. */
         if (getenv("DIVA_SAVE_TEXTURES")) {
             char dump_dir[1100];

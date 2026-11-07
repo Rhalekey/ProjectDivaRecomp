@@ -137,6 +137,8 @@ int controls_hook(uint32_t addr) {
     const int was_playing = now - g_song_seen < SONG_GONE_MS;
     const int playing = psp_read8(song + SONG_ACTIVE) && !psp_read8(song + SONG_OVER) && !psp_read8(song + SONG_PAUSED) &&
                         !psp_read8(song + SONG_PAUSED_TOO) && !psp_read8(song + SONG_LEAVING) && !psp_read8(song + SONG_ASKING);
+    /* Paused as well, so that the picture does not jump. Not the fade out or what follows it. */
+    if (psp_read8(song + SONG_ACTIVE) && !psp_read8(song + SONG_OVER) && !psp_read8(song + SONG_LEAVING)) psp_render_gl_song_frame();
     /* Only the changes, to see in the log that this is what it is thought to be. */
     if (playing != was_playing) fprintf(stderr, "controls: %s\n", playing ? "a song is playing" : "the song stopped");
     /* A pause menu or the results get their confirm button on the very frame they begin. */

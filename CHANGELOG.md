@@ -12,6 +12,8 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 - Test switches moved to a developer's own `dev.ini`, and are all off without it.
 - The test bot is gone, as there is nothing left for it to collect.
 - Each button can have a second key, to alternate on fast repeated notes.
+- **Background dim** in Options darkens a song's background from 1% to 100%, leaving the notes and HUD as they are, on 3D stages and 2D backgrounds alike.
+- Fixed a white fade when coming back to the main menu from Graphics.
 
 ## 2026-11-06: first public version
 

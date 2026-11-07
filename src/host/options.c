@@ -16,6 +16,7 @@ diva_options g_options = {
     {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
     0, 0, -1, 2,
     {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+    0,
 };
 
 static void folder(const char *data_dir, char *out, size_t cap) {
@@ -51,6 +52,8 @@ int options_load(const char *data_dir) {
             g_options.smoothing = number != 0;
         } else if (sscanf(line, "wide_view = %d", &number) == 1) {
             if (number >= 0 && number <= 2) g_options.wide_view = number;
+        } else if (sscanf(line, "background_dim = %d", &number) == 1) {
+            if (number >= 0 && number <= 100) g_options.background_dim = number;
         } else if (sscanf(line, "confirm_cross = %d", &number) == 1) {
             g_options.confirm_cross = number != 0;
         } else if (sscanf(line, "key %d = %d", &button, &number) == 2 && button >= 0 && button < PSP_BIND_COUNT) {
@@ -83,7 +86,7 @@ void options_save(const char *data_dir) {
     }
     fprintf(f, "language = %s\nsong_names = %s\nlyrics = %s\nshow_fps = %d\n", g_options.language, g_options.song_names,
             g_options.lyrics, g_options.show_fps);
-    fprintf(f, "display_mode = %d\nwide_view = %d\n", g_options.display_mode, g_options.wide_view);
+    fprintf(f, "display_mode = %d\nwide_view = %d\nbackground_dim = %d\n", g_options.display_mode, g_options.wide_view, g_options.background_dim);
     if (g_options.render_scale) fprintf(f, "render_scale = %d\n", g_options.render_scale);
     if (g_options.smoothing >= 0) fprintf(f, "smoothing = %d\n", g_options.smoothing);
     if (g_options.ask_language >= 0) fprintf(f, "ask_language = %d\n", g_options.ask_language);

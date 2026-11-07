@@ -70,7 +70,8 @@
 
 enum { B_RIGHT = 0x0020, B_LEFT = 0x0080 };
 
-enum { ROW_LANGUAGE = 2, ROW_SONGS, ROW_LYRICS, ROW_ASK, ROW_CONFIRM, ROW_BUTTONS, ROW_COUNT };
+/* The game's own are its two volumes. */
+enum { ROW_DIM = 2, ROW_LANGUAGE, ROW_SONGS, ROW_LYRICS, ROW_ASK, ROW_CONFIRM, ROW_BUTTONS, ROW_COUNT };
 enum { G_DISPLAY, G_RESOLUTION, G_SMOOTHING, G_SHAPE, G_FPS, G_COUNT };
 
 #define LABEL_WIDTH 22       /* what the game's "%-20s%2d" comes to */
@@ -84,6 +85,7 @@ typedef struct {
 /* What the game's font reads: Shift-JIS, and German letters where translation.c puts them. */
 static const row_text ROWS[UI_COUNT][ROW_COUNT] = {
     [UI_ENGLISH] = {
+        [ROW_DIM] = {"Background dim", "Darkens the background", "during songs."},
         [ROW_LANGUAGE] = {"Language", "Change the language.", ""},
         [ROW_SONGS] = {"Song names", "Show song names in", "Japanese or romaji."},
         [ROW_LYRICS] = {"Lyrics", "Show lyrics in", "Japanese or romaji."},
@@ -92,6 +94,7 @@ static const row_text ROWS[UI_COUNT][ROW_COUNT] = {
         [ROW_BUTTONS] = {"Buttons", "Change the keyboard", "and controller buttons."},
     },
     [UI_JAPANESE] = {
+        [ROW_DIM] = {"\x94w\x8ci\x82\xcc\x88\xc3\x82\xb3", "\x8b\xc8\x82\xcc\x8a\xd4\x81" "A\x94w\x8ci\x82\xf0", "\x88\xc3\x82\xad\x82\xb5\x82\xdc\x82\xb7\x81" "B"},
         [ROW_LANGUAGE] = {"\x8c\xbe\x8c\xea", "\x8c\xbe\x8c\xea\x82\xf0\x95\xcf\x8d\x58\x82\xb5\x82\xdc\x82\xb7", ""},
         [ROW_SONGS] = {"\x8b\xc8\x96\xbc", "\x8b\xc8\x96\xbc\x82\xcc\x95\x5c\x8b\x4c\x82\xf0\x95\xcf\x8d\x58\x82\xb5\x82\xdc\x82\xb7", ""},
         [ROW_LYRICS] = {"\x89\xcc\x8e\x8c", "\x89\xcc\x8e\x8c\x82\xcc\x95\x5c\x8b\x4c\x82\xf0\x95\xcf\x8d\x58\x82\xb5\x82\xdc\x82\xb7", ""},
@@ -100,6 +103,7 @@ static const row_text ROWS[UI_COUNT][ROW_COUNT] = {
         [ROW_BUTTONS] = {"\x83\x7b\x83\x5e\x83\x93\x90\xdd\x92\xe8", "\x83\x4c\x81\x5b\x83\x7b\x81\x5b\x83\x68\x82\xc6\x83\x52\x83\x93\x83\x67\x83\x8d\x81\x5b\x83\x89\x81\x5b", "\x82\xcc\x83\x7b\x83\x5e\x83\x93\x82\xf0\x95\xcf\x8d\x58\x82\xb5\x82\xdc\x82\xb7\x81\x42"},
     },
     [UI_GERMAN] = {
+        [ROW_DIM] = {"Abdunkeln", "Hintergrund im Lied", "abdunkeln."},
         [ROW_LANGUAGE] = {"Sprache", "Sprache \xa1" "ndern.", ""},
         [ROW_SONGS] = {"Liednamen", "Liednamen auf Japanisch", "oder in Romaji."},
         [ROW_LYRICS] = {"Liedtext", "Liedtext auf Japanisch", "oder in Romaji."},
@@ -197,6 +201,12 @@ static void apply_scripts(void) {
 
 static const char *value_of(int row) {
     switch (row) {
+    case ROW_DIM: {
+        static char percent[8];
+        if (!g_options.background_dim) return WORD_OFF[g_ui];
+        snprintf(percent, sizeof percent, "%d%%", g_options.background_dim);
+        return percent;
+    }
     case ROW_SONGS:
         return script_name(g_options.song_names);
     case ROW_LYRICS:
@@ -215,9 +225,23 @@ static const char *value_of(int row) {
     }
 }
 
+/* The value goes between the arrows in the row's bar, which leave it 49 pixels. Spaces are all
+ * that can move it, so it comes as near the middle as they allow. */
+static void write_between_arrows(uint32_t to, const char *name, const char *value) {
+    char text[LABEL_SIZE];
+    const float gap = ARROWS_MIDDLE - letters_width_small(value) / 2.0f - letters_width_small(name);
+    const int spaces = (int)(gap / LETTERS_SMALL_SPACE + 0.5f);
+    snprintf(text, sizeof text, "%s%*s%s", name, spaces > 1 ? spaces : 1, "", value);
+    write_string(to, text);
+}
+
 static void write_label(int row) {
     char text[LABEL_SIZE];
     const char *value = value_of(row);
+    if (row == ROW_DIM) {
+        write_between_arrows(g_labels[row], ROWS[g_ui][row].name, value);
+        return;
+    }
     snprintf(text, sizeof text, "%-*s%s", LABEL_WIDTH - (int)strlen(value), ROWS[g_ui][row].name, value);
     write_string(g_labels[row], text);
 }
@@ -244,16 +268,9 @@ static const char *graphics_value_of(int row) {
     }
 }
 
-/* The value goes between the arrows in the row's bar, which leave it 49 pixels. Spaces are all
- * that can move it, so it comes as near the middle as they allow. */
 static void write_graphics_label(int row) {
     char text[LABEL_SIZE];
-    const char *value = graphics_value_of(row);
-    const char *name = GRAPHICS_ROWS[g_ui][row].name;
-    const float gap = ARROWS_MIDDLE - letters_width_small(value) / 2.0f - letters_width_small(name);
-    const int spaces = (int)(gap / LETTERS_SMALL_SPACE + 0.5f);
-    snprintf(text, sizeof text, "%s%*s%s", name, spaces > 1 ? spaces : 1, "", value);
-    write_string(g_graphics_labels[row], text);
+    write_between_arrows(g_graphics_labels[row], GRAPHICS_ROWS[g_ui][row].name, graphics_value_of(row));
     if (row != G_RESOLUTION) return;
     snprintf(text, sizeof text, "%dx%d", 480 * g_settings.render_scale, 272 * g_settings.render_scale);
     for (int ui = 0; ui < UI_COUNT; ui++) write_string(g_graphics_lines[ui][row][1], text);
@@ -261,7 +278,7 @@ static void write_graphics_label(int row) {
 
 static void write_all_labels(void) {
     if (!g_labels[ROW_COUNT - 1] || !g_graphics_labels[0]) return;  /* no memory for them */
-    for (int row = ROW_LANGUAGE; row < ROW_COUNT; row++) write_label(row);
+    for (int row = ROW_DIM; row < ROW_COUNT; row++) write_label(row);
     for (int row = 0; row < G_COUNT; row++) write_graphics_label(row);
 }
 
@@ -368,6 +385,34 @@ static void change_graphics(int row, int step) {
     play_sound();
 }
 
+/* Goes by ones, and on by itself with the button held, as far as each end. It is saved when the
+ * button comes up, not at each step. */
+#define DIM_MOST 100
+#define DIM_HOLD_FRAMES 20
+#define DIM_REPEAT_FRAMES 2
+static int g_dim_unsaved;
+
+static void step_dim(int step) {
+    const int value = g_options.background_dim + step;
+    if (value < 0 || value > DIM_MOST) return;
+    g_options.background_dim = value;
+    g_dim_unsaved = 1;
+    psp_render_gl_set_background_dim(value);
+    write_label(ROW_DIM);
+}
+
+static void update_dim(uint32_t buttons, uint32_t pressed) {
+    static int held_frames;
+    const uint32_t held = buttons & (B_LEFT | B_RIGHT);
+    if (pressed & (B_LEFT | B_RIGHT)) {
+        held_frames = 0;
+        step_dim(pressed & B_LEFT ? -1 : 1);
+        play_sound();
+    } else if (held && ++held_frames >= DIM_HOLD_FRAMES && held_frames % DIM_REPEAT_FRAMES == 0) {
+        step_dim(held & B_LEFT ? -1 : 1);
+    }
+}
+
 /* F11 and Alt+Enter change the display away from the menus, so it is noted here. */
 static void note_display_mode(void) {
     const int mode = psp_window_get_mode();
@@ -384,10 +429,18 @@ static void on_window_update(void) {
     g_held = buttons;
     const uint32_t row = psp_read32(psp_cpu.r[PSP_REG_A0] + WINDOW_ROW);
     note_display_mode();
+    if (g_dim_unsaved && !(buttons & (B_LEFT | B_RIGHT))) {
+        g_dim_unsaved = 0;
+        options_save(g_data_dir);
+    }
+    if (!g_graphics && row == ROW_DIM) {
+        update_dim(buttons, pressed);
+        return;
+    }
     if (!(pressed & (B_LEFT | B_RIGHT))) return;
     if (g_graphics) {
         if (row < G_COUNT) change_graphics((int)row, pressed & B_LEFT ? -1 : 1);
-    } else if (row >= ROW_LANGUAGE && row < ROW_COUNT) {
+    } else if (row > ROW_DIM && row < ROW_COUNT) {
         change((int)row);
     }
 }
@@ -414,7 +467,7 @@ static void on_window_draw(void) {
         if (row < G_COUNT) fill_lines(lines, g_graphics_lines[g_ui][row]);
         return;
     }
-    if (row < ROW_LANGUAGE) {
+    if (row < ROW_DIM) {
         /* Rows of two lines, so this is the size of the font in use. */
         const int gap = (int)psp_read32(lines + LINE_SIZE + 8) - (int)psp_read32(lines + 8);
         if (psp_read32(lines + LINE_SIZE) && gap > 0) g_line_height = gap;
@@ -445,6 +498,13 @@ static void on_menu_enter(void) {
     g_back_to_graphics = 0;
 }
 
+/* Entering the menu, it has just read its row to ask how to come in: from rows 0, 1, 4 and 5 as it
+ * is, and from any other with a white fade, as those leave for scenes of their own. This one is
+ * a window, as Options is. */
+static void on_menu_row_read(void) {
+    if (psp_cpu.r[PSP_REG_V1] == MENU_ROW_GRAPHICS) psp_cpu.r[PSP_REG_V1] = MENU_ROW_OPTIONS;
+}
+
 /* The game's tables have nothing for this row, and it has filled the lines from what follows. */
 static void on_menu_draw(void) {
     const uint32_t menu = psp_cpu.r[PSP_REG_A0];
@@ -467,8 +527,11 @@ static void on_window_title(void) {
 /* The game has just marked its two volume rows for the bars with arrows. All of these change
  * with left and right too. */
 static void on_window_rows_marked(void) {
-    if (!g_graphics) return;
     const uint32_t rows = psp_read32(psp_cpu.r[PSP_REG_S0] + LIST_ROWS);
+    if (!g_graphics) {
+        psp_write8(rows + ROW_DIM * LIST_ROW_SIZE + LIST_ROW_ARROWS, 1);
+        return;
+    }
     for (uint32_t row = 0; row < G_COUNT; row++) psp_write8(rows + row * LIST_ROW_SIZE + LIST_ROW_ARROWS, 1);
 }
 
@@ -502,7 +565,7 @@ void extras_start(const char *data_dir) {
     if (!translation_has_song_romaji()) snprintf(g_options.song_names, sizeof g_options.song_names, "japanese");
     if (!translation_has_lyric_romaji()) snprintf(g_options.lyrics, sizeof g_options.lyrics, "japanese");
     apply_scripts();
-    for (int row = ROW_LANGUAGE; row < ROW_COUNT; row++) {
+    for (int row = ROW_DIM; row < ROW_COUNT; row++) {
         g_labels[row] = psp_sysmem_alloc(LABEL_SIZE, 1);
         int have_memory = g_labels[row] != 0;
         for (int ui = 0; ui < UI_COUNT; ui++) have_memory = new_lines(g_lines[ui][row], &ROWS[ui][row]) && have_memory;
@@ -547,6 +610,7 @@ int extras_hook(uint32_t addr) {
     else if (addr == EXTRAS_WINDOW_ROWS) { /* only so that the next can be inside it */ }
     else if (addr == EXTRAS_WINDOW_ROWS_MARKED) on_window_rows_marked();
     else if (addr == EXTRAS_MENU_ENTER) on_menu_enter();
+    else if (addr == EXTRAS_MENU_ROW_READ) on_menu_row_read();
     else if (addr == EXTRAS_MENU_DRAW) on_menu_draw();
     else if (addr == EXTRAS_MENU_CONFIRM) on_menu_confirm();
     else return 0;

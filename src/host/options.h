@@ -18,6 +18,7 @@ typedef struct {
     int smoothing;       /* of the picture as it fits the window; -1 leaves it to the edition */
     int wide_view;       /* 0 bars, 1 crops the 3D scene, 2 shows more of it */
     int keys2[PSP_BIND_COUNT]; /* each button's second key, 0 for none; -1 leaves it as it comes */
+    int background_dim;  /* how dark the background is in a song, from 0, for not at all, to 100 */
 } diva_options;
 
 extern diva_options g_options;
