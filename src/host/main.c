@@ -242,6 +242,7 @@ int main(int argc, char **argv) {
     g_seconds = argc > 4 ? (unsigned)strtoul(argv[4], NULL, 10) : 0;
 
     setvbuf(stderr, NULL, _IONBF, 0);
+    settings_load_dev(g_data_dir);
     settings_load(g_data_dir);
     SetUnhandledExceptionFilter(on_crash);
 

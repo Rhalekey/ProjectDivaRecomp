@@ -82,6 +82,37 @@ static int load_file(const char *path) {
     return 1;
 }
 
+/* A developer's own file, which players do not have, so all of this is off for them:
+ *
+ *   %LOCALAPPDATA%\ProjectDivaRecomp\dev.ini
+ *
+ *     DIVA_NO_DEATH = 1
+ *     DIVA_COMPARE = 1
+ *
+ * Each line sets an environment variable for this run, which is what the test tools look at. Any
+ * value counts as on, so a switch goes off by taking its line out or putting a # before it. Other
+ * names than these two families are left alone. DIVA_NO_DEV ignores the file, as Play.bat does. */
+void settings_load_dev(const char *data_dir) {
+    if (getenv("DIVA_NO_DEV")) return;
+    char path[1100];
+    snprintf(path, sizeof path, "%s\\..\\dev.ini", data_dir);
+    FILE *f = fopen(path, "r");
+    if (!f) return;
+    char line[512];
+    while (fgets(line, sizeof line, f)) {
+        char *comment = strpbrk(line, "#;");
+        if (comment) *comment = '\0';
+        char *eq = strchr(line, '=');
+        if (!eq) continue;
+        *eq = '\0';
+        const char *name = trim(line), *value = trim(eq + 1);
+        if (!value[0] || (strncmp(name, "DIVA_", 5) && strncmp(name, "PSPRECOMP_", 10))) continue;
+        _putenv_s(name, value);
+        fprintf(stderr, "dev.ini: %s = %s\n", name, value);
+    }
+    fclose(f);
+}
+
 void settings_load(const char *data_dir) {
     const char *profile = getenv("DIVA_PROFILE");
     if (profile && !load_file(profile)) fprintf(stderr, "settings: cannot read %s\n", profile);

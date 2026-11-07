@@ -4,6 +4,13 @@ Everything this project has added to or changed about *Hatsune Miku: Project DIV
 
 The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhalekey/psprecomp/tree/diva-recomp), branch `diva-recomp`. Those this game depends on are listed here too.
 
+## 2026-11-07
+
+- On the results screen in a taller window, NOT CLEAR goes down with the bottom band.
+- The d-pad's circles in the menu hints are slightly smaller.
+- OK, Back and Retry are centred on their buttons, with their signs.
+- Test switches moved to a developer's own `dev.ini`, and are all off without it.
+
 ## 2026-11-06: first public version
 
 ### Graphics

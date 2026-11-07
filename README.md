@@ -37,7 +37,7 @@ powershell -ExecutionPolicy Bypass -File Tools\build.ps1 -Game <folder holding P
 
 The script installs a compiler once into `%LOCALAPPDATA%\ProjectDivaRecomp`, generates C from your executable, builds `build\game\diva.exe` and runs it for 60 seconds. Logs and the last frame go to `build\`. The generated code is derived from your copy of the game, so it stays in `build\` and must not be shared.
 
-To play with no test switches, double-click `Play.bat` once it is built. Calling `Tools\build.ps1` directly is for development: it logs more, turns on comparison keys, and keeps your life gauge full so that a song cannot be lost.
+To play, double-click `Play.bat` once it is built. For development, a `dev.ini` file in `%LOCALAPPDATA%\ProjectDivaRecomp` turns on test switches, such as a life gauge that stays full, as `src\host\settings.c` explains. Without that file they are all off, and `Play.bat` ignores it.
 
 ## Graphics
 

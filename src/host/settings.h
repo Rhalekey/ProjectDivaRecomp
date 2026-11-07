@@ -21,4 +21,7 @@ extern diva_settings g_settings;
 /* Read the edition's settings and the player's own. See settings.c for the order. */
 void settings_load(const char *data_dir);
 
+/* Test switches from dev.ini beside the player's data. See settings.c. Goes before anything else. */
+void settings_load_dev(const char *data_dir);
+
 #endif

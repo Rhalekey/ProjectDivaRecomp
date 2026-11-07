@@ -44,6 +44,7 @@ WINDOW_BOTTOM = ((30, 33, 37, 191), (37, 42, 45, 195), (21, 157, 145, 255), (28,
                  (84, 226, 214, 255), (28, 216, 201, 255), (21, 157, 145, 255), (7, 105, 100, 255))
 WINDOW_SIZE = 60
 WINDOW_X, WINDOW_Y = 150, 139
+BUTTON_WORD_AT = 18    # where a button's word starts, after its sign and colon
 WINDOW_CUT = 3
 
 # Letters on a grid of three by six, so that all of them on any sign are the same size.
@@ -169,7 +170,7 @@ def sign_triangle(c, x):
 
 
 def sign_dpad(c, x):
-    c.paint([circle(x + 5, 2.1, 2.1), circle(x + 5, 7.9, 2.1), circle(x + 2.1, 5, 2.1), circle(x + 7.9, 5, 2.1)], TEAL)
+    c.paint([circle(x + 5, 1.8, 1.8), circle(x + 5, 8.2, 1.8), circle(x + 1.8, 5, 1.8), circle(x + 8.2, 5, 1.8)], TEAL)
 
 
 def sign_left_right(c, x):
@@ -411,6 +412,12 @@ def window(sheet):
     paste(sheet, c, WINDOW_X, WINDOW_Y)
 
 
+def centred_on_button(drawer, text, button_width):
+    """How far along a button its sign and word start, so that together they are in its middle."""
+    word = sum(GGO_METRICS_ADVANCE(drawer, ch) for ch in text) / SCALE
+    return max(0, int(button_width - BUTTON_WORD_AT - word) // 2)
+
+
 def button_sign(c, x, y, circle_sign):
     """A sign with a white edge all the way round, twelve pixels across, and the colon after it."""
     if circle_sign:
@@ -432,15 +439,19 @@ def sheet_of_windows(archive, labels, drawer, out, cross_confirms):
     c = enlarged(archive, picture, pixels, w, h)
     wipe(c, (WINDOW_X, WINDOW_Y, WINDOW_SIZE, WINDOW_SIZE))
     window(c)
-    for name, confirm, moved in (('basic_btninfo_kettei.png', True, 0), ('basic_btninfo_modoru.png', False, 0),
+    # Yes and No are placed to keep their row in the middle, and the others on their own buttons.
+    # Back comes first: the edge of its sign reaches into OK, whose wipe then clears it.
+    for name, confirm, moved in (('basic_btninfo_modoru.png', False, None), ('basic_btninfo_kettei.png', True, None),
                                  ('basic_btninfo_yes.png', True, 7), ('basic_btninfo_no.png', False, 24),
-                                 ('basic_btninfo_saisikou.png', True, 0)):
+                                 ('basic_btninfo_saisikou.png', True, None)):
         if name not in labels:
             continue
         x, y, bw, bh = rects[name]
+        if moved is None:
+            moved = centred_on_button(drawer, labels[name][1], bw)
         wipe(c, rects[name])
         button_sign(c, x + moved, y, confirm != cross_confirms)
-        write_text(c, drawer, labels[name][1], (x + moved + 18, y, bw - moved - 18, bh), WORD, False, WORD_EDGE)
+        write_text(c, drawer, labels[name][1], (x + moved + BUTTON_WORD_AT, y, bw - moved - BUTTON_WORD_AT, bh), WORD, False, WORD_EDGE)
     for name, word in (('basic_flwin_resume.png', 'RESUME'), ('basic_flwin_retry.png', 'RETRY'), ('basic_flwin_return.png', 'RETURN')):
         wipe(c, rects[name])
         write_text(c, drawer, word, rects[name], WHITE, True, WORD_EDGE)

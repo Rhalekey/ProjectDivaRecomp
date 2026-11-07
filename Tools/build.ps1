@@ -2,8 +2,7 @@
 #
 #   powershell -ExecutionPolicy Bypass -File Tools\build.ps1 [-Game <dir>] [-Edition raw|recommended] [-Seconds <n>] [-SkipTests] [-SaveTextures] [-Player]
 #
-# -Player plays with none of the switches for testing below, as Play.bat does. Without it, the
-# life gauge stays full, some keys compare what is on screen, and the logs are longer.
+# -Player ignores the test switches in dev.ini, as Play.bat does. They are in src\host\settings.c.
 #
 # -Game is the folder holding PSP_GAME; its SYSDIR needs ULJM05472_EBOOT.BIN, the
 # decrypted executable dumped with PPSSPP. The compiler is installed once into
@@ -256,13 +255,7 @@ if ($BuildOnly) { "FIM" *>> $Log; Hide-UserFolder; exit 0 }
 Step "running the game for $Seconds seconds"
 $env:DIVA_PROFILE = $EditionFile
 $env:DIVA_LANG_DIR = Join-Path $Root "lang"
-if (-not $Player) {
-    $env:PSPRECOMP_TRACE_IO = "1"
-    $env:DIVA_LANG_LOG = "1"
-    $env:DIVA_COMPARE = "1"
-    $env:DIVA_WIDE = "1"
-    $env:DIVA_NO_DEATH = "1"
-}
+if ($Player) { $env:DIVA_NO_DEV = "1" }
 if ($SaveTextures) { $env:DIVA_SAVE_TEXTURES = "1" } else { Remove-Item Env:DIVA_SAVE_TEXTURES -ErrorAction SilentlyContinue }
 # Saves live outside build\, so that cleaning a build never loses them.
 $Data = Join-Path $env:LOCALAPPDATA "ProjectDivaRecomp\data"
