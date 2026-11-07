@@ -36,6 +36,7 @@ static queue_t *g_queue;
 static CRITICAL_SECTION g_lock;
 static volatile LONGLONG g_underruns;
 static volatile LONGLONG g_trims;
+static volatile LONGLONG g_queued_sum, g_queued_count, g_card_sum, g_card_count;
 
 static void queue_drop(queue_t *q, uint32_t frames) {
     q->head = (q->head + frames) % QUEUE_FRAMES;
@@ -65,6 +66,7 @@ void audio_out_submit(int slot, const int16_t *samples, uint32_t frames, int ste
 static void mix(int16_t *out, uint32_t frames) {
     static int32_t sum[BUFFER_FRAMES * 2];
     int short_of_data = 0;
+    uint32_t longest = 0;
     memset(sum, 0, sizeof(int32_t) * frames * 2);
 
     EnterCriticalSection(&g_lock);
@@ -74,6 +76,7 @@ static void mix(int16_t *out, uint32_t frames) {
             if (q->count < PREROLL) continue;
             q->primed = 1;
         }
+        if (q->count > longest) longest = q->count;
         const uint32_t take = q->count < frames ? q->count : frames;
         if (take < frames) {
             short_of_data = 1;
@@ -89,6 +92,10 @@ static void mix(int16_t *out, uint32_t frames) {
     LeaveCriticalSection(&g_lock);
 
     if (short_of_data) InterlockedIncrement64(&g_underruns);
+    if (longest) {
+        g_queued_sum += longest;
+        g_queued_count++;
+    }
     for (uint32_t i = 0; i < frames * 2; i++) {
         const int32_t v = sum[i];
         out[i] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
@@ -121,12 +128,20 @@ static unsigned __stdcall audio_thread(void *arg) {
     }
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
+    uint64_t written = 0;
     for (;;) {
         for (int i = 0; i < BUFFERS; i++) {
             if (!(hdr[i].dwFlags & WHDR_DONE)) continue;
             mix(pcm[i], BUFFER_FRAMES);
             hdr[i].dwFlags &= ~(DWORD)WHDR_DONE;
             waveOutWrite(dev, &hdr[i], sizeof hdr[i]);
+            written += BUFFER_FRAMES;
+        }
+        MMTIME played;
+        played.wType = TIME_SAMPLES;
+        if (waveOutGetPosition(dev, &played, sizeof played) == MMSYSERR_NOERROR && played.wType == TIME_SAMPLES) {
+            g_card_sum += (LONGLONG)(written - played.u.sample);
+            g_card_count++;
         }
         WaitForSingleObject(ready, 20);
     }
@@ -142,3 +157,8 @@ void audio_out_start(void) {
 
 uint64_t audio_out_underruns(void) { return (uint64_t)g_underruns; }
 uint64_t audio_out_trims(void) { return (uint64_t)g_trims; }
+
+void audio_out_waits(double *queued, double *at_card) {
+    *queued = g_queued_count ? (double)g_queued_sum / (double)g_queued_count * 1000.0 / RATE : 0;
+    *at_card = g_card_count ? (double)g_card_sum / (double)g_card_count * 1000.0 / RATE : 0;
+}

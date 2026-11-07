@@ -65,7 +65,8 @@ Buttons go by position, not by what is printed on them. The bottom button is alw
 
 ## 5. Options
 
-- **Options**, in the main menu: volume, background dim, language, song names and lyrics in romaji, the confirm button, and changing keys and buttons. Each button can have a second key, which helps with fast repeated notes.
+- **Note timing**, in Options: **strongly recommended before you play seriously.** Play one song following the sound, then come back to this row, which says how late or early your presses were, and press left or right until it says on time. Check it again if you change your headphones, speakers or monitor.
+- **Options**, in the main menu: volume, background dim, note timing, language, song names and lyrics in romaji, the confirm button, and changing keys and buttons. Each button can have a second key, which helps with fast repeated notes.
 - **Graphics**, in the main menu: display mode, resolution, smoothing, image shape and the frame rate counter.
 
 The opening movie does not play in this version, and ad hoc play does not work. This is expected.

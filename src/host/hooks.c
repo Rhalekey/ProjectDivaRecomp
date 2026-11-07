@@ -4,6 +4,7 @@
 
 #include "controls.h"
 #include "extras.h"
+#include "timing.h"
 #include "translation.h"
 
 #include <psprecomp/cpu.h>
@@ -45,5 +46,5 @@ static void on_life_change(void) {
 void psp_game_hook(uint32_t addr) {
     if (addr == LIFE_CHANGE) on_life_change();
     else if (addr == MOVIE_START) on_movie_start();
-    else if (!controls_hook(addr) && !extras_hook(addr)) translation_hook(addr);
+    else if (!controls_hook(addr) && !extras_hook(addr) && !timing_hook(addr)) translation_hook(addr);
 }

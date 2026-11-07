@@ -12,5 +12,7 @@ void audio_out_submit(int slot, const int16_t *samples, uint32_t frames, int ste
 uint64_t audio_out_underruns(void);
 /* How many times queued sound was thrown away because the game had got ahead of the card. */
 uint64_t audio_out_trims(void);
+/* In ms on average, how long sound waits in the queues here and at the sound card. */
+void audio_out_waits(double *queued, double *at_card);
 
 #endif

@@ -17,6 +17,7 @@
 #include "letters.h"
 #include "options.h"
 #include "settings.h"
+#include "timing.h"
 #include "translation.h"
 
 #include <psprecomp/cpu.h>
@@ -71,7 +72,7 @@
 enum { B_RIGHT = 0x0020, B_LEFT = 0x0080 };
 
 /* The game's own are its two volumes. */
-enum { ROW_DIM = 2, ROW_LANGUAGE, ROW_SONGS, ROW_LYRICS, ROW_ASK, ROW_CONFIRM, ROW_BUTTONS, ROW_COUNT };
+enum { ROW_DIM = 2, ROW_TIMING, ROW_LANGUAGE, ROW_SONGS, ROW_LYRICS, ROW_ASK, ROW_CONFIRM, ROW_BUTTONS, ROW_COUNT };
 enum { G_DISPLAY, G_RESOLUTION, G_SMOOTHING, G_SHAPE, G_FPS, G_COUNT };
 
 #define LABEL_WIDTH 22       /* what the game's "%-20s%2d" comes to */
@@ -86,6 +87,7 @@ typedef struct {
 static const row_text ROWS[UI_COUNT][ROW_COUNT] = {
     [UI_ENGLISH] = {
         [ROW_DIM] = {"Background dim", "Darkens the background", "during songs."},
+        [ROW_TIMING] = {"Note timing", "Shifts the hit timing.", "Play a song to measure."},
         [ROW_LANGUAGE] = {"Language", "Change the language.", ""},
         [ROW_SONGS] = {"Song names", "Show song names in", "Japanese or romaji."},
         [ROW_LYRICS] = {"Lyrics", "Show lyrics in", "Japanese or romaji."},
@@ -95,6 +97,7 @@ static const row_text ROWS[UI_COUNT][ROW_COUNT] = {
     },
     [UI_JAPANESE] = {
         [ROW_DIM] = {"\x94w\x8ci\x82\xcc\x88\xc3\x82\xb3", "\x8b\xc8\x82\xcc\x8a\xd4\x81" "A\x94w\x8ci\x82\xf0", "\x88\xc3\x82\xad\x82\xb5\x82\xdc\x82\xb7\x81" "B"},
+        [ROW_TIMING] = {"\x94" "\xbb" "\x92" "\xe8" "\x83" "^" "\x83" "C" "\x83" "~" "\x83" "\x93" "\x83" "O", "\x94" "\xbb" "\x92" "\xe8" "\x82" "\xcc" "\x83" "^" "\x83" "C" "\x83" "~" "\x83" "\x93" "\x83" "O" "\x82" "\xf0" "\x92" "\xb2" "\x90" "\xae", "\x8b" "\xc8" "\x82" "\xf0" "\x97" "V" "\x82" "\xd4" "\x82" "\xc6" "\x91" "\xaa" "\x92" "\xe8" "\x82" "\xb5" "\x82" "\xdc" "\x82" "\xb7"},
         [ROW_LANGUAGE] = {"\x8c\xbe\x8c\xea", "\x8c\xbe\x8c\xea\x82\xf0\x95\xcf\x8d\x58\x82\xb5\x82\xdc\x82\xb7", ""},
         [ROW_SONGS] = {"\x8b\xc8\x96\xbc", "\x8b\xc8\x96\xbc\x82\xcc\x95\x5c\x8b\x4c\x82\xf0\x95\xcf\x8d\x58\x82\xb5\x82\xdc\x82\xb7", ""},
         [ROW_LYRICS] = {"\x89\xcc\x8e\x8c", "\x89\xcc\x8e\x8c\x82\xcc\x95\x5c\x8b\x4c\x82\xf0\x95\xcf\x8d\x58\x82\xb5\x82\xdc\x82\xb7", ""},
@@ -104,6 +107,7 @@ static const row_text ROWS[UI_COUNT][ROW_COUNT] = {
     },
     [UI_GERMAN] = {
         [ROW_DIM] = {"Abdunkeln", "Hintergrund im Lied", "abdunkeln."},
+        [ROW_TIMING] = {"Timing", "Verschiebt das Timing.", "Zum Messen Lied spielen."},
         [ROW_LANGUAGE] = {"Sprache", "Sprache \xa1" "ndern.", ""},
         [ROW_SONGS] = {"Liednamen", "Liednamen auf Japanisch", "oder in Romaji."},
         [ROW_LYRICS] = {"Liedtext", "Liedtext auf Japanisch", "oder in Romaji."},
@@ -159,6 +163,12 @@ static const char *const WORD_BARS[UI_COUNT] = {"Bars", "\x8d\x95\x91\xd1", "Bal
 static const char *const WORD_CROP[UI_COUNT] = {"Crop", "3D\x8ag\x91\xe5", "Schnitt"};
 static const char *const WORD_EXTEND[UI_COUNT] = {"Extend", "\x8ag\x92\xa3", "Breit"};
 static const char *const WORD_CHANGE[UI_COUNT] = {"Change", "\x95\xcf\x8d\x58", "\xa1ndern"};
+/* What the last song measured: before the number, after it when late or early, and with none. */
+static const char *const TIMING_LAST[UI_COUNT] = {"Last song: ", "\x91" "O" "\x89" "\xf1" ":" " ", "Zuletzt: "};
+static const char *const TIMING_LATE[UI_COUNT] = {" ms late", " " "m" "s" " " "\x92" "x" "\x82" "\xa2", " ms sp\xa1t"};
+static const char *const TIMING_EARLY[UI_COUNT] = {" ms early", " " "m" "s" " " "\x91" "\x81" "\x82" "\xa2", " ms fr\xa3h"};
+static const char *const TIMING_ON_TIME[UI_COUNT] = {"on time", "\x82" "\xd2" "\x82" "\xc1" "\x82" "\xbd" "\x82" "\xe8", "genau"};
+#define TIMING_LINE_SIZE 48u
 #define WORD_CIRCLE "\x81\x9b"
 #define WORD_CROSS "\x81\x7e"
 
@@ -207,6 +217,11 @@ static const char *value_of(int row) {
         snprintf(percent, sizeof percent, "%d%%", g_options.background_dim);
         return percent;
     }
+    case ROW_TIMING: {
+        static char ms[12];
+        snprintf(ms, sizeof ms, g_options.note_timing ? "%+dms" : "%dms", g_options.note_timing);
+        return ms;
+    }
     case ROW_SONGS:
         return script_name(g_options.song_names);
     case ROW_LYRICS:
@@ -235,11 +250,25 @@ static void write_between_arrows(uint32_t to, const char *name, const char *valu
     write_string(to, text);
 }
 
+/* What the last song says, against what is set now, so that setting it right reads as on time. */
+static void write_timing_lines(void) {
+    int measured;
+    if (!timing_last_song(&measured)) return;
+    const int off = measured - g_options.note_timing;
+    for (int ui = 0; ui < UI_COUNT; ui++) {
+        char text[TIMING_LINE_SIZE];
+        if (!off) snprintf(text, sizeof text, "%s%s", TIMING_LAST[ui], TIMING_ON_TIME[ui]);
+        else snprintf(text, sizeof text, "%s%d%s", TIMING_LAST[ui], off > 0 ? off : -off, off > 0 ? TIMING_LATE[ui] : TIMING_EARLY[ui]);
+        write_string(g_lines[ui][ROW_TIMING][1], text);
+    }
+}
+
 static void write_label(int row) {
     char text[LABEL_SIZE];
     const char *value = value_of(row);
-    if (row == ROW_DIM) {
+    if (row == ROW_DIM || row == ROW_TIMING) {
         write_between_arrows(g_labels[row], ROWS[g_ui][row].name, value);
+        if (row == ROW_TIMING) write_timing_lines();
         return;
     }
     snprintf(text, sizeof text, "%-*s%s", LABEL_WIDTH - (int)strlen(value), ROWS[g_ui][row].name, value);
@@ -385,31 +414,32 @@ static void change_graphics(int row, int step) {
     play_sound();
 }
 
-/* Goes by ones, and on by itself with the button held, as far as each end. It is saved when the
- * button comes up, not at each step. */
+/* These go by ones, and on by themselves with the button held, as far as each end. They are saved
+ * when the button comes up, not at each step. */
 #define DIM_MOST 100
-#define DIM_HOLD_FRAMES 20
-#define DIM_REPEAT_FRAMES 2
-static int g_dim_unsaved;
+#define SLIDER_HOLD_FRAMES 20
+#define SLIDER_REPEAT_FRAMES 2
+static int g_slider_unsaved;
 
-static void step_dim(int step) {
-    const int value = g_options.background_dim + step;
-    if (value < 0 || value > DIM_MOST) return;
-    g_options.background_dim = value;
-    g_dim_unsaved = 1;
-    psp_render_gl_set_background_dim(value);
-    write_label(ROW_DIM);
+static void step_slider(int row, int step) {
+    int *value = row == ROW_DIM ? &g_options.background_dim : &g_options.note_timing;
+    const int least = row == ROW_DIM ? 0 : OPTIONS_TIMING_LEAST, most = row == ROW_DIM ? DIM_MOST : OPTIONS_TIMING_MOST;
+    if (*value + step < least || *value + step > most) return;
+    *value += step;
+    g_slider_unsaved = 1;
+    if (row == ROW_DIM) psp_render_gl_set_background_dim(*value);
+    write_label(row);
 }
 
-static void update_dim(uint32_t buttons, uint32_t pressed) {
+static void update_slider(int row, uint32_t buttons, uint32_t pressed) {
     static int held_frames;
     const uint32_t held = buttons & (B_LEFT | B_RIGHT);
     if (pressed & (B_LEFT | B_RIGHT)) {
         held_frames = 0;
-        step_dim(pressed & B_LEFT ? -1 : 1);
+        step_slider(row, pressed & B_LEFT ? -1 : 1);
         play_sound();
-    } else if (held && ++held_frames >= DIM_HOLD_FRAMES && held_frames % DIM_REPEAT_FRAMES == 0) {
-        step_dim(held & B_LEFT ? -1 : 1);
+    } else if (held && ++held_frames >= SLIDER_HOLD_FRAMES && held_frames % SLIDER_REPEAT_FRAMES == 0) {
+        step_slider(row, held & B_LEFT ? -1 : 1);
     }
 }
 
@@ -429,18 +459,18 @@ static void on_window_update(void) {
     g_held = buttons;
     const uint32_t row = psp_read32(psp_cpu.r[PSP_REG_A0] + WINDOW_ROW);
     note_display_mode();
-    if (g_dim_unsaved && !(buttons & (B_LEFT | B_RIGHT))) {
-        g_dim_unsaved = 0;
+    if (g_slider_unsaved && !(buttons & (B_LEFT | B_RIGHT))) {
+        g_slider_unsaved = 0;
         options_save(g_data_dir);
     }
-    if (!g_graphics && row == ROW_DIM) {
-        update_dim(buttons, pressed);
+    if (!g_graphics && (row == ROW_DIM || row == ROW_TIMING)) {
+        update_slider((int)row, buttons, pressed);
         return;
     }
     if (!(pressed & (B_LEFT | B_RIGHT))) return;
     if (g_graphics) {
         if (row < G_COUNT) change_graphics((int)row, pressed & B_LEFT ? -1 : 1);
-    } else if (row > ROW_DIM && row < ROW_COUNT) {
+    } else if (row > ROW_TIMING && row < ROW_COUNT) {
         change((int)row);
     }
 }
@@ -530,6 +560,7 @@ static void on_window_rows_marked(void) {
     const uint32_t rows = psp_read32(psp_cpu.r[PSP_REG_S0] + LIST_ROWS);
     if (!g_graphics) {
         psp_write8(rows + ROW_DIM * LIST_ROW_SIZE + LIST_ROW_ARROWS, 1);
+        psp_write8(rows + ROW_TIMING * LIST_ROW_SIZE + LIST_ROW_ARROWS, 1);
         return;
     }
     for (uint32_t row = 0; row < G_COUNT; row++) psp_write8(rows + row * LIST_ROW_SIZE + LIST_ROW_ARROWS, 1);
@@ -568,7 +599,14 @@ void extras_start(const char *data_dir) {
     for (int row = ROW_DIM; row < ROW_COUNT; row++) {
         g_labels[row] = psp_sysmem_alloc(LABEL_SIZE, 1);
         int have_memory = g_labels[row] != 0;
-        for (int ui = 0; ui < UI_COUNT; ui++) have_memory = new_lines(g_lines[ui][row], &ROWS[ui][row]) && have_memory;
+        for (int ui = 0; ui < UI_COUNT; ui++) {
+            have_memory = new_lines(g_lines[ui][row], &ROWS[ui][row]) && have_memory;
+            if (row != ROW_TIMING) continue;
+            /* Its second line changes after each song. */
+            g_lines[ui][row][1] = psp_sysmem_alloc(TIMING_LINE_SIZE, 1);
+            if (g_lines[ui][row][1]) write_string(g_lines[ui][row][1], ROWS[ui][row].line2);
+            else have_memory = 0;
+        }
         if (!have_memory) {
             fprintf(stderr, "extras: no memory for the rows, leaving the window as it is\n");
             return;

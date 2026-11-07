@@ -6,6 +6,16 @@ Static recompilation of *Hatsune Miku: Project DIVA* (PSP, ULJM05472 v1.01) to r
 
 What has changed is in the [changelog](CHANGELOG.md). To install and play, see [INSTALL.md](INSTALL.md).
 
+## Before you play: set Note timing
+
+**This is strongly recommended.** Sound and picture take a moment to reach you on a PC, and that moment differs from one computer, monitor and pair of headphones to another. Until it is set, your presses can count as late even when they feel right, which makes Cools and long combos harder than they should be.
+
+1. Play one song all the way through, following the sound.
+2. In the main menu, open **Options** and go to **Note timing**. Its description says how late or early your presses were in the last song.
+3. Press left or right until it says **on time**, then play again.
+
+Check it again if you change your headphones, speakers or monitor. Bluetooth headphones in particular can add a lot. This setting is in the recommended edition, which is the default.
+
 ## Suggestions welcome
 
 I am accepting suggestions for things to add to the game. If there is something you would like to see, [open an issue](https://github.com/Rhalekey/ProjectDivaRecomp/issues).
@@ -69,7 +79,7 @@ The game can be played in Japanese, English and German. It asks which language t
 
 The German translation was written without a native speaker and has not been reviewed by one yet, so expect some awkward or wrong wording. Corrections are welcome in `lang/de.txt` and `lang/de_images.txt`.
 
-The recommended edition adds rows to the game's own Options window: language, song names and lyrics in romaji (each on its own), whether to ask the language at each start, the confirm button, and the keyboard and controller buttons, with a second key if wanted. It also adds a background dim for songs, from off to 100%. The song names come from `lang\romaji_titles.txt`. The lyrics are never in this repository: `Tools\romaji.py` makes them during the build from your copy of the game, using a dictionary, so a line can come out misread. The language changes at once. These are kept in the same file, and the row that asks wins over `language_prompt`. Put `extras = 0` in `settings.ini` to leave the window as the game has it.
+The recommended edition adds rows to the game's own Options window: language, song names and lyrics in romaji (each on its own), whether to ask the language at each start, the confirm button, and the keyboard and controller buttons, with a second key if wanted. It also adds a background dim for songs, from off to 100%, and [Note timing](#before-you-play-set-note-timing), from -100 to +300 ms. The song names come from `lang\romaji_titles.txt`. The lyrics are never in this repository: `Tools\romaji.py` makes them during the build from your copy of the game, using a dictionary, so a line can come out misread. The language changes at once. These are kept in the same file, and the row that asks wins over `language_prompt`. Put `extras = 0` in `settings.ini` to leave the window as the game has it.
 
 The Japanese is never replaced. `lang\en.txt` lists the address of each original text and its English, and the game's words are swapped as they reach the screen. Song names, lyrics and illustrator credits have no lines in it, so they stay as they are. `lang\en_images.txt` does the same for words drawn into pictures: `Tools\lang_images.py` makes those pictures from your copy of the game each time it builds, in a folder outside this repository.
 

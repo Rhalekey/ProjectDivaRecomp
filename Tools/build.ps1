@@ -121,10 +121,11 @@ if ($LASTEXITCODE -ne 0) { Fail "compile the recompiler" }
 Step "generating C from the game"
 New-Item -ItemType Directory -Force $Gen | Out-Null
 $Recomp = Join-Path $Out "third_party\psprecomp\tools\allegrexrecomp\allegrexrecomp.exe"
-# translation.c, letters.c, controls.c, hooks.c and extras.c say what these are.
+# translation.c, letters.c, controls.c, hooks.c, extras.c and timing.c say what these are.
 $Hooks = @(
     "0883D598", "0883EC34", "0883F104", "08851CD8", "08AF1C54", "08815FF4", "08ABF1B8", "0886B304", "08864C90", "08AD49B4",
-    "08AB5908", "08AB5A4C", "08AB5448", "08AB5528", "08AB59A0", "08AB41C4", "08AB4C58", "08AB4D18", "08AB5EF0", "08AB5F38", "08AB4384"
+    "08AB5908", "08AB5A4C", "08AB5448", "08AB5528", "08AB59A0", "08AB41C4", "08AB4C58", "08AB4D18", "08AB5EF0", "08AB5F38", "08AB4384",
+    "08857818", "08857E70", "08858200", "08858314"
 )
 $GenStamp = Join-Path $Out "generated_from.txt"
 $GenWanted = "$ExpectedElf $((Get-FileHash $Recomp).Hash) $($Hooks -join ' ')"

@@ -79,6 +79,9 @@ static void report(const char *why) {
             run_us / 1e6, (double)psp_display_flips() * 1e6 / run_us,
             100.0 * (double)psp_ge_busy_us() / run_us,
             (unsigned long long)audio_out_underruns());
+    double queued, at_card;
+    audio_out_waits(&queued, &at_card);
+    fprintf(stderr, "sound waits %.0f ms in its queue and %.0f ms at the card, on average\n", queued, at_card);
     fprintf(stderr, "framebuffer 0x%08X  audio blocks %llu  bytes read %llu  ge callbacks %llu\n",
             psp_display_framebuffer(),
             (unsigned long long)psp_audio_blocks(),

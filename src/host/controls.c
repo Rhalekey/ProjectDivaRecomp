@@ -15,6 +15,7 @@
 #include "language.h"
 #include "options.h"
 #include "screen_kit.h"
+#include "timing.h"
 
 #include <psprecomp/cpu.h>
 #include <psprecomp/hle.h>
@@ -141,6 +142,7 @@ int controls_hook(uint32_t addr) {
     if (psp_read8(song + SONG_ACTIVE) && !psp_read8(song + SONG_OVER) && !psp_read8(song + SONG_LEAVING)) psp_render_gl_song_frame();
     /* Only the changes, to see in the log that this is what it is thought to be. */
     if (playing != was_playing) fprintf(stderr, "controls: %s\n", playing ? "a song is playing" : "the song stopped");
+    if (was_playing && !playing) timing_song_stopped();
     /* A pause menu or the results get their confirm button on the very frame they begin. */
     g_song_seen = playing ? now : 0;
     return 1;
