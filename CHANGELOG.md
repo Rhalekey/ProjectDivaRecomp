@@ -14,6 +14,7 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 - Each button can have a second key, to alternate on fast repeated notes.
 - **Background dim** in Options darkens a song's background from 1% to 100%, leaving the notes and HUD as they are, on 3D stages and 2D backgrounds alike.
 - Fixed a white fade when coming back to the main menu from Graphics.
+- Fixed the HUD jumping around in songs with a full-screen 2D background, in windows of other shapes.
 
 ## 2026-11-06: first public version
 
