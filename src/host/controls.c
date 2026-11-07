@@ -116,8 +116,7 @@ static uint32_t swap_confirm(uint32_t buttons) {
 }
 
 void controls_apply(void) {
-    /* The bot presses the game's own buttons. */
-    if (!getenv("DIVA_BOT")) psp_ctrl_set_filter(swap_confirm);
+    psp_ctrl_set_filter(swap_confirm);
     language_confirm_changed();
 }
 

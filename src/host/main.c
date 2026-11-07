@@ -24,7 +24,6 @@
 #include "options.h"
 #include "settings.h"
 #include "translation.h"
-#include "bot.h"
 #include "lifesearch.h"
 #include "watch.h"
 
@@ -302,7 +301,7 @@ int main(int argc, char **argv) {
         g_ask_language = g_settings.language_prompt || !chosen;
         if (g_ask_language || (g_settings.extras && g_options.confirm_cross < 0)) {
             g_disc_dir = argv[2];
-            if (!bot_is_on()) mods_on_first_read("title.png", ask_language);
+            mods_on_first_read("title.png", ask_language);
         }
     }
     if (g_settings.extras) {
@@ -362,7 +361,6 @@ int main(int argc, char **argv) {
 
     watch_start();
     lifesearch_start();
-    bot_start();
     const uint32_t result = psp_module_start(&m);
     fprintf(stderr, "module_start returned 0x%08X\n", result);
 
