@@ -179,7 +179,8 @@ static int g_ask_language, g_ask_at_title;
 static void at_title(void) {
     if (!g_ask_at_title) return;
     if (g_ask_language) language_apply(language_screen_run(g_options.language, g_disc_dir));
-    if (g_options.confirm_cross < 0) controls_ask_confirm();
+    /* DIVA_ASK_CONFIRM, a test switch, asks again even with a choice saved. */
+    if (g_options.confirm_cross < 0 || getenv("DIVA_ASK_CONFIRM")) controls_ask_confirm();
     options_save(g_data_dir);
 }
 
@@ -308,7 +309,7 @@ int main(int argc, char **argv) {
         language_apply(g_options.language);
         /* The picture the title screen starts with: the intros have been and gone by then. */
         g_ask_language = g_settings.language_prompt || !chosen;
-        if (g_ask_language || (g_settings.extras && g_options.confirm_cross < 0)) {
+        if (g_ask_language || (g_settings.extras && (g_options.confirm_cross < 0 || getenv("DIVA_ASK_CONFIRM")))) {
             g_disc_dir = argv[2];
             g_ask_at_title = 1;
         }

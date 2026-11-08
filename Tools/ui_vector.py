@@ -136,8 +136,9 @@ def letter_rects(word, x, y):
     return out
 
 
-def write_text(canvas, drawer, text, box, colour, centred=False, edge=None):
-    """Letters at their own widths, narrowed together only if they would not fit. Says how far."""
+def write_text(canvas, drawer, text, box, colour, centred=False, edge=None, below=0):
+    """Letters at their own widths, narrowed together only if they would not fit. Says how far.
+    `below` lets what hangs under the letters run that far past the box."""
     x, y, w, h = box
     pen, marks = 0, []
     for ch in text:
@@ -160,7 +161,7 @@ def write_text(canvas, drawer, text, box, colour, centred=False, edge=None):
                 if v:
                     key = (left + int((start + m.x + gx) * squeeze), py)
                     coverage[key] = max(coverage.get(key, 0), min(255, v * 255 // 64))
-    x0, y0, x1, y1 = x * SCALE, y * SCALE, (x + w) * SCALE, (y + h) * SCALE
+    x0, y0, x1, y1 = x * SCALE, y * SCALE, (x + w) * SCALE, (y + h + below) * SCALE
     if edge:
         reach = 3
         for px, py in [k for k, v in coverage.items() if v > 96]:
@@ -299,17 +300,17 @@ def signs_of(name, cross_confirms):
     return None, 0
 
 
-def hint(sheet, name, box, start, text, drawer, cross_confirms):
+def hint(sheet, name, box, start, text, drawer, cross_confirms, below=0):
     x, y, w, h = box
     signs, usual_start = signs_of(name, cross_confirms)
     if not signs:
         return 1.0
     start = start if start is not None else usual_start
-    piece = Canvas(w, h)
+    piece = Canvas(w, h + below)
     for sign_x, sign in signs:
         sign(piece, sign_x)
     piece.paint([rect(start - 3, 3, 2, 2), rect(start - 3, 6, 2, 2)], TEAL)
-    squeeze = write_text(piece, drawer, text, (start, 0, w - start, h), GREY)
+    squeeze = write_text(piece, drawer, text, (start, 0, w - start, h), GREY, below=below)
     paste(sheet, piece, x, y)
     return squeeze
 
@@ -1838,19 +1839,63 @@ def write_sheet(c, pixels, folder):
     c.write(os.path.join(folder, '%08X.rgba' % colour_hash(pixels)))
 
 
+def hint_width(name, start, text, drawer):
+    """How wide a hint is with its words at their own widths, in the sheet's pixels."""
+    signs, usual_start = signs_of(name, False)
+    if not signs:
+        return None
+    start = start if start is not None else usual_start
+    pen = sum(GGO_METRICS_ADVANCE(drawer, ch) for ch in text)
+    return int(math.ceil(start + (pen + 4) / SCALE)) + 1
+
+
+# The footer's hints are laid out again by the renderer, at their own widths: see pieces.txt in
+# render_gl.c. A hint wider than its place on the sheet is drawn again whole in the rows the sheet
+# leaves empty, under the bands; the narrowed one stays where it was, for screens that keep the
+# game's layout.
+SPARE_ROWS = (203, 216, 229, 242)   # below the footer line art and its shadow, which reach row 202
+SPARE_GAP = 2
+# Letters that hang below the line, which an 11 pixel hint cuts: such a hint goes to the spare rows
+# too, with this much more room under it.
+HANGING = set('gjpqy,;')
+SPARE_BELOW = 2
+
+
 def sheet_of_hints(archive, labels, drawer, out, cross_confirms):
     picture = 'menu_basic02.png'
     w, h, pixels = decode_png(archive.read(archive.find(picture)))
     rects = layout_of(archive, picture)
     c = enlarged(archive, picture, pixels, w, h)
     tight = []
-    for name, box in rects.items():
+    pieces = ['sheet %08X' % colour_hash(pixels)]
+    spare_row, spare_x = 0, 0
+    for name, box in sorted(rects.items(), key=lambda kv: (kv[1][1], kv[1][0])):
         if name in labels:
             start, text = labels[name]
             wipe(c, box)
             squeeze = hint(c, name.split('.')[0], box, start, text, drawer, cross_confirms)
             if squeeze < 0.8:
                 tight.append('%s %d%%' % (text, squeeze * 100))
+            natural = hint_width(name.split('.')[0], start, text, drawer)
+            if natural is None:
+                continue
+            x, y, bw, bh = box
+            if natural <= bw and not HANGING & set(text):
+                pieces.append('hint %d %d %d %d %d %d %d %d' % (x, y, bw, bh, x, y, natural, bh))
+                continue
+            if spare_x + natural > w:
+                spare_row, spare_x = spare_row + 1, 0
+            if spare_row >= len(SPARE_ROWS):
+                print('no room in the spare rows for the hint %s' % text)
+                continue
+            whole = (spare_x, SPARE_ROWS[spare_row], natural, bh)
+            hint(c, name.split('.')[0], whole, start, text, drawer, cross_confirms, SPARE_BELOW)
+            pieces.append('hint %d %d %d %d %d %d %d %d' % (x, y, bw, bh, whole[0], whole[1], natural, bh + SPARE_BELOW))
+            spare_x += natural + SPARE_GAP
+    for name in ('basic_btm.png', 'basic_btm_ele01.png', 'basic_btm_ele02.png'):
+        pieces.append('band %d %d %d %d' % rects[name])
+    with open(os.path.join(out, 'pieces.txt'), 'w') as f:
+        f.write('\n'.join(pieces) + '\n')
     btm, edit_btm = rects['basic_btm.png'], rects['edit_btm.png']
     wipe(c, btm)
     band(c, btm[1], 31, 46, btm[1] + 7, True)
