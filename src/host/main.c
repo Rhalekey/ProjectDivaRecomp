@@ -21,6 +21,11 @@
 #include "controls.h"
 #include "language_screen.h"
 #include "mods.h"
+#include "screenshot.h"
+#include "presence.h"
+
+/* Project DIVA Recomp's application on Discord. */
+#define DISCORD_APPLICATION_ID "1568866146696958012"
 #include "options.h"
 #include "settings.h"
 #include "translation.h"
@@ -168,10 +173,11 @@ static LONG WINAPI on_crash(EXCEPTION_POINTERS *e) {
 }
 
 static const char *g_disc_dir;
-static int g_ask_language;
+static int g_ask_language, g_ask_at_title;
 
-/* The game waits here, in the middle of reading a file, until there is an answer. */
-static void ask_language(void) {
+/* The game waits here, in the middle of reading the title screen's picture, until there is an answer. */
+static void at_title(void) {
+    if (!g_ask_at_title) return;
     if (g_ask_language) language_apply(language_screen_run(g_options.language, g_disc_dir));
     if (g_options.confirm_cross < 0) controls_ask_confirm();
     options_save(g_data_dir);
@@ -304,7 +310,7 @@ int main(int argc, char **argv) {
         g_ask_language = g_settings.language_prompt || !chosen;
         if (g_ask_language || (g_settings.extras && g_options.confirm_cross < 0)) {
             g_disc_dir = argv[2];
-            mods_on_first_read("title.png", ask_language);
+            g_ask_at_title = 1;
         }
     }
     if (g_settings.extras) {
@@ -313,6 +319,7 @@ int main(int argc, char **argv) {
         translation_romaji_start(romaji);
         extras_start(g_data_dir);
     }
+    if (g_ask_at_title) mods_on_first_read("title.png", at_title);
 
     /* By default beside the game's data. */
     const char *mods_dir = getenv("DIVA_MODS");
@@ -347,8 +354,16 @@ int main(int argc, char **argv) {
         const char *overlay = getenv("DIVA_SHOW_FPS");
         if (overlay) psp_render_gl_set_overlay(overlay[0] && overlay[0] != '0');
         else psp_render_gl_set_overlay(g_settings.extras && g_options.show_fps);
-        if (psp_render_select("gl") == 0) psp_window_set_external(1);
+        if (psp_render_select("gl") == 0) {
+            psp_window_set_external(1);
+            /* The game's own screenshots, kept in the player's Pictures folder. */
+            psp_utility_set_screenshot_handler(screenshot_take);
+        }
     }
+    /* What the player is doing, on their Discord profile. The application's id is public: it is the
+     * name Discord shows, not a secret. DIVA_DISCORD_ID in dev.ini can name another for testing. */
+    const char *discord_id = getenv("DIVA_DISCORD_ID");
+    presence_start(discord_id ? discord_id : DISCORD_APPLICATION_ID);
     psp_ge_set_async(1);
 
     g_started_ms = GetTickCount64();

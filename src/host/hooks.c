@@ -4,6 +4,7 @@
 
 #include "controls.h"
 #include "extras.h"
+#include "presence.h"
 #include "timing.h"
 #include "translation.h"
 
@@ -20,7 +21,12 @@
 #define LIFE_FIELD  (0x10000u - 17432u)
 #define LIFE_FULL   255u
 
-enum { REG_A0 = 4 };
+/* The song list's panel (this, song, level): its object leads to the save's scores object. */
+#define SONG_PANEL 0x08AC00B0u
+#define PANEL_GAME 4u
+#define GAME_SCORES 29328u
+
+enum { REG_A0 = 4, REG_A1 = 5, REG_A2 = 6 };
 
 static uint32_t g_empty_player;
 
@@ -44,7 +50,10 @@ static void on_life_change(void) {
 }
 
 void psp_game_hook(uint32_t addr) {
-    if (addr == LIFE_CHANGE) on_life_change();
+    if (addr == SONG_PANEL) {
+        const uint32_t game = psp_read32(psp_cpu.r[REG_A0] + PANEL_GAME);
+        presence_chosen(game ? psp_read32(game + GAME_SCORES) : 0, (int)psp_cpu.r[REG_A1], (int)psp_cpu.r[REG_A2]);
+    } else if (addr == LIFE_CHANGE) on_life_change();
     else if (addr == MOVIE_START) on_movie_start();
     else if (!controls_hook(addr) && !extras_hook(addr) && !timing_hook(addr)) translation_hook(addr);
 }

@@ -53,6 +53,8 @@ TITLE_RIGHT = 512
 TITLE_SHADOW_ROWS = 2  # of shadow under a plate with no lines under it
 TITLE_TAIL = 10
 TITLE_EDGE = 3
+TITLE_EDGE_CLEAR_UNDER = 1   # under the plate, cleared from this far left of the cut edge's line on
+TITLE_EDGE_STRIP = 3   # how far left of the plate's cut edge it is redrawn, past any words
 TITLE_EDGE_TOP = 4     # where that edge starts, under the white band
 TITLE_GREY = (133, 136, 147)
 TITLE_LINES_END = 480  # where the lines under that plate end, and go up to it
@@ -87,7 +89,7 @@ RESULT_WORD_LEAST = 40           # letter pixels a word needs to be there at all
 LINE_WIDTH = 1.0                 # one pixel lines drawn through their middles
 TEXTURE_FROM = (120, 108, 132, 96)  # how far right, on the same row, the window's bare ground is copied from
 BUTTON_WORD_AT = 18    # where a button's word starts, after its sign and colon
-WINDOW_CUT = 3
+WINDOW_ROUND = 3.5       # the message window's corners, round
 
 # Letters on a grid of three by six, so that all of them on any sign are the same size.
 LETTERS = {
@@ -402,16 +404,14 @@ def line_shapes(x, y):
 
 
 def line_art(c, x, y):
-    """The small marks and the long line that runs along the bottom, with their shadow."""
-    for dash in (0, 4, 8, 12, 16):
-        c.paint([rect(x + dash + 0.6, y + 1, 2, 1)], SHADOW, 90)
-        c.paint([rect(x + dash, y, 2, 1)], WHITE)
-    c.paint([rect(x + 21.6, y + 1, 458, 1)], SHADOW, 90)
-    c.paint([rect(x + 21, y, 459, 1)], WHITE)
-    y += 5
-    shapes = line_shapes(x, y)
-    c.paint([[(px + 0.7, py + 1.1) for px, py in shape] for shape in shapes], SHADOW, 110)
-    c.paint(shapes, WHITE)
+    """The small marks and the long line that runs along the bottom, over their shadow, cast down
+    and to the right as the game's is. Drawn on a layer of their own, then laid over the band."""
+    ox, oy = x - 1, y - 1
+    layer = Canvas(LINE_ART_W, LINE_ART_H)
+    shapes = [rect(x + dash, y, 2, 1) for dash in (0, 4, 8, 12, 16)] + [rect(x + 21, y, 459, 1)] + line_shapes(x, y + 5)
+    layer.paint([[(px - ox, py - oy) for px, py in shape] for shape in shapes], WHITE)
+    blend(c, drop_shadow(layer, LINE_SHADOW_ALPHA, LINE_SHADOW_COLOUR), ox, oy)
+    blend(c, layer, ox, oy)
 
 
 def sampled(pixels, x, y, box):
@@ -466,12 +466,27 @@ def title_plate_edge(sheet, pixels, y, lines_below):
     def edge(row):
         return TITLE_RIGHT - row - x0
 
-    # The soft shadow under it, then the plate, its edge, and the small diagonal at the lines' end.
-    c.paint([[(0, h), (edge(h) + TITLE_EDGE, h), (edge(h + under) + TITLE_EDGE, h + under), (0, h + under)]], (42, 42, 42), 32)
+    # It starts from what is there: under the plate the game has a dark band and its lines, which
+    # must stay as they are. Only the cut edge, its shadow and the lines' end are drawn over them.
+    # Right of the cut edge, where its old steps and their shadow were, it is cleared first.
+    for row in range(c.h):
+        src = ((y * SCALE + row) * sheet.w + x0 * SCALE) * 4
+        c.data[row * c.w * 4:(row + 1) * c.w * 4] = sheet.data[src:src + c.w * 4]
+        game_row = row / SCALE
+        if game_row >= h and lines_below:
+            continue    # under the plate the game's own band, lines and their end's shadow stay
+        clear_from = edge(game_row) - (TITLE_EDGE_STRIP if game_row < h else TITLE_EDGE_CLEAR_UNDER)
+        start = max(0, int(clear_from * SCALE))
+        c.data[(row * c.w + start) * 4:(row + 1) * c.w * 4] = bytes((c.w - start) * 4)
+    # With no lines under it, a soft shadow; then the plate, its edge, and the small diagonal at the lines' end.
+    if not lines_below:
+        c.paint([[(0, h), (edge(h) + TITLE_EDGE, h), (edge(h + under) + TITLE_EDGE, h + under), (0, h + under)]], (42, 42, 42), 32)
     # Its first rows are the white band above, which runs on to the edge of the picture. The shadow
-    # beside the edge runs its whole length, from where the edge starts to the bottom of the picture.
+    # beside the edge runs its whole length, from where the edge starts to the plate's bottom, or on to
+    # the bottom of the picture where no lines are under it: as the game's, which stops at the lines.
     top = TITLE_EDGE_TOP
-    c.paint([[(edge(top), top), (edge(top) + 5, top), (edge(h + under) + 5, h + under), (edge(h + under), h + under)]], (20, 20, 20), 80)
+    end = h if lines_below else h + under
+    c.paint([[(edge(top), top), (edge(top) + 5, top), (edge(end) + 5, end), (edge(end), end)]], (20, 20, 20), 80)
     c.paint([[(0, 0), (c.w / SCALE, 0), (c.w / SCALE, top), (edge(top), top), (edge(h), h), (0, h)]], plate)
     c.paint([[(edge(top), top), (edge(top) + TITLE_EDGE, top), (edge(h) + TITLE_EDGE, h), (edge(h), h)]], TITLE_GREY)
     tail_x = TITLE_LINES_END - x0
@@ -479,15 +494,22 @@ def title_plate_edge(sheet, pixels, y, lines_below):
         c.paint([[(tail_x + 6, h), (tail_x + 3, h), (tail_x - 3, h + 6), (tail_x, h + 6)]], plate)
         c.paint([rect(tail_x - 3, h + 5, 3, 1)], plate)
         c.paint([rect(tail_x - 3, h + 2, 1, 1)], plate)    # the last dot of the line above it
-    paste_over(sheet, c, x0, y, keep_left=tail_x - 3)
+    # On the plate's rows only a narrow strip by its edge is laid down, where the old steps were: a long
+    # name runs nearly to the edge, and must not be painted over. Under the plate, from the tail on.
+    paste_over(sheet, c, x0, y, keep_left=tail_x - 3, plate_rows=h, strip=lambda row: edge(row) - TITLE_EDGE_STRIP)
 
 
-def paste_over(sheet, piece, x, y, keep_left):
-    """Over what is there, from a column on, as the left of a piece may hold words."""
+def paste_over(sheet, piece, x, y, keep_left, plate_rows=0, strip=None):
+    """Over what is there, from a column on, as the left of a piece may hold words. On its first
+    `plate_rows` rows it starts from `strip(row)` instead, if that is further right."""
     for row in range(piece.h):
-        src = (row * piece.w + keep_left * SCALE) * 4
-        dst = ((y * SCALE + row) * sheet.w + (x + keep_left) * SCALE) * 4
-        width = (piece.w - keep_left * SCALE) * 4
+        start = keep_left
+        if strip and row < plate_rows * SCALE:
+            start = max(keep_left, strip(row / SCALE))
+        start_px = int(start * SCALE)
+        src = (row * piece.w + start_px) * 4
+        dst = ((y * SCALE + row) * sheet.w + x * SCALE + start_px) * 4
+        width = (piece.w - start_px) * 4
         sheet.data[dst:dst + width] = piece.data[src:src + width]
 
 
@@ -525,8 +547,11 @@ class LineArt:
             self.shape(rect(x - self.ox, y - self.oy, bw, bh))
 
     def finish(self, sheet):
-        self.c.paint(self.shadows, (30, 30, 30), 96)
-        self.c.paint(self.whites, TITLE_LINE)
+        """The lines over their shadow, cast down and to the right as the game's is."""
+        layer = Canvas(self.c.w // SCALE, self.c.h // SCALE)
+        layer.paint(self.whites, TITLE_LINE)
+        self.c.data[:] = drop_shadow(layer, LINE_SHADOW_ALPHA, LINE_SHADOW_COLOUR).data
+        blend(self.c, layer, 0, 0)
         paste(sheet, self.c, self.ox, self.oy)
 
 
@@ -1254,19 +1279,154 @@ def traced_over(sheet, pixels, box, inside, colour_from=None):
     blend(sheet, c, box[0], box[1])
 
 
+# The circle at a corner of the card's line art, by where its right side and bottom are, and its radius.
+CARD_CIRCLES = (('info_free_ele01.png', 352, 104), ('info_free_ele02.png', 470, 104), ('info_free_ele03.png', 509, 223))
+CARD_CIRCLE_R = 7.6
+CARD_SHADOW_AT = (2.0, 3.0)    # where the lines' shadow falls, from the game's
+CARD_SHADOW_SPREAD = 0.5       # how soft it is: as tight as the game's
+CARD_SHADOW_ALPHA = 66         # how dark under a line one pixel wide
+CARD_SHADOW_MOST_ALPHA = 140
+CARD_SHADOW_REACH = 5          # how far from a line its old shadow is taken out
+LINE_SHADOW_ALPHA = 61         # the titles' and the footer's lines: the same soft shadow
+LINE_SHADOW_COLOUR = (30, 30, 30)
+LINE_ART_W, LINE_ART_H = 481, 28   # the footer's line art, to the sheet's edge, with room for its shadow
+CARD_LINE_OFF = 0.6      # the straight lines that run into it are this far past its middle
+
+
+def card_circle_parts(right, bottom):
+    """The circle's middle, and the triangle inside it, from its right side and bottom."""
+    r = CARD_CIRCLE_R
+    cx, cy = right + 0.5 - r, bottom + 0.5 - r
+    triangle = [(cx + 2.1, cy - 3.9), (cx + 2.1, cy + 2.1), (cx - 3.9, cy + 2.1)]
+    return cx, cy, triangle
+
+
+def inside(point, poly):
+    """Whether a point is inside a polygon, by crossings."""
+    x, y = point
+    hit = False
+    for (ax, ay), (bx, by) in zip(poly, poly[1:] + poly[:1]):
+        if (ay > y) != (by > y) and x < ax + (y - ay) * (bx - ax) / (by - ay):
+            hit = not hit
+    return hit
+
+
+def without_card_circles(pixels):
+    """The card's pixels with its corner circles and their triangles taken out of the white lines,
+    so the tracer leaves them to be drawn round."""
+    out = [list(row) for row in pixels]
+    for _, right, bottom in CARD_CIRCLES:
+        cx, cy, triangle = card_circle_parts(right, bottom)
+        for j in range(int(cy - 11), int(cy + 11)):
+            for i in range(int(cx - 11), int(cx + 11)):
+                d = math.hypot(i + 0.5 - cx, j + 0.5 - cy)
+                # The arc is three quarters round: the inner frame's corner passes by the missing one.
+                on_arc = abs(d - CARD_CIRCLE_R) <= 1.2 and not (i + 0.5 < cx and j + 0.5 < cy)
+                if card_line(pixels[j][i]) and (on_arc or inside((i + 0.5, j + 0.5), triangle)):
+                    out[j][i] = (0, 0, 0, 0)
+    return out
+
+
+def card_circle(layer, pixels, box, right, bottom):
+    """The corner circle: three quarters of a true circle from the line coming down to the line
+    coming in from the left, both run on to meet it, and the triangle inside."""
+    cx, cy, triangle = card_circle_parts(right, bottom)
+    r, off = CARD_CIRCLE_R, CARD_LINE_OFF
+    colour = next(tuple(pixels[j][i][:3]) for j in range(bottom - 2, bottom + 1) for i in range(right - 10, right) if card_line(pixels[j][i]))
+    reach = math.sqrt(r * r - off * off)
+    start, end = math.atan2(-reach, off), math.atan2(off, -reach) + 2 * math.pi * 0
+    if end < start:
+        end += 2 * math.pi
+    arc = [(cx + r * math.cos(start + (end - start) * k / 48), cy + r * math.sin(start + (end - start) * k / 48)) for k in range(49)]
+    path = [(cx + off, cy - r - 1.6)] + arc + [(cx - r - 1.6, cy + off)]
+    x, y, w, h = box
+    layer.paint([[(px - x, py - y) for px, py in thick(path, 1.0)], [(px - x, py - y) for px, py in triangle]], colour)
+
+
+def card_shadow(p):
+    """The soft black the game put under the card's lines, down and to the right of them."""
+    return 0 < p[3] < CARD_SHADOW_MOST_ALPHA and max(p[:3]) < 10
+
+
+def box_blur(alpha, w, h, r, passes=3):
+    """A list of alphas, w by h, blurred by boxes 2r+1 wide, with running sums."""
+    size = 2 * r + 1
+    for _ in range(passes):
+        rows = [0.0] * (w * h)
+        for y in range(h):
+            base = y * w
+            run = sum(alpha[base + min(max(k, 0), w - 1)] for k in range(-r, r + 1))
+            for x in range(w):
+                rows[base + x] = run / size
+                run += alpha[base + min(x + r + 1, w - 1)] - alpha[base + max(x - r, 0)]
+        cols = [0.0] * (w * h)
+        for x in range(w):
+            run = sum(rows[min(max(k, 0), h - 1) * w + x] for k in range(-r, r + 1))
+            for y in range(h):
+                cols[y * w + x] = run / size
+                run += rows[min(y + r + 1, h - 1) * w + x] - rows[max(y - r, 0) * w + x]
+        alpha = cols
+    return alpha
+
+
+def drop_shadow(layer, darkest, colour=(0, 0, 0)):
+    """The layer's shadow as the game drew it: its shape blurred, moved down and to the right, as
+    dark as `darkest` under a line one pixel wide, darker under what is filled."""
+    w, h = layer.w, layer.h
+    r = max(1, int(CARD_SHADOW_SPREAD * SCALE))
+    spread = box_blur([layer.data[i * 4 + 3] for i in range(w * h)], w, h, r)
+    # How high a one pixel line comes out of the same blur.
+    probe_w = 8 * r
+    line = [255.0 if probe_w // 2 - SCALE // 2 <= i < probe_w // 2 + SCALE // 2 else 0.0 for i in range(probe_w)]
+    peak = max(box_blur(line, probe_w, 1, r))
+    shadow = Canvas(w // SCALE, h // SCALE)
+    dx, dy = int(CARD_SHADOW_AT[0] * SCALE), int(CARD_SHADOW_AT[1] * SCALE)
+    for y in range(h):
+        for x in range(w):
+            v = spread[y * w + x]
+            if v <= 0.5:
+                continue
+            tx, ty = x + dx, y + dy
+            if 0 <= tx < w and 0 <= ty < h:
+                at = (ty * w + tx) * 4
+                shadow.data[at:at + 3] = bytes(colour)
+                shadow.data[at + 3] = min(255, int(v / peak * darkest))
+    return shadow
+
+
 def sheet_of_card(archive, out):
-    """The card before a song: its corner lines, circle and ticks traced, with the white taken out
-    of the picture before it is enlarged so no step is left under them; and its three small icons."""
+    """The card before a song: its corner lines, circle and ticks traced, with the white and its
+    shadow taken out of the picture before it is enlarged so no step is left under them, then a new
+    shadow from the new lines, and its three small icons."""
     picture = 'menu_common.png'
     w, h, pixels = decode_png(archive.read(archive.find(picture)))
     rects = layout_of(archive, picture)
-    boxes = [rects[n] for n in ('info_free_ele01.png', 'info_free_ele02.png', 'info_free_ele03.png')]
-    clean = pixels
+    names = ('info_free_ele01.png', 'info_free_ele02.png', 'info_free_ele03.png')
+    boxes = [rects[n] for n in names]
+    # The old shadow falls within a few pixels down and right of a line; the dark panel behind the
+    # words is shadow-coloured too, and stays.
+    near_line = set()
+    for bx, by, bw, bh in boxes:
+        for j in range(by, by + bh):
+            for i in range(bx, bx + bw):
+                if card_line(pixels[j][i]):
+                    near_line |= {(i + di, j + dj) for di in range(-1, CARD_SHADOW_REACH + 1) for dj in range(-1, CARD_SHADOW_REACH + 1)}
+    clean = [list(row) for row in pixels]
+    for (i, j) in near_line:
+        if 0 <= j < len(pixels) and 0 <= i < len(pixels[0]) and card_shadow(pixels[j][i]):
+            clean[j][i] = (0, 0, 0, 0)
     for box in boxes:
         clean = filled_in(clean, box, card_line)
     c = enlarged(archive, picture, clean, w, h)
-    for box in boxes:
-        traced_over(c, pixels, box, card_line)
+    lines = without_card_circles(pixels)
+    for name, box in zip(names, boxes):
+        layer = Canvas(box[2], box[3])
+        traced_layer(layer, lines, box, card_line)
+        for circle_name, right, bottom in CARD_CIRCLES:
+            if circle_name == name:
+                card_circle(layer, pixels, box, right, bottom)
+        blend(c, drop_shadow(layer, CARD_SHADOW_ALPHA), box[0], box[1])
+        blend(c, layer, box[0], box[1])
     white = lambda p: p[3] > 128 and lum(p) > 200
     for name in ('info_free_star.png', 'info_free_kachi.png', 'info_free_oukan.png'):
         traced_piece(c, pixels, rects[name], [(lambda p: p[3] > 128, white), (lambda p: p[3] > 128 and lum(p) <= 200, None)])
@@ -1747,8 +1907,13 @@ def window(sheet):
     c.fill_rect(WINDOW_SIZE - 1, 6, 1, WINDOW_SIZE - 12, WINDOW_RIGHT)
     window_marks(c, False)
     window_marks(c, True)
-    s, n = WINDOW_SIZE, WINDOW_CUT
-    punch(c, [[(0, 0), (n, 0), (0, n)], [(s, 0), (s - n, 0), (s, n)], [(0, s), (n, s), (0, s - n)], [(s, s), (s - n, s), (s, s - n)]])
+    # Its corners are round: outside a quarter circle at each, nothing.
+    s, r = WINDOW_SIZE, WINDOW_ROUND
+    corners = []
+    for cx, cy, corner, start in ((r, r, (0, 0), 180), (s - r, r, (s, 0), 270), (s - r, s - r, (s, s), 0), (r, s - r, (0, s), 90)):
+        corners.append([corner] + [(cx + r * math.cos(math.radians(start + 90 * k / 12)), cy + r * math.sin(math.radians(start + 90 * k / 12)))
+                                   for k in range(13)])
+    punch(c, corners)
     paste(sheet, c, WINDOW_X, WINDOW_Y)
 
 

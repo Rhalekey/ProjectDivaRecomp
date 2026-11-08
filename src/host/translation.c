@@ -28,6 +28,10 @@
 
 #include "translation.h"
 
+#include <psprecomp/render.h>
+
+#include "presence.h"
+
 #include "letters.h"
 
 #include <psprecomp/cpu.h>
@@ -302,6 +306,11 @@ static void text_draw_hook(void) {
         psp_cpu.f[12] = AD_HOC_LINES_MIDDLE - letters_width(text, size, spacing) / 2.0f;
         g_drawing_placed = 1;
     }
+    /* A line a message's window holds, centred. The game sized the window for the Japanese, before
+     * this line was known, so the window is drawn wider where the line is wider, in any language. */
+    if (g_drawing_placed && !g_drawing_lyric) psp_render_gl_dialog_line(letters_width(text, size, spacing));
+    /* What is on screen tells Discord what the player is doing. */
+    presence_text(asked, text, g_drawing_placed);
     /* These sit low on their plates in this font. */
     if (!strcmp(text, "RETRY") || !strcmp(text, "RETURN")) psp_cpu.f[13] -= 1.5f;
     /* Lyrics are lit in step with the song, by what the game takes their width to be. */
