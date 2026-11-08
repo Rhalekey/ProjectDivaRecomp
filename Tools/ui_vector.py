@@ -44,6 +44,48 @@ WINDOW_BOTTOM = ((30, 33, 37, 191), (37, 42, 45, 195), (21, 157, 145, 255), (28,
                  (84, 226, 214, 255), (28, 216, 201, 255), (21, 157, 145, 255), (7, 105, 100, 255))
 WINDOW_SIZE = 60
 WINDOW_X, WINDOW_Y = 150, 139
+BLADE_X, BLADE_Y, BLADE_W, BLADE_H = 0, 0, 164, 17
+BLADE_SEAM_X = 105     # where the plate's second part starts, at the top
+BLADE_SEAM_LEAN = 0.8
+BLADE_CLEAR = 2.5      # how far from an edge its colours are taken, to miss the old steps
+TITLE_PLATE_H = 21     # the plate with a menu's name, which ends at the picture's right edge
+TITLE_RIGHT = 512
+TITLE_SHADOW_ROWS = 2  # of shadow under a plate with no lines under it
+TITLE_TAIL = 10
+TITLE_EDGE = 3
+TITLE_EDGE_TOP = 4     # where that edge starts, under the white band
+TITLE_GREY = (133, 136, 147)
+TITLE_LINES_END = 480  # where the lines under that plate end, and go up to it
+TITLE_LINE = (247, 241, 251)
+ARROW_GLOW_REACH = 2.6  # how far an arrow's glow spreads, in the game's pixels
+ARROW_RIM = 0.6        # how thick its lighter rim is
+# The arrows inside a row's bar, as the columns they fill: either side of a value.
+BAR_ARROWS = ((113, 117, 'left'), (167, 171, 'right'))
+BAR_ARROW_TOP, BAR_ARROW_H = 12, 7   # from the glow's top; in the plain bar they start 5 from its top
+BAR_ARROW_MARGIN = 2   # around one, where the old halo is cleared
+BAR_ARROW_HALO = 1.2   # and how far the new one spreads
+ICON_PINK_TOP, ICON_PINK_LOW = (236, 30, 155), (160, 0, 96)
+ICON_BLUE_TOP, ICON_BLUE_LOW = (60, 150, 212), (1, 98, 166)
+ICON_FOLDER_LIGHT = (200, 226, 245)
+ICON_RING_DARK = (65, 75, 90)
+ICON_RING_A, ICON_RING_B = (1, 214, 166), (40, 250, 240)
+PLATE_ICON_X, PLATE_ICON_Y = 9, 3     # where a title plate's icon is, from the plate's corner
+PLATE_ICON_W, PLATE_ICON_H = 16, 15
+DIGIT_SHADOW_ALPHA = 225
+MARKER_EDGE = (0x6b, 0xfe, 0xff)      # the scroll marker's edge and middle
+MARKER_FILL = (0x55, 0xec, 0xf1)
+SLIDER_ROUND = 1.6
+RESULT_HEADER = (0, 0, 480, 69)       # the top of the results picture, with its line art
+RESULT_ICON = (9, 2, 16, 15)
+RESULT_WORDS = (36, 1, 110, 19)       # where its title's words are, kept as written
+RESULT_STAR_MIDDLE, RESULT_STAR_R = 7.0, 6.4
+RESULT_WORD_EDGE = 0.28          # the dark edge round the window's words: how dark, how wide, how solid
+RESULT_WORD_EDGE_W = 0.45
+RESULT_WORD_STROKE = 2.3       # the letters' strokes, their dark edge inside
+RESULT_WORD_EDGE_ALPHA = 230
+RESULT_WORD_LEAST = 40           # letter pixels a word needs to be there at all
+LINE_WIDTH = 1.0                 # one pixel lines drawn through their middles
+TEXTURE_FROM = (120, 108, 132, 96)  # how far right, on the same row, the window's bare ground is copied from
 BUTTON_WORD_AT = 18    # where a button's word starts, after its sign and colon
 WINDOW_CUT = 3
 
@@ -60,7 +102,7 @@ LETTERS = {
 LETTER_W, LETTER_H = 3, 6
 
 # Pictures of the menus with no words in them here, enlarged and cleaned.
-CLEAN_ONLY = ('menu_common.png', 'menu_common2.png', 'menu_basic03.png', 'menu_basic04.png', 'result_win_nm.png', 'result_win_edit.pn')
+CLEAN_ONLY = ('menu_common2.png',)
 
 
 # ---- drawing
@@ -90,16 +132,6 @@ def letter_rects(word, x, y):
                 if mark == '#':
                     out.append(rect(x + n * (LETTER_W + 1) + col, y + row, 1, 1))
     return out
-
-
-def tapered(a, b, width_a, width_b):
-    """A piece of line that changes thickness along its way, with round joints at both ends."""
-    dx, dy = b[0] - a[0], b[1] - a[1]
-    length = math.hypot(dx, dy) or 1
-    nx, ny = -dy / length, dx / length
-    return [[(a[0] + nx * width_a / 2, a[1] + ny * width_a / 2), (b[0] + nx * width_b / 2, b[1] + ny * width_b / 2),
-             (b[0] - nx * width_b / 2, b[1] - ny * width_b / 2), (a[0] - nx * width_a / 2, a[1] - ny * width_a / 2)],
-            circle(a[0], a[1], width_a / 2, 16), circle(b[0], b[1], width_b / 2, 16)]
 
 
 def write_text(canvas, drawer, text, box, colour, centred=False, edge=None):
@@ -302,10 +334,59 @@ def band(c, y, top_line_x, inner_x, body_top, has_upper_line):
         c.paint([rect(inner_x + 2, line_y + row, width - inner_x - 2, 1)], SHADOW, alpha)
 
 
-# The long line, as (x, y, thickness) at each turn. It changes thickness on the way into a bend.
-LONG_LINE = ((47, 4.5, 1.0), (86.5, 4.5, 1.0), (89.5, 7.5, 1.0), (92, 6, 1.4), (96, 6, 2.0), (128, 6, 2.0), (132, 5.5, 1.2),
-             (137.5, 0.5, 1.0), (144.5, 7.5, 1.0), (148, 4.5, 1.4), (152, 4, 2.0), (216, 4, 2.0), (220, 4.5, 1.2),
-             (223.5, 7.5, 1.0), (226, 5.5, 1.0), (294.5, 5.5, 1.0), (298.5, 1.5, 1.0), (301, 3.5, 1.4), (305, 4, 2.0), (480, 4, 2.0))
+# The long line: thin runs that bend, and thick flat runs between them, as the titles' top wave is.
+# Each thin run starts or ends on the middle of a thick run's end; ('thick', from x, to x, y).
+LONG_LINE = (
+    ('thin', ((47, 4.5), (86.5, 4.5), (89.5, 7.5), (91, 6))),
+    ('thick', 91, 132, 6),
+    ('thin', ((132, 6), (137.5, 0.5), (144.5, 7.5), (148, 4))),
+    ('thick', 148, 220, 4),
+    ('thin', ((220, 4), (223.5, 7.5), (226, 5.5), (294.5, 5.5), (298.5, 1.5), (301, 4))),
+    ('thick', 301, 480, 4),
+)
+LONG_LINE_THIN, LONG_LINE_THICK = 1.0, 2.0
+
+
+def thin_into_thick(points, width, start_y, end_y, half):
+    """The two sides of a thin stroke going left to right, its top side first. Where an end meets a
+    thick flat line centred at start_y or end_y, each side runs on to that line's top or bottom, so
+    the two meet corner to corner with no step, as the titles' top wave does."""
+    poly = thick(points, width)
+    n = len(points)
+    bottom, top = poly[:n], poly[n:][::-1]
+    for index, cy in ((0, start_y), (n - 1, end_y)):
+        if cy is None:
+            continue
+        for side in (top, bottom):
+            p = side[index]
+            q = side[1] if index == 0 else side[n - 2]
+            target = cy - half if p[1] < cy else cy + half
+            t = (target - p[1]) / ((q[1] - p[1]) or 1e-9)
+            side[index] = (p[0] + (q[0] - p[0]) * t, target)
+    return top, bottom
+
+
+def long_line(x, y):
+    """The whole long line as one outline, its thin and thick runs joined, so no seam shows."""
+    half = LONG_LINE_THICK / 2
+    upper, lower = [], []
+    for k, run in enumerate(LONG_LINE):
+        if run[0] == 'thin':
+            before = LONG_LINE[k - 1] if k > 0 else None
+            after = LONG_LINE[k + 1] if k + 1 < len(LONG_LINE) else None
+            top, bottom = thin_into_thick([(x + px, y + py) for px, py in run[1]], LONG_LINE_THIN,
+                                          y + before[3] if before else None, y + after[3] if after else None, half)
+            upper += top
+            lower += bottom
+        else:
+            _, x0, x1, cy = run
+            if k == 0:
+                upper.append((x + x0, y + cy - half))
+                lower.append((x + x0, y + cy + half))
+            if k == len(LONG_LINE) - 1:
+                upper.append((x + x1, y + cy - half))
+                lower.append((x + x1, y + cy + half))
+    return upper + lower[::-1]
 
 
 def line_shapes(x, y):
@@ -316,8 +397,7 @@ def line_shapes(x, y):
     shapes.append([(x + 37, y + 4.5), (x + 40, y + 2.2), (x + 40, y + 6.8)])
     # The arrow the long line ends in, larger than those before it.
     shapes.append([(x + 42, y + 4.5), (x + 47.5, y + 0.7), (x + 47.5, y + 8.3)])
-    for a, b in zip(LONG_LINE, LONG_LINE[1:]):
-        shapes += tapered((x + a[0], y + a[1]), (x + b[0], y + b[1]), a[2], b[2])
+    shapes.append(long_line(x, y))
     return shapes
 
 
@@ -332,6 +412,1266 @@ def line_art(c, x, y):
     shapes = line_shapes(x, y)
     c.paint([[(px + 0.7, py + 1.1) for px, py in shape] for shape in shapes], SHADOW, 110)
     c.paint(shapes, WHITE)
+
+
+def sampled(pixels, x, y, box):
+    """The game's picture between its pixels, at a point kept inside a box of it."""
+    x0, y0, x1, y1 = box
+    fx = min(max(x - 0.5, x0), x1 - 1.001)
+    fy = min(max(y - 0.5, y0), y1 - 1.001)
+    ix, iy = int(fx), int(fy)
+    tx, ty = fx - ix, fy - iy
+    out = []
+    for i in range(3):
+        top = pixels[iy][ix][i] * (1 - tx) + pixels[iy][ix + 1][i] * tx
+        low = pixels[iy + 1][ix][i] * (1 - tx) + pixels[iy + 1][ix + 1][i] * tx
+        out.append(int(top * (1 - ty) + low * ty))
+    return tuple(out)
+
+
+def blade(sheet, pixels):
+    """The plate under each menu's title. Its metal is the game's own: only its second plate's edge and
+    its cut end become straight, each side taking its colour from a little way off the old steps."""
+    x, y, w, h = BLADE_X, BLADE_Y, BLADE_W, BLADE_H
+    box = (x, y + 1, x + w, y + h - 1)
+    c = Canvas(w, h)
+
+    def seam(row):
+        return BLADE_SEAM_X - BLADE_SEAM_LEAN * row
+
+    def left_plate(px, py):
+        return sampled(pixels, x + min(px, seam(py) - BLADE_CLEAR), y + py, box)
+
+    def right_plate(px, py):
+        return sampled(pixels, x + min(max(px, seam(py) + BLADE_CLEAR), w - py - BLADE_CLEAR), y + py, box)
+
+    c.paint([[(0, 0), (seam(0), 0), (seam(h), h), (0, h)]], left_plate)
+    c.paint([[(seam(0), 0), (w, 0), (w - h, h), (seam(h), h)]], right_plate)
+    # What catches the light: the lines along its top and bottom, and the cut.
+    c.paint([[(0, 0), (w, 0), (w - 1, 1), (0, 1)]], lambda px, py: sampled(pixels, x + min(px, w - 3), y + 0.5, (x, y, x + w, y + 1.002)))
+    c.paint([[(0, h - 1), (w - h + 1, h - 1), (w - h, h), (0, h)]], lambda px, py: sampled(pixels, x + min(px, w - h - 2), y + h - 0.5, (x, y + h - 1, x + w, y + h + 0.002)))
+    c.paint([[(w, 0), (w - h, h), (w - h - 1, h), (w - 1, 0)]], WHITE)
+    paste(sheet, c, x, y)
+
+
+def title_plate_edge(sheet, pixels, y, lines_below):
+    """The cut end of the plate with a menu's name: a grey edge along it, a shadow beside that, and,
+    where two lines run under the plate, the white diagonal that takes them up to meet that edge."""
+    h, tail = TITLE_PLATE_H, TITLE_TAIL
+    x0 = TITLE_RIGHT - h - tail - 8
+    c = Canvas(TITLE_RIGHT - x0, h + tail)
+    plate = tuple(pixels[y + 1][x0 - 20])
+    under = tail if lines_below else TITLE_SHADOW_ROWS
+
+    def edge(row):
+        return TITLE_RIGHT - row - x0
+
+    # The soft shadow under it, then the plate, its edge, and the small diagonal at the lines' end.
+    c.paint([[(0, h), (edge(h) + TITLE_EDGE, h), (edge(h + under) + TITLE_EDGE, h + under), (0, h + under)]], (42, 42, 42), 32)
+    # Its first rows are the white band above, which runs on to the edge of the picture. The shadow
+    # beside the edge runs its whole length, from where the edge starts to the bottom of the picture.
+    top = TITLE_EDGE_TOP
+    c.paint([[(edge(top), top), (edge(top) + 5, top), (edge(h + under) + 5, h + under), (edge(h + under), h + under)]], (20, 20, 20), 80)
+    c.paint([[(0, 0), (c.w / SCALE, 0), (c.w / SCALE, top), (edge(top), top), (edge(h), h), (0, h)]], plate)
+    c.paint([[(edge(top), top), (edge(top) + TITLE_EDGE, top), (edge(h) + TITLE_EDGE, h), (edge(h), h)]], TITLE_GREY)
+    tail_x = TITLE_LINES_END - x0
+    if lines_below:
+        c.paint([[(tail_x + 6, h), (tail_x + 3, h), (tail_x - 3, h + 6), (tail_x, h + 6)]], plate)
+        c.paint([rect(tail_x - 3, h + 5, 3, 1)], plate)
+        c.paint([rect(tail_x - 3, h + 2, 1, 1)], plate)    # the last dot of the line above it
+    paste_over(sheet, c, x0, y, keep_left=tail_x - 3)
+
+
+def paste_over(sheet, piece, x, y, keep_left):
+    """Over what is there, from a column on, as the left of a piece may hold words."""
+    for row in range(piece.h):
+        src = (row * piece.w + keep_left * SCALE) * 4
+        dst = ((y * SCALE + row) * sheet.w + (x + keep_left) * SCALE) * 4
+        width = (piece.w - keep_left * SCALE) * 4
+        sheet.data[dst:dst + width] = piece.data[src:src + width]
+
+
+class LineArt:
+    """Thin white lines with the game's soft shadow under them, built from straight pieces, all the
+    shadows first so that no shadow falls on a line. Points are given in the sheet's pixels."""
+
+    def __init__(self, x, y, w, h):
+        self.c = Canvas(w, h)
+        self.ox, self.oy = x, y
+        self.whites, self.shadows = [], []
+
+    def at(self, *points):
+        return [(px - self.ox, py - self.oy) for px, py in points]
+
+    def shape(self, polygon):
+        self.whites.append(polygon)
+        self.shadows.append([(px + 1, py + 1) for px, py in polygon])
+
+    def stroke(self, points, width):
+        self.whites.extend(polyline(points, width))
+        self.shadows.extend(polyline([(px + 1, py + 1) for px, py in points], width))
+
+    def bar(self, x0, x1, y0, rows=1):
+        self.shape(rect(x0 - self.ox, y0 - self.oy, x1 - x0 + 1, rows))
+
+    def ledge(self, x0, x1, y0, under):
+        """A row on the top or bottom of a thicker line, with slanted ends."""
+        wide, short = (y0 + 1, y0) if under else (y0, y0 + 1)
+        self.shape(self.at((x0, wide), (x1 + 1, wide), (x1, short), (x0 + 1, short)))
+
+    def box(self, x0, y0, w, h):
+        """A square outline of single pixels."""
+        for x, y, bw, bh in ((x0, y0, w, 1), (x0, y0 + h - 1, w, 1), (x0, y0, 1, h), (x0 + w - 1, y0, 1, h)):
+            self.shape(rect(x - self.ox, y - self.oy, bw, bh))
+
+    def finish(self, sheet):
+        self.c.paint(self.shadows, (30, 30, 30), 96)
+        self.c.paint(self.whites, TITLE_LINE)
+        paste(sheet, self.c, self.ox, self.oy)
+
+
+def title_top_row(k, dx, left):
+    """The first row of every title: the thick line, its rise and dip, its arrow, and the marks that run
+    on from it. The titles with a small plate have it all 3 pixels to the left of the Home one.
+    The wave rises out of the thick line's middle, its two edges meeting the thick line's two
+    corners, so neither side has a step. Its piece starts at row 29, which is as high as anything
+    can go, and the arrow's ends stay within it."""
+    k.shape(k.at((left, 32), (261.3 + dx, 32), (260.94 + dx, 34), (left, 34)))
+    k.stroke(k.at(*[(px + dx, py) for px, py in ((260.8, 33.3), (264.8, 29.8), (268, 32.5), (306, 32.5), (309.5, 35.5), (313, 32.5), (357.5, 32.5))]), 1.25)
+    k.stroke(k.at((353.6 + dx, 29.7), (357.5 + dx, 32.5), (353.6 + dx, 35.3)), 1.4)
+    for tip in (361, 396):
+        k.shape(k.at((tip + dx, 29.5), (tip + dx + 3.5, 32.5), (tip + dx, 35.5)))
+    for start in range(366, 392, 5):
+        k.stroke(k.at((start + dx, 30), (start + dx + 2.6, 32.5), (start + dx, 35)), 0.9)
+    for x0, x1 in ((405, 407), (409, 411), (413, 415), (417, 420), (422, 424), (426, 428), (430, 432), (434, 436), (438, 441), (443, 445),
+                   (447, 449), (451, 454), (456, 458), (460, 463), (465, 468), (470, 471), (473, 475), (477, 479), (481, 483), (485, 487),
+                   (489, 491), (493, 495), (497, 499), (501, 504), (506, 508), (510, 511)):
+        k.bar(x0 + dx, x1 + dx, 32)
+
+
+def title_home_lines(sheet):
+    """The lines of the Home title, and Miku's Room's, which are the same: every one straight, with the
+    same ends and bends as the game's."""
+    k = LineArt(32, 29, 480, 47)
+    title_top_row(k, 0, 32)
+    # Second line, with its gaps, and the dashes that follow.
+    for x0, x1 in ((32, 239), (247, 285), (295, 329), (340, 377)):
+        k.ledge(x0, x1, 40, True)
+    k.bar(32, 377, 41)
+    for x0 in range(379, 396, 4):
+        k.bar(x0, x0 + 2, 40, 2)
+    # The bracket that takes the top line down to the row of squares.
+    k.stroke(k.at((405, 32.5), (397.5, 40)), 1)
+    k.stroke(k.at((397.5, 41.5), (403.5, 47.5), (409.5, 47.5), (409.5, 50.5), (486.5, 50.5)), 1)
+    for dot in range(489, 511, 3):
+        k.bar(dot, dot, 50)
+    k.stroke(k.at((411.5, 41), (411.5, 48.5), (512, 48.5)), 1)
+    # The squares, one of them full.
+    for x0 in (415, 429, 436, 443, 450, 457, 464):
+        k.box(x0, 43, 4, 4)
+    k.bar(422, 425, 43, 4)
+    # Below them, two small squares and a line with gaps.
+    for x0 in (403, 409):
+        k.box(x0, 54, 4, 3)
+    k.bar(415, 511, 54, 2)
+    for x0, x1 in ((415, 426), (448, 460), (480, 492), (510, 511)):
+        k.ledge(x0, x1, 56, False)
+    # The two lines at the bottom, stepping down to the fork at the left.
+    k.stroke(k.at((512, 60.5), (433.5, 60.5), (429.5, 64.5), (402, 64.5)), 1)
+    k.bar(433, 511, 64, 2)
+    # The fork: both its arms come to the point where the thick line starts.
+    k.stroke(k.at((433.5, 65), (430.5, 68)), 2)
+    k.shape(k.at((430.5, 67), (333, 67), (332.4, 68), (333, 69), (430.5, 69)))
+    k.stroke(k.at((347.5, 55.5), (336, 55.5), (328.5, 63.5), (324, 63.5)), 1)
+    k.stroke(k.at((328.5, 63.5), (332.6, 68)), 1.2)
+    k.stroke(k.at((332.6, 68), (328.6, 72)), 1.2)
+    k.finish(sheet)
+
+
+def title_short_lines(sheet):
+    """The lines of the titles with a small plate, Rhythm Game Edit, Ad Hoc and the gallery's, which
+    have only two rows: the first as Home's, and a thick one under it that leads to a row of squares."""
+    k = LineArt(29, 29, 483, 17)
+    title_top_row(k, -3, 29)
+    k.bar(29, 374, 40, 2)
+    for x0 in (378, 383, 388, 393):
+        k.bar(x0, x0 + 2, 40, 2)
+    # A small mark pointing left, and the line from it that runs under the squares.
+    k.stroke(k.at((402.5, 36), (402.5, 41.5), (509, 41.5)), 1)
+    k.stroke(k.at((402.5, 36.6), (400.6, 38.5), (402.5, 40.4)), 1)
+    for x0 in (406, 420, 427, 434, 441, 448, 455):
+        k.box(x0, 36, 4, 4)
+    k.bar(413, 416, 36, 4)
+    k.finish(sheet)
+
+
+# Each title's picture: its lines, where they are, and where its plate is and whether lines run under it.
+TITLES = (
+    ('menu_title_home.png', title_home_lines, (32, 29, 480, 47), 76, True),
+    ('menu_title_myroom.png', title_home_lines, (32, 29, 480, 47), 76, True),
+    ('menu_title_edit.png', title_short_lines, (29, 29, 483, 17), 46, False),
+    ('menu_title_adhok.png', title_short_lines, (29, 29, 483, 17), 46, False),
+    ('menu_title_gallery.png', title_short_lines, (29, 29, 483, 17), 46, False),
+)
+
+
+def titles(archive, out):
+    """Takes the pictures already made with each name in this language, and redoes their lines."""
+    for name, lines, box, plate_y, lines_below in TITLES:
+        picture = archive.find(name)
+        w, h, pixels = decode_png(archive.read(picture))
+        path = os.path.join(out, '%08X.rgba' % colour_hash(pixels))
+        if os.path.exists(path):
+            with open(path, 'rb') as f:
+                made_w, made_h = struct.unpack('<II', f.read(8))
+                data = f.read()
+            c = Canvas(made_w // SCALE, made_h // SCALE)
+            for row in range(made_h):
+                c.data[(made_h - 1 - row) * made_w * 4:(made_h - row) * made_w * 4] = data[row * made_w * 4:(row + 1) * made_w * 4]
+        else:
+            c = enlarged(archive, picture, pixels, w, h)
+        wipe(c, box)
+        lines(c)
+        title_plate_edge(c, pixels, plate_y, lines_below)
+        plate = layout_of(archive, picture)['title_%s_title.png' % name[len('menu_title_'):-len('.png')]]
+        plate_icon(c, pixels, plate[0] + PLATE_ICON_X, plate[1] + PLATE_ICON_Y, PLATE_ICONS[name])
+        write_sheet(c, pixels, out)
+
+
+def arrow(direction, left, top, right, bottom):
+    """A triangle filling a box given by its pixels' edges, pointing up, down, left or right."""
+    mx, my = (left + right) / 2, (top + bottom) / 2
+    return {'up': [(mx, top), (right, bottom), (left, bottom)], 'down': [(left, top), (right, top), (mx, bottom)],
+            'left': [(left, my), (right, top), (right, bottom)], 'right': [(left, top), (right, my), (left, bottom)]}[direction]
+
+
+def shrunk(poly, by):
+    """The same triangle with its sides moved in by `by` pixels."""
+    (ax, ay), (bx, by_), (cx, cy) = poly
+    sides = [math.hypot(bx - cx, by_ - cy), math.hypot(ax - cx, ay - cy), math.hypot(ax - bx, ay - by_)]
+    area = abs((bx - ax) * (cy - ay) - (cx - ax) * (by_ - ay)) / 2
+    middle = ((sides[0] * ax + sides[1] * bx + sides[2] * cx) / sum(sides), (sides[0] * ay + sides[1] * by_ + sides[2] * cy) / sum(sides))
+    keep = max(0.0, 1 - by / (2 * area / sum(sides)))
+    return [(middle[0] + (px - middle[0]) * keep, middle[1] + (py - middle[1]) * keep) for px, py in poly]
+
+
+def blurred(c, reach):
+    """The canvas's coverage spread out, three box blurs one after another, as a list of alphas."""
+    w, h = c.w, c.h
+    a = [c.data[i * 4 + 3] for i in range(w * h)]
+    r = max(1, int(reach * SCALE / 3))
+    for _ in range(3):
+        rows = [0] * (w * h)
+        for y in range(h):
+            for x in range(w):
+                lo, hi = max(0, x - r), min(w - 1, x + r)
+                rows[y * w + x] = sum(a[y * w + lo:y * w + hi + 1]) / (2 * r + 1)
+        cols = [0] * (w * h)
+        for x in range(w):
+            for y in range(h):
+                lo, hi = max(0, y - r), min(h - 1, y + r)
+                cols[y * w + x] = sum(rows[k * w + x] for k in range(lo, hi + 1)) / (2 * r + 1)
+        a = cols
+    return a
+
+
+def core_box(pixels, box, strong=0xE0):
+    """The edges of the solid part of a piece."""
+    x, y, w, h = box
+    solid = [(i, j) for j in range(y, y + h) for i in range(x, x + w) if pixels[j][i][3] >= strong]
+    return min(i for i, _ in solid), min(j for _, j in solid), max(i for i, _ in solid) + 1, max(j for _, j in solid) + 1
+
+
+def glowing_arrow(sheet, pixels, box, direction):
+    """An arrow of the lists: a light rim, a bright middle and the soft teal glow around it, all in
+    the piece's own colours. One with no glow, the greyed out ones, is a single flat colour."""
+    x, y, w, h = box
+    left, top, right, bottom = core_box(pixels, box)
+    shape = [(px - x, py - y) for px, py in arrow(direction, left, top, right, bottom)]
+    solid = [pixels[j][i] for j in range(top, bottom) for i in range(left, right) if pixels[j][i][3] >= 0xE0]
+    rim = max(solid, key=lambda p: p[0])[:3]
+    middle = min(solid, key=lambda p: p[0])[:3]
+    faint = [pixels[j][i] for j in range(y, y + h) for i in range(x, x + w) if 0 < pixels[j][i][3] < 0xE0]
+    c = Canvas(w, h)
+    if faint:
+        mask = Canvas(w, h)
+        mask.paint([shape], WHITE)
+        glow = max(faint, key=lambda p: p[3])
+        spread = blurred(mask, ARROW_GLOW_REACH)
+        for i, cover in enumerate(spread):
+            alpha = int(min(1.0, cover / 255 * 2.4) * glow[3])
+            if alpha:
+                c.data[i * 4:i * 4 + 4] = bytes(glow[:3]) + bytes([alpha])
+        c.paint([shape], rim)
+        c.paint([shrunk(shape, ARROW_RIM)], middle)
+    else:
+        c.paint([shape], middle)
+    wipe(sheet, box)
+    paste(sheet, c, x, y)
+
+
+def arrow_in_bar(sheet, pixels, core, direction):
+    """An arrow drawn into a row's bar: the bar runs on under it, then the arrow in its colour, with the
+    soft halo of the colour the game put around it."""
+    left, top, right, bottom = core
+    colour = pixels[(top + bottom) // 2][(left + right) // 2][:3]
+    around = [pixels[j][i] for j in range(top - 1, bottom + 1) for i in (left - 1, right)]
+    halo = tuple(sum(p[k] for p in around) // len(around) for k in range(3))
+    m = BAR_ARROW_MARGIN
+    x0, x1 = (left - m) * SCALE, (right + m) * SCALE
+    for row in range((top - m) * SCALE, (bottom + m) * SCALE):
+        a = sheet.data[(row * sheet.w + x0 - 1) * 4:(row * sheet.w + x0) * 4]
+        b = sheet.data[(row * sheet.w + x1) * 4:(row * sheet.w + x1 + 1) * 4]
+        for col in range(x0, x1):
+            t = (col - x0 + 0.5) / (x1 - x0)
+            sheet.data[(row * sheet.w + col) * 4:(row * sheet.w + col + 1) * 4] = bytes(int(a[k] + (b[k] - a[k]) * t) for k in range(4))
+    pw, ph = right - left + 2 * m, bottom - top + 2 * m
+    piece = Canvas(pw, ph)
+    for row in range(piece.h):
+        src = (((top - m) * SCALE + row) * sheet.w + (left - m) * SCALE) * 4
+        piece.data[row * piece.w * 4:(row + 1) * piece.w * 4] = sheet.data[src:src + piece.w * 4]
+    shape = [(px - left + m, py - top + m) for px, py in arrow(direction, left, top, right, bottom)]
+    mask = Canvas(pw, ph)
+    mask.paint([shape], WHITE)
+    for i, cover in enumerate(blurred(mask, BAR_ARROW_HALO)):
+        k = min(1.0, cover / 255 * 1.8) * 0.75
+        if k > 0:
+            at = i * 4
+            piece.data[at:at + 3] = bytes(int(piece.data[at + j] + (halo[j] - piece.data[at + j]) * k) for j in range(3))
+    piece.paint([shape], colour)
+    paste(sheet, piece, left - m, top - m)
+
+
+def sheet_of_arrows(archive, out):
+    """The arrows and cursors of the lists, and the slider's handle."""
+    picture = 'menu_basic04.png'
+    w, h, pixels = decode_png(archive.read(archive.find(picture)))
+    rects = layout_of(archive, picture)
+    c = enlarged(archive, picture, pixels, w, h)
+    for name, direction in (('basic_yajirusi_upon.png', 'up'), ('basic_yajirusi_dnon.png', 'down'),
+                            ('basic_yajirusi_upoff.png', 'up'), ('basic_yajirusi_dnoff.png', 'down'),
+                            ('basic_cursor_l_on.png', 'left'), ('basic_cursor_r_on.png', 'right'),
+                            ('basic_cursor_l_off.png', 'left'), ('basic_cursor_r_off.png', 'right'),
+                            ('basic_cursor_up_on.png', 'up'), ('basic_cursor_dn_on.png', 'down'),
+                            ('basic_cursor_up_off.png', 'up'), ('basic_cursor_dn_off.png', 'down')):
+        glowing_arrow(c, pixels, rects[name], direction)
+    # The pink arrows inside the selected row's glow, which the rows with values show.
+    for name in ('basic_glow_arw_a.png', 'basic_glow_arw.png'):
+        x, y, bw, bh = rects[name]
+        for left, right, direction in BAR_ARROWS:
+            arrow_in_bar(c, pixels, (left, y + BAR_ARROW_TOP, right, y + BAR_ARROW_TOP + BAR_ARROW_H), direction)
+    marker_end(c, rects['basic_marker_up.png'], True)
+    marker_end(c, rects['basic_marker_dn.png'], False)
+    write_sheet(c, pixels, out)
+
+
+def outlined(c, strokes, fill, outline=WHITE, border=1.0, square_ends=True):
+    """Coloured strokes inside a white border, the look of the game's small icons. Each stroke is a
+    list of points and a width; the border is the same strokes made wider, under them."""
+    def shapes(extra):
+        polys = []
+        for points, width in strokes:
+            w = width + 2 * extra
+            for i in range(len(points) - 1):
+                (ax, ay), (bx, by) = points[i], points[i + 1]
+                if square_ends:
+                    length = math.hypot(bx - ax, by - ay) or 1
+                    ux, uy = (bx - ax) / length * w / 2, (by - ay) / length * w / 2
+                    ax, ay, bx, by = ax - ux, ay - uy, bx + ux, by + uy
+                polys.append(segment(ax, ay, bx, by, w))
+        return polys
+    c.paint(shapes(border), outline)
+    c.paint(shapes(0), fill)
+
+
+def magenta_down(top, bottom):
+    """The icons' pink, lighter at the top."""
+    return lambda x, y: tuple(int(a + (b - a) * min(1.0, max(0.0, (y - top) / (bottom - top)))) for a, b in zip(ICON_PINK_TOP, ICON_PINK_LOW))
+
+
+def blue_down(top, bottom):
+    return lambda x, y: tuple(int(a + (b - a) * min(1.0, max(0.0, (y - top) / (bottom - top)))) for a, b in zip(ICON_BLUE_TOP, ICON_BLUE_LOW))
+
+
+def white_ground(c, pixels, box):
+    """The white the game's icon sits on, square pixel for square pixel: its steps are the letters'
+    own, going down one after another, not steps of a slanted line."""
+    x, y, w, h = box
+    c.paint([rect(i, j, 1, 1) for j in range(h) for i in range(w) if pixels[y + j][x + i][3] > 40], WHITE)
+
+
+def icon_new(sheet, pixels, box):
+    """NEW, its letters going down in steps, N into E into W, each line straight."""
+    x, y, w, h = box
+    c = Canvas(w, h)
+    white_ground(c, pixels, box)
+    outlined(c, [
+        ([(1.5, 1.2), (1.5, 6)], 1), ([(1.5, 1.5), (4.5, 4.5)], 1), ([(4.5, 1.2), (4.5, 7.5)], 1),
+        ([(4.5, 3.5), (6.5, 3.5)], 1), ([(4.5, 5.5), (6.5, 5.5)], 1), ([(4.5, 7.5), (6.5, 7.5)], 1),
+        ([(6.5, 7.5), (6.5, 9.6), (7.5, 10.4), (8.5, 9.6), (8.5, 7.8)], 1),
+        ([(8.5, 9.6), (9.5, 10.4), (10.5, 9.6), (10.5, 5.2)], 1),
+    ], magenta_down(1, 10.5), border=0)
+    wipe(sheet, box)
+    paste(sheet, c, x, y)
+
+
+def icon_note(sheet, box):
+    """Two notes joined by a beam that rises on a straight slant."""
+    x, y, w, h = box
+    c = Canvas(w, h)
+    heads = [(2.2, 9.2), (9.2, 8.2)]
+    border = [circle(hx, hy, 2.15, 24) for hx, hy in heads]
+    c.paint(border, WHITE)
+    outlined(c, [([(3.5, 9), (3.5, 3.6)], 1), ([(10.5, 8), (10.5, 1.6)], 1), ([(3.5, 3.4), (10.5, 1.4)], 2)], magenta_down(1, 10.5))
+    c.paint([[(hx + 1.25 * math.cos(t / 12 * math.tau) * 1.15 - 0.4 * math.sin(t / 12 * math.tau),
+               hy + 1.0 * math.sin(t / 12 * math.tau)) for t in range(12)] for hx, hy in heads], magenta_down(1, 10.5))
+    wipe(sheet, box)
+    paste(sheet, c, x, y)
+
+
+def icon_folder(sheet, box):
+    """A blue plate with a white border, and a white folder on it."""
+    x, y, w, h = box
+    c = Canvas(w, h)
+    # The plate is a folder too: its top steps down on a slant after the tab, as the game's does.
+    c.paint([[(0, 0), (6.6, 0), (8.6, 2), (12, 2), (12, 11), (11, 12), (1, 12), (0, 11)]], WHITE)
+    c.paint([[(1, 1), (6.2, 1), (8.2, 3), (11, 3), (11, 10.6), (10.6, 11), (1.4, 11), (1, 10.6)]], blue_down(1, 11))
+    c.paint([[(3, 2), (5, 2), (5.6, 3.6), (9.2, 3.6), (9.2, 8.4), (3, 8.4)]], ICON_FOLDER_LIGHT)
+    c.paint([[(3.7, 4.4), (8.5, 4.4), (8.5, 7.8), (3.7, 7.8)]], WHITE)
+    wipe(sheet, box)
+    paste(sheet, c, x, y)
+
+
+def icon_set(sheet, pixels, box):
+    """SET, its letters going down in steps as NEW's do."""
+    x, y, w, h = box
+    c = Canvas(w, h)
+    white_ground(c, pixels, box)
+    outlined(c, [
+        ([(4.5, 1.5), (1.5, 1.5), (1.5, 3.5), (4.5, 3.5), (4.5, 5.5), (1.5, 5.5)], 1),
+        ([(4.5, 3.5), (4.5, 7.5)], 1), ([(4.5, 3.5), (6.5, 3.5)], 1), ([(4.5, 5.5), (6.5, 5.5)], 1), ([(4.5, 7.5), (6.5, 7.5)], 1),
+        ([(7.5, 6.5), (10.5, 6.5)], 1), ([(8.5, 6.5), (8.5, 10.5)], 1),
+    ], blue_down(1, 10.5), border=0)
+    wipe(sheet, box)
+    paste(sheet, c, x, y)
+
+
+def icon_ring(sheet, pixels, box):
+    """The ring beside the titles: a teal band round a dark middle, inside a dark border."""
+    x, y, w, h = box
+    c = Canvas(w, h)
+    cx, cy = w / 2, h / 2
+    dark = pixels[y + 4][x + 4][:3] if pixels[y + 4][x + 4][3] else (65, 75, 90)
+    c.paint([circle(cx, cy, 6, 72)], ICON_RING_DARK)
+    c.paint(ring(cx, cy, 5, 2.1), lambda px, py: tuple(int(a + (b - a) * min(1.0, max(0.0, (px + py) / (w + h)))) for a, b in zip(ICON_RING_A, ICON_RING_B)))
+    wipe(sheet, box)
+    paste(sheet, c, x, y)
+
+
+def sheet_of_icons(archive, out):
+    """The small icons of the lists, on the sheet that also has the Project DIVA badge and the digits."""
+    picture = 'menu_basic03.png'
+    w, h, pixels = decode_png(archive.read(archive.find(picture)))
+    rects = layout_of(archive, picture)
+    c = enlarged(archive, picture, pixels, w, h)
+    icon_new(c, pixels, rects['basic_icon_new.png'])
+    icon_note(c, rects['basic_icon_note.png'])
+    icon_folder(c, rects['basic_icon_folder.png'])
+    icon_set(c, pixels, rects['basic_icon_set.png'])
+    for digit, strokes in DIGITS.items():
+        shadowed(c, rects['basic_num_%s.png' % digit], strokes)
+    percent_sign(c, rects['basic_num_percent.png'])
+    x, y, bw, bh = rects['basic_achivement.png']
+    a = Canvas(bw, bh)
+    a.paint(pixel_strokes(ACHIEVEMENT), WHITE)
+    wipe(c, rects['basic_achivement.png'])
+    paste(c, a, x, y)
+    write_sheet(c, pixels, out)
+
+
+def rounded(x, y, w, h, r, corners='tl tr br bl', steps=8):
+    """A rectangle with the named corners rounded, as one polygon."""
+    out = []
+    for name, cx, cy, start in (('tl', x + r, y + r, 180), ('tr', x + w - r, y + r, 270),
+                                ('br', x + w - r, y + h - r, 0), ('bl', x + r, y + h - r, 90)):
+        if name in corners.split():
+            out += [(cx + r * math.cos(math.radians(start + 90 * k / steps)), cy + r * math.sin(math.radians(start + 90 * k / steps)))
+                    for k in range(steps + 1)]
+        else:
+            out.append({'tl': (x, y), 'tr': (x + w, y), 'br': (x + w, y + h), 'bl': (x, y + h)}[name])
+    return out
+
+
+def with_hole(outer, inner):
+    """One polygon with a hole, joined by an edge taken twice, as ring() does."""
+    return outer + outer[:1] + inner[:1] + inner[:0:-1] + inner[:1] + outer[:1]
+
+
+def pixel_strokes(paths, width=1.0, dx=0.0, dy=0.0):
+    """Lines through the middles of the game's pixels, given by column and row, with square ends,
+    so that straight runs cover their pixels exactly and the steps become slants."""
+    polys = []
+    for points in paths:
+        points = [(px + 0.5 + dx, py + 0.5 + dy) for px, py in points]
+        if len(points) == 1:
+            px, py = points[0]
+            polys.append(rect(px - width / 2, py - width / 2, width, width))
+            continue
+        for i in range(len(points) - 1):
+            (ax, ay), (bx, by) = points[i], points[i + 1]
+            length = math.hypot(bx - ax, by - ay) or 1
+            ux, uy = (bx - ax) / length * width / 2, (by - ay) / length * width / 2
+            polys.append(segment(ax - ux, ay - uy, bx + ux, by + uy, width))
+    return polys
+
+
+def arc_band(cx, cy, r, width, from_deg, to_deg, steps=24):
+    """A curved band, `width` thick, along a circle."""
+    def at(radius, k):
+        a = math.radians(from_deg + (to_deg - from_deg) * k / steps)
+        return cx + radius * math.cos(a), cy + radius * math.sin(a)
+    return [at(r + width / 2, k) for k in range(steps + 1)] + [at(r - width / 2, k) for k in range(steps, -1, -1)]
+
+
+# The icons on the title plates: a frame with soft corners and a picture inside, in the plate's teal.
+def plate_icon_home(c, colour):
+    """A head: the hair's cap on top, the hair down the left side shaded with fine slanted lines,
+    the cheek and chin on the right."""
+    cap = [(8.5 + 4.5 * math.cos(math.radians(a)), 4.5 + 1.55 * math.sin(math.radians(a))) for a in range(0, 360, 10)]
+    c.paint([cap, rounded(7, 2, 2, 2, 0.6, 'tl tr')], colour)
+    c.paint(pixel_strokes([[(3, 5), (3, 9.6), (4.4, 11), (8, 11)], [(9, 6), (8, 7.2), (8, 10.6)],
+                           [(12, 5), (12, 9.4), (10.2, 11.6), (9.2, 12), (7, 12)]]), colour)
+    c.paint([segment(k - 6.5, 12.5, k + 0.5, 5.5, 0.62) for k in range(5, 17, 2)], colour, clip=(4, 6, 8, 11))
+
+
+def plate_icon_film(c, colour):
+    """A frame of film: holes down both sides, a window in the middle."""
+    c.paint([with_hole(rect(3, 4, 10, 7), rect(6, 5, 4, 5)[::-1])], colour)
+    punch(c, [rounded(hx, hy, 1, 1, 0.3) for hx in (4, 11) for hy in (5, 7, 9)])
+
+
+def plate_icon_folder(c, colour):
+    """A folder seen a little from the side: its left and bottom thicker."""
+    c.paint([[(3, 4.2), (4.2, 3), (5, 3), (5, 10), (13, 10), (13, 11), (12, 12), (4, 12), (3, 11)]], colour)
+    c.paint(pixel_strokes([[(4, 3), (7, 3), (8.5, 5), (11, 5), (12, 6), (12, 10)]]), colour)
+
+
+def plate_icon_door(c, colour):
+    """A door standing on the frame's bottom edge, with its handle."""
+    c.paint([rect(4, 4, 1, 9.5), rect(4, 4, 8, 1), rect(10, 4, 2, 9.5)], colour)
+    c.paint([rounded(9, 8, 1.6, 2, 0.5, 'tl bl')], colour)
+
+
+def plate_icon_waves(c, colour):
+    """Three waves going out, for playing together nearby."""
+    # Each ends flat, on the rows where the game's ends were.
+    for cx, r, top, bottom in ((2.5, 2.5, 5, 10), (5.8, 3.2, 4, 11), (7.14, 4.86, 3, 12)):
+        reach = math.degrees(math.asin(min(1.0, (7.5 - top - 0.6) / r)))
+        c.paint([arc_band(cx, 7.5, r, 1.8, -reach, reach)], colour, clip=(0, top, PLATE_ICON_W, bottom))
+
+
+PLATE_ICONS = {
+    'menu_title_home.png': plate_icon_home, 'menu_title_myroom.png': plate_icon_door,
+    'menu_title_edit.png': plate_icon_folder, 'menu_title_adhok.png': plate_icon_waves,
+    'menu_title_gallery.png': plate_icon_film,
+}
+
+
+def blend(sheet, piece, x, y):
+    """Lay a piece over what is there, by its alpha."""
+    for row in range(piece.h):
+        src = row * piece.w * 4
+        dst = ((y * SCALE + row) * sheet.w + x * SCALE) * 4
+        for i in range(0, piece.w * 4, 4):
+            cover = piece.data[src + i + 3] / 255
+            if not cover:
+                continue
+            under = sheet.data[dst + i + 3] / 255
+            out = cover + under * (1 - cover)
+            for k in range(3):
+                sheet.data[dst + i + k] = int((piece.data[src + i + k] * cover + sheet.data[dst + i + k] * under * (1 - cover)) / out)
+            sheet.data[dst + i + 3] = int(out * 255)
+
+
+def plate_icon(sheet, pixels, x, y, draw):
+    """An icon in a frame, as on the title plates, redrawn over the ground beside it."""
+    colour = pixels[y + 7][x][:3]
+    c = Canvas(PLATE_ICON_W, PLATE_ICON_H)
+    for row in range(PLATE_ICON_H):
+        ground = tuple(pixels[y + row][x - 1])
+        c.paint([rect(0, row, PLATE_ICON_W, 1)], ground[:3], ground[3])
+    picture = Canvas(PLATE_ICON_W, PLATE_ICON_H)
+    draw(picture, colour)
+    blend(c, picture, 0, 0)
+    frame = with_hole(rounded(0, 0, PLATE_ICON_W, PLATE_ICON_H, 1.5), rounded(2, 2, PLATE_ICON_W - 4, PLATE_ICON_H - 4, 0.8)[::-1])
+    c.paint([frame], colour)
+    paste(sheet, c, x, y)
+
+
+# The game's small digits, white with a dark shadow down and to the right; each list is one line
+# through the pixels' middles, by column and row.
+DIGITS = {
+    '1': [[(1, 0), (2, 0), (2, 7)]],
+    '2': [[(0, 1), (1, 0), (3, 0), (4, 1), (4, 2), (0, 6), (0, 7), (4, 7)]],
+    '3': [[(0, 1), (1, 0), (3, 0), (4, 1), (4, 2), (3, 3), (2, 3)], [(3, 3), (4, 4), (4, 6), (3, 7), (1, 7), (0, 6)]],
+    '4': [[(3, 0), (0, 4.2), (0, 5), (4, 5)], [(3, 0), (3, 7)]],
+    '5': [[(4, 0), (0, 0), (0, 3), (3, 3), (4, 4), (4, 6), (3, 7), (1, 7), (0, 6)]],
+    '6': [[(4, 1), (3, 0), (1, 0), (0, 1), (0, 6), (1, 7), (3, 7), (4, 6), (4, 4), (3, 3), (0, 3)]],
+    '7': [[(0, 0), (4, 0), (4, 1.5), (2, 5.5), (2, 7)]],
+    '8': [[(1, 3), (0, 2), (0, 1), (1, 0), (3, 0), (4, 1), (4, 2), (3, 3), (1, 3), (0, 4), (0, 6), (1, 7), (3, 7), (4, 6), (4, 4), (3, 3)]],
+    '9': [[(4, 4), (1, 4), (0, 3), (0, 1), (1, 0), (3, 0), (4, 1), (4, 6), (3, 7), (1, 7), (0, 6)]],
+    '0': [[(1, 0), (3, 0), (4, 1), (4, 6), (3, 7), (1, 7), (0, 6), (0, 1), (1, 0)]],
+}
+ACHIEVEMENT = [
+    [(0, 4), (0, 1), (1, 0), (2, 0), (3, 1), (3, 4)], [(0, 2), (3, 2)],
+    [(7, 0), (6, 0), (5, 1), (5, 3), (6, 4), (7, 4)],
+    [(9, 0), (9, 4)], [(12, 0), (12, 4)], [(9, 2), (12, 2)],
+    [(14, 0), (14, 4)],
+    [(18, 0), (16, 0), (16, 4), (18, 4)], [(16, 2), (18, 2)],
+    [(20, 0), (20, 2), (21, 3), (22, 2), (22, 0)], [(21, 3), (21, 4)],
+    [(26, 0), (24, 0), (24, 4), (26, 4)], [(24, 2), (26, 2)],
+    [(28, 4), (28, 0), (29, 0), (30, 1), (31, 0), (32, 0), (32, 4)], [(30, 1), (30, 2)],
+    [(36, 0), (34, 0), (34, 4), (36, 4)], [(34, 2), (36, 2)],
+    [(38, 4), (38, 0), (41, 3)], [(41, 0), (41, 4)],
+    [(43, 0), (45, 0)], [(44, 0), (44, 4)],
+]
+
+
+def shadowed(sheet, box, strokes, extra=()):
+    """White strokes over a dark shadow one pixel down and to the right."""
+    x, y, w, h = box
+    c = Canvas(w, h)
+    c.paint(pixel_strokes(strokes, dx=1, dy=1) + [[(px + 1, py + 1) for px, py in poly] for poly in extra], SHADOW, DIGIT_SHADOW_ALPHA)
+    c.paint(pixel_strokes(strokes) + list(extra), WHITE)
+    wipe(sheet, box)
+    paste(sheet, c, x, y)
+
+
+def percent_sign(sheet, box):
+    """Two small rings and the slash between them."""
+    rings = ring(1.5, 1.5, 1.45, 0.55, 24) + ring(6.5, 6.5, 1.45, 0.55, 24)
+    shadowed(sheet, box, [[(5, 0), (2, 7)]], rings)
+
+
+def marker_end(sheet, box, up):
+    """An end of the scroll marker: round, its edge lighter than its middle."""
+    x, y, w, h = box
+    c = Canvas(w, h)
+    cy, sign = (h, -1) if up else (0, 1)
+    def half(rx, ry):
+        return [(w / 2 + rx * math.cos(math.radians(a)), cy + sign * ry * math.sin(math.radians(a))) for a in range(0, 181, 10)]
+    c.paint([half(w / 2, h)], MARKER_EDGE)
+    c.paint([half(w / 2 - 0.9, h - 0.9)], MARKER_FILL, 254)
+    wipe(sheet, box)
+    paste(sheet, c, x, y)
+
+
+def slider_end(sheet, pixels, box, top):
+    """The slider's track with its end rounded off, the edge one pixel wide in the game's colours."""
+    x, y, w, h = box
+    edge, fill = pixels[y + h // 2][x][:3], pixels[y + h // 2][x + w // 2][:3]
+    c = Canvas(w, h)
+    corners = 'tl tr' if top else 'bl br'
+    c.paint([rounded(0, 0, w, h, SLIDER_ROUND, corners)], edge)
+    c.paint([rounded(1, 1 if top else 0, w - 2, h - 1, SLIDER_ROUND - 0.7, corners)], fill)
+    wipe(sheet, box)
+    paste(sheet, c, x, y)
+
+
+# ---- tracing the game's pixel art
+def pixel_loops(mask):
+    """The edges of the set pixels, as closed loops of corner points, the set side on the right.
+    Pixels touching only at a corner count as joined, so that one pixel wide slanted lines hold."""
+    out_of = {}
+    for (i, j) in mask:
+        for side, (a, b) in enumerate((((i, j), (i + 1, j)), ((i + 1, j), (i + 1, j + 1)),
+                                       ((i + 1, j + 1), (i, j + 1)), ((i, j + 1), (i, j)))):
+            other = ((i, j - 1), (i + 1, j), (i, j + 1), (i - 1, j))[side]
+            if other not in mask:
+                out_of.setdefault(a, []).append(b)
+    loops = []
+    while out_of:
+        start = next(iter(out_of))
+        loop, here, heading = [start], start, None
+        while True:
+            ends = out_of[here]
+            if len(ends) > 1 and heading:
+                # Where four edges meet, turn left: that keeps the pixels across the corner together.
+                left = (heading[1], -heading[0])
+                there = next((e for e in ends if (e[0] - here[0], e[1] - here[1]) == left), ends[0])
+            else:
+                there = ends[0]
+            ends.remove(there)
+            if not ends:
+                del out_of[here]
+            heading = (there[0] - here[0], there[1] - here[1])
+            here = there
+            if here == start:
+                break
+            loop.append(here)
+        loops.append(loop)
+    return loops
+
+
+def slanted(loop):
+    """A loop of pixel corners with its steps cut into slants. A corner is a step when the next or
+    the last corner turns the other way one pixel from it; any other corner stays sharp."""
+    corners = []
+    n = len(loop)
+    for k in range(n):
+        a, b, c = loop[k - 1], loop[k], loop[(k + 1) % n]
+        d1, d2 = (b[0] - a[0], b[1] - a[1]), (c[0] - b[0], c[1] - b[1])
+        if d1 != d2:
+            corners.append((b, d1[0] * d2[1] - d1[1] * d2[0]))
+    m = len(corners)
+    if m < 3:
+        return [p for p, _ in corners]
+    def run(p, q):
+        return abs(p[0] - q[0]) + abs(p[1] - q[1])
+    out = []
+    for k in range(m):
+        (p, turn), (q, last_turn), (r, next_turn) = corners[k], corners[k - 1], corners[(k + 1) % m]
+        step = (last_turn != turn and run(q, p) == 1) or (next_turn != turn and run(p, r) == 1)
+        if not step:
+            out.append(p)
+            continue
+        back = (p[0] + (q[0] - p[0]) * 0.5 / run(q, p), p[1] + (q[1] - p[1]) * 0.5 / run(q, p))
+        on = (p[0] + (r[0] - p[0]) * 0.5 / run(p, r), p[1] + (r[1] - p[1]) * 0.5 / run(p, r))
+        for point in (back, on):
+            if not out or out[-1] != point:
+                out.append(point)
+    if len(out) > 1 and out[0] == out[-1]:
+        out.pop()
+    return out
+
+
+def as_one_polygon(loops):
+    """Loops joined into one polygon by edges taken twice, so filling by crossings makes holes."""
+    if not loops:
+        return []
+    anchor = loops[0][0]
+    out = []
+    for loop in loops:
+        out += [anchor] + loop + [loop[0]]
+    return out + [anchor]
+
+
+def nearest_colours(pixels, box, wanted):
+    """For each pixel of the box, the colour of the nearest pixel that `wanted` accepts."""
+    from collections import deque
+    x, y, w, h = box
+    near = {}
+    queue = deque()
+    for j in range(h):
+        for i in range(w):
+            p = pixels[y + j][x + i]
+            if wanted(p):
+                near[(i, j)] = tuple(p)
+                queue.append((i, j))
+    while queue:
+        i, j = queue.popleft()
+        for a, b in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)):
+            if 0 <= a < w and 0 <= b < h and (a, b) not in near:
+                near[(a, b)] = near[(i, j)]
+                queue.append((a, b))
+    return near
+
+
+def traced_layer(c, pixels, box, inside, colour_from=None, at=(0, 0), grow=0.0):
+    """Paint into the canvas, at `at`, the pixels of the box that `inside` accepts, traced; each
+    point takes the colour of the nearest pixel that `colour_from` accepts (the same by default)."""
+    x, y, w, h = box
+    mask = {(i, j) for j in range(h) for i in range(w) if inside(pixels[y + j][x + i])}
+    if not mask:
+        return
+    near = nearest_colours(pixels, box, colour_from or inside)
+    loops = [slanted(loop) for loop in pixel_loops(mask)]
+    if grow:
+        loops = [grown(loop, grow) for loop in loops]
+    poly = as_one_polygon([[(px + at[0], py + at[1]) for px, py in loop] for loop in loops if len(loop) >= 3])
+    def colour(px, py):
+        return near.get((min(w - 1, max(0, int(px - at[0]))), min(h - 1, max(0, int(py - at[1])))), (0, 0, 0, 0))
+    c.paint([poly], colour)
+
+
+def grown(loop, by):
+    """The loop's edges moved out by `by`, the set side being on the right as it goes."""
+    n = len(loop)
+    out = []
+    for k in range(n):
+        a, b, c = loop[k - 1], loop[k], loop[(k + 1) % n]
+        def normal(p, q):
+            dx, dy = q[0] - p[0], q[1] - p[1]
+            length = math.hypot(dx, dy) or 1
+            return -dy / length, dx / length
+        n1, n2 = normal(a, b), normal(b, c)
+        mx, my = n1[0] + n2[0], n1[1] + n2[1]
+        size = mx * n1[0] + my * n1[1]
+        if abs(size) < 1e-6:
+            out.append((b[0] - n1[0] * by, b[1] - n1[1] * by))
+        else:
+            out.append((b[0] - mx / size * by, b[1] - my / size * by))
+    return out
+
+
+def filled_in(pixels, box, taken):
+    """The pixels with those that `taken` accepts replaced by the nearest of the others, so the
+    picture can be enlarged without them and they can be drawn back over it, traced."""
+    x, y, w, h = box
+    near = nearest_colours(pixels, box, lambda p: not taken(p))
+    out = [list(row) for row in pixels]
+    for j in range(h):
+        for i in range(w):
+            if taken(pixels[y + j][x + i]):
+                out[y + j][x + i] = near.get((i, j), (0, 0, 0, 0))
+    return out
+
+
+def traced_piece(sheet, pixels, box, layers):
+    """A piece redrawn from its own pixels: each layer is (inside, colour_from), painted in order."""
+    x, y, w, h = box
+    c = Canvas(w, h)
+    for inside, colour_from in layers:
+        traced_layer(c, pixels, box, inside, colour_from)
+    wipe(sheet, box)
+    paste(sheet, c, x, y)
+
+
+# ---- the card before a song, and the results screen
+def lum(p):
+    return (p[0] * 3 + p[1] * 6 + p[2]) / 10
+
+
+def card_line(p):
+    """The card's white line art, not the teal glow it frames."""
+    return p[3] > 150 and lum(p) > 170 and max(p[:3]) - min(p[:3]) < 40
+
+
+def traced_over(sheet, pixels, box, inside, colour_from=None):
+    """A layer of a box traced and laid over what the sheet has there."""
+    c = Canvas(box[2], box[3])
+    traced_layer(c, pixels, box, inside, colour_from)
+    blend(sheet, c, box[0], box[1])
+
+
+def sheet_of_card(archive, out):
+    """The card before a song: its corner lines, circle and ticks traced, with the white taken out
+    of the picture before it is enlarged so no step is left under them; and its three small icons."""
+    picture = 'menu_common.png'
+    w, h, pixels = decode_png(archive.read(archive.find(picture)))
+    rects = layout_of(archive, picture)
+    boxes = [rects[n] for n in ('info_free_ele01.png', 'info_free_ele02.png', 'info_free_ele03.png')]
+    clean = pixels
+    for box in boxes:
+        clean = filled_in(clean, box, card_line)
+    c = enlarged(archive, picture, clean, w, h)
+    for box in boxes:
+        traced_over(c, pixels, box, card_line)
+    white = lambda p: p[3] > 128 and lum(p) > 200
+    for name in ('info_free_star.png', 'info_free_kachi.png', 'info_free_oukan.png'):
+        traced_piece(c, pixels, rects[name], [(lambda p: p[3] > 128, white), (lambda p: p[3] > 128 and lum(p) <= 200, None)])
+    write_sheet(c, pixels, out)
+
+
+def result_line(p):
+    """The results screen's dark line art."""
+    return p[3] > 200 and max(p[:3]) < 12
+
+
+def result_icon(c, colour):
+    """An octagon round a small square, in the results screen's title frame."""
+    c.paint(pixel_strokes([[(5, 3), (10, 3), (12, 5), (12, 9), (10, 11), (5, 11), (3, 9), (3, 5), (5, 3)],
+                           [(6, 5), (9, 5), (9, 9), (6, 9), (6, 5)]]), colour)
+
+
+def result_header(archive, picture, pixels, c):
+    """The top of the results screen: its lines traced over the picture enlarged without them, and
+    its icon redrawn; the title's words, already in `c`, are kept."""
+    w, h = len(pixels[0]), len(pixels)
+    clean = filled_in(pixels, RESULT_HEADER, result_line)
+    x, y, hw, hh = RESULT_ICON
+    clean = filled_in(clean, (x, y, PLATE_ICON_W, PLATE_ICON_H), lambda p: p[3] > 200 and lum(p) > 200)
+    fresh = enlarged(archive, picture, clean, w, h)
+    centre_lines_over(fresh, pixels, RESULT_HEADER, result_line)
+    plate_icon(fresh, pixels, x, y, result_icon)
+    tx0, ty0, tx1, ty1 = (v * SCALE for v in RESULT_WORDS)
+    for row in range(RESULT_HEADER[1] * SCALE, (RESULT_HEADER[1] + RESULT_HEADER[3]) * SCALE):
+        for x0, x1 in (((RESULT_HEADER[0] * SCALE, tx0), (tx1, (RESULT_HEADER[0] + RESULT_HEADER[2]) * SCALE))
+                       if ty0 <= row < ty1 else (((RESULT_HEADER[0] * SCALE, (RESULT_HEADER[0] + RESULT_HEADER[2]) * SCALE)),)):
+            at = (row * c.w + x0) * 4
+            c.data[at:at + (x1 - x0) * 4] = fresh.data[at:at + (x1 - x0) * 4]
+
+
+def result_star(sheet, pixels, box):
+    """A difficulty star: five straight points, a soft edge, the game's colour."""
+    x, y, w, h = box
+    middle = pixels[y + h // 2][x + w // 2]
+    edge = max((pixels[y + j][x + i] for j in range(h) for i in range(w) if 0 < pixels[y + j][x + i][3] < 200),
+               key=lambda p: p[3], default=middle)
+    def star(r_out, r_in):
+        return [(w / 2 + (r_out if k % 2 == 0 else r_in) * math.cos(math.radians(-90 + k * 36)),
+                 RESULT_STAR_MIDDLE + (r_out if k % 2 == 0 else r_in) * math.sin(math.radians(-90 + k * 36))) for k in range(10)]
+    c = Canvas(w, h)
+    c.paint([star(RESULT_STAR_R + 0.6, RESULT_STAR_R * 0.42 + 0.3)], edge[:3], edge[3])
+    c.paint([star(RESULT_STAR_R, RESULT_STAR_R * 0.42)], middle[:3], middle[3])
+    wipe(sheet, box)
+    paste(sheet, c, x, y)
+
+
+# ---- the results window's words and the results digits
+def thick(points, width, closed=False):
+    """A stroke along the points with mitred corners and flat ends, as one polygon (a ring when closed)."""
+    n = len(points)
+    def normal(p, q):
+        dx, dy = q[0] - p[0], q[1] - p[1]
+        length = math.hypot(dx, dy) or 1
+        return -dy / length, dx / length
+    segs = [(points[k], points[(k + 1) % n]) for k in range(n if closed else n - 1)]
+    normals = [normal(p, q) for p, q in segs]
+    left, right = [], []
+    for k in range(n):
+        if closed:
+            n1, n2 = normals[k - 1], normals[k % len(normals)]
+        else:
+            n1 = normals[max(0, k - 1)]
+            n2 = normals[min(len(normals) - 1, k)]
+        mx, my = n1[0] + n2[0], n1[1] + n2[1]
+        size = 1 + n1[0] * n2[0] + n1[1] * n2[1]
+        ox, oy = (mx / size, my / size) if size > 1e-6 else n1
+        px, py = points[k]
+        left.append((px + ox * width / 2, py + oy * width / 2))
+        right.append((px - ox * width / 2, py - oy * width / 2))
+    return with_hole(left, right[::-1]) if closed else left + right[::-1]
+
+
+def glyph(ch, w, half=1.0):
+    """A letter of the results window, as strokes on a box `w` wide and 8 high: (points, closed).
+    `half` is half the stroke, so that the strokes' outsides meet the box."""
+    l, r, t, m, b, c = half, w - half, half, 4, 8 - half, 1.5
+    o = GLYPH_END_IN  # free ends at the box's side stop short of it, so neighbours never touch
+    return {
+        'A': [([(l, 8), (w / 2 - 0.9, t), (w / 2 + 0.9, t), (r, 8)], False), ([(l + 1.1, 5.4), (r - 1.1, 5.4)], False)],
+        'B': [([(l, t), (r - c, t), (r, t + c), (r, m - 1), (r - 1, m), (l, m)], False),
+              ([(l, m), (r - 1, m), (r, m + 1), (r, b - c), (r - c, b), (l, b)], False), ([(l, 0), (l, 8)], False)],
+        'C': [([(w - o, t), (l + c, t), (l, t + c), (l, b - c), (l + c, b), (w - o, b)], False)],
+        'D': [([(l, t), (r - c, t), (r, t + c), (r, b - c), (r - c, b), (l, b)], True)],
+        'E': [([(w - o, t), (l, t), (l, b), (w - o, b)], False), ([(l, m), (w - 0.5 - o, m)], False)],
+        'F': [([(w - o, t), (l, t), (l, 8)], False), ([(l, m), (w - 1, m)], False)],
+        'H': [([(l, 0), (l, 8)], False), ([(r, 0), (r, 8)], False), ([(l, m), (r, m)], False)],
+        'I': [([(l, 0), (l, 8)], False)],
+        'L': [([(l, 0), (l, b - c), (l + c, b), (w - o, b)], False)],
+        'M': [([(l, 8), (l, t + 1), (l + 1, t), (w / 2 - 1, t), (w / 2, t + 1), (w / 2, 8)], False),
+              ([(w / 2, t + 1), (w / 2 + 1, t), (r - 1, t), (r, t + 1), (r, 8)], False)],
+        'N': [([(l, 8), (l, 0)], False), ([(l, 0.6), (r, 7.4)], False), ([(r, 0), (r, 8)], False)],
+        'O': [([(l + c, t), (r - c, t), (r, t + c), (r, b - c), (r - c, b), (l + c, b), (l, b - c), (l, t + c)], True)],
+        'R': [([(l, 8), (l, t), (r - c, t), (r, t + c), (r, m - 1), (r - 1.2, m), (l + 1, m)], False),
+              ([(l, m), (l + 1.5, m)], False), ([(r - 3, m), (r, 8)], False)],
+        'S': [([(w - o, t), (l + c, t), (l, t + c), (l, m - 1), (l + 1, m), (r - 1, m), (r, m + 1), (r, b - c), (r - c, b), (o, b)], False)],
+        'T': [([(o, t), (w - o, t)], False), ([(w / 2, t), (w / 2, 8)], False)],
+        'W': [([(l, 0), (l, b - c), (l + c, b), (w / 2, b - 1.6), (r - c, b), (r, b - c), (r, 0)], False), ([(w / 2, 2.2), (w / 2, b - 1.6)], False)],
+        ' ': [],
+    }[ch]
+
+
+GLYPH_W = {'A': 9, 'B': 8, 'C': 7, 'D': 8, 'E': 7, 'F': 7, 'H': 8, 'I': 2, 'L': 7, 'M': 10, 'N': 8, 'O': 8,
+           'R': 8, 'S': 8, 'T': 7, 'W': 10, ' ': 3.5}
+GLYPH_GAP = 1.0
+GLYPH_END_IN = 0.5
+# The words of the results window: where each stood, by its first and past its last column, its top and its height.
+RESULT_WINDOW_WORDS = (
+    ('COOL', 16, 51, 61, 8), ('FINE', 16, 43, 79, 8), ('SAFE', 16, 50, 97, 8), ('SAD', 16, 43, 115, 8),
+    ('WORST', 16, 62, 133, 8), ('COMBO', 16, 62, 151, 8), ('CHANCE TIME', 16, 103, 169, 8), ('SCORE', 16, 75, 195, 11),
+)
+
+
+def word_strokes(word, x0, x1, top, height):
+    """The word's letters as polygons, spread to fill the columns it had."""
+    total = sum(GLYPH_W[ch] for ch in word) + GLYPH_GAP * (len(word) - 1)
+    sx, sy = (x1 - x0) / total, height / 8
+    width = 2.0
+    polys, at = [], 0.0
+    for ch in word:
+        for points, closed in glyph(ch, GLYPH_W[ch]):
+            polys.append(thick([(x0 + (at + px) * sx, top + py * sy) for px, py in points], width, closed))
+        at += GLYPH_W[ch] + GLYPH_GAP
+    return polys, width
+
+
+def letter_pixel(p):
+    """A pixel of a results window word: bright or coloured, unlike the grey window."""
+    return p[3] > 200 and (lum(p) > 95 or max(p[:3]) - min(p[:3]) > 60)
+
+
+def result_window_words(archive, picture, pixels):
+    """The results window with its words drawn again: the old letters and their dark edge taken out
+    of the picture before it is enlarged, then each word in vector letters, coloured row by row as
+    the game coloured it, inside a dark edge of its own colour."""
+    w, h = len(pixels[0]), len(pixels)
+    # The editor's window has no CHANCE TIME: a word is drawn only where the picture has it.
+    words = [entry for entry in RESULT_WINDOW_WORDS
+             if sum(1 for j in range(entry[3], entry[3] + entry[4]) for i in range(entry[1], entry[2]) if letter_pixel(pixels[j][i])) > RESULT_WORD_LEAST]
+    taken = set()
+    for word, x0, x1, top, height in words:
+        for j in range(top - 1, top + height + 1):
+            for i in range(x0 - 1, x1 + 1):
+                if letter_pixel(pixels[j][i]):
+                    taken |= {(i + di, j + dj) for di in (-1, 0, 1) for dj in (-1, 0, 1)}
+    clean = texture_filled(pixels, (0, 0, w, h), taken)
+    c = enlarged(archive, picture, clean, w, h)
+    for word, x0, x1, top, height in words:
+        rows = []
+        for j in range(top, top + height):
+            got = [pixels[j][i] for i in range(x0, x1) if letter_pixel(pixels[j][i])]
+            rows.append(tuple(sum(p[k] for p in got) // len(got) for k in range(3)) if got else None)
+        known = [k for k, v in enumerate(rows) if v]
+        rows = [rows[k] or rows[min(known, key=lambda q: abs(q - k))] for k in range(len(rows))]
+        def colour(px, py, rows=rows, top=top):
+            f = min(len(rows) - 1.0, max(0.0, py - top - 0.5))
+            a, b = rows[int(f)], rows[min(len(rows) - 1, int(f) + 1)]
+            return tuple(int(a[k] + (b[k] - a[k]) * (f - int(f))) for k in range(3))
+        width = RESULT_WORD_STROKE
+        darkest = tuple(int(sum(v[k] for v in rows) / len(rows) * RESULT_WORD_EDGE) for k in range(3))
+        bottom, e = top + height, RESULT_WORD_EDGE_W
+        outer, inner = [], []
+        paths = word_paths(word, x0, x1, top, height, width)
+        for index, (points, closed) in enumerate(paths):
+            others = [p for k, p in enumerate(paths) if k != index]
+            if not closed:
+                # Strokes that reach the word's top or bottom run on past it and are cut level there.
+                points = list(points)
+                for end, nextp in ((0, 1), (-1, -2)):
+                    (px, py), (qx, qy) = points[end], points[nextp]
+                    if py <= top + 0.01 or py >= bottom - 0.01:
+                        length = math.hypot(px - qx, py - qy) or 1
+                        points[end] = (px + (px - qx) / length * 2, py + (py - qy) / length * 2)
+            outer.append(clipped_band(thick(points, width, closed), top, bottom))
+            # A free end gets its edge too; an end that meets another stroke runs on into it, no edge between.
+            inside = points if closed else ends_drawn(points, [joins(points[0], others, width), joins(points[-1], others, width)], e, width)
+            inner.append(clipped_band(thick(inside, width - 2 * e, closed), top + e, bottom - e))
+        # The dark edge is the letter's own outside: the colour is laid inside it, nothing reaches past.
+        move = lambda polys: [[(px - x0 + 2, py - top + 2) for px, py in poly] for poly in polys if len(poly) >= 3]
+        letters = Canvas(x1 - x0 + 4, height + 4)
+        letters.paint(move(outer), darkest)
+        letters.paint(move(inner), lambda px, py: colour(px + x0 - 2, py + top - 2))
+        blend(c, letters, x0 - 2, top - 2)
+    return c
+
+
+def clipped_band(poly, y0, y1):
+    """The polygon cut level at y0 and y1, keeping what lies between."""
+    def cut(points, keep, y):
+        out = []
+        for k in range(len(points)):
+            a, b = points[k - 1], points[k]
+            if keep(b[1]):
+                if not keep(a[1]):
+                    out.append((a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]), y))
+                out.append(b)
+            elif keep(a[1]):
+                out.append((a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]), y))
+        return out
+    return cut(cut(poly, lambda v: v >= y0, y0), lambda v: v <= y1, y1)
+
+
+def joins(point, paths, width):
+    """Whether a stroke's end lies on another of the strokes, `width` wide."""
+    px, py = point
+    for points, closed in paths:
+        pairs = list(zip(points, points[1:] + (points[:1] if closed else [])))
+        for (ax, ay), (bx, by) in pairs:
+            dx, dy = bx - ax, by - ay
+            t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / ((dx * dx + dy * dy) or 1)))
+            if math.hypot(ax + dx * t - px, ay + dy * t - py) < width / 2 + 0.05:
+                return True
+    return False
+
+
+def ends_drawn(points, joined, edge, width):
+    """An open path with each free end drawn back by `edge` and each joined end left on the middle of the stroke it meets."""
+    points = list(points)
+    for (end, nextp), meets in zip(((0, 1), (-1, -2)), joined):
+        (px, py), (qx, qy) = points[end], points[nextp]
+        length = math.hypot(px - qx, py - qy) or 1
+        by = 0.0 if meets else edge
+        points[end] = (px + (qx - px) / length * by, py + (qy - py) / length * by)
+    return points
+
+
+def shortened(points, by):
+    """An open path with each end drawn back by `by`."""
+    points = list(points)
+    for end, nextp in ((0, 1), (-1, -2)):
+        (px, py), (qx, qy) = points[end], points[nextp]
+        length = math.hypot(px - qx, py - qy) or 1
+        points[end] = (px + (qx - px) / length * by, py + (qy - py) / length * by)
+    return points
+
+
+def word_paths(word, x0, x1, top, height, width=2.0):
+    """The word's strokes as centre lines, laid so that strokes `width` wide fill its box."""
+    total = sum(GLYPH_W[ch] for ch in word) + GLYPH_GAP * (len(word) - 1)
+    sx, sy = (x1 - x0) / total, height / 8
+    out, at = [], 0.0
+    for ch in word:
+        for points, closed in glyph(ch, GLYPH_W[ch], width / 2 / sy):
+            out.append(([(x0 + (at + px) * sx, top + py * sy) for px, py in points], closed))
+        at += GLYPH_W[ch] + GLYPH_GAP
+    return out
+
+
+def sheet_of_result_window(archive, picture, out):
+    w, h, pixels = decode_png(archive.read(archive.find(picture)))
+    write_sheet(result_window_words(archive, archive.find(picture), pixels), pixels, out)
+
+
+# The results screen's digits, large and small: centre lines on the large ones' box, 11 by 12.
+RESULT_DIGITS = {
+    '1': [([(5.0, 1.0), (5.0, 11.6)], False)],
+    '2': [([(1.0, 1.9), (8.3, 1.9), (9.0, 2.6), (9.0, 4.7), (8.1, 5.6), (2.7, 5.8), (1.9, 6.6), (1.9, 10.6), (10.0, 10.6)], False)],
+    '3': [([(1.0, 1.9), (8.3, 1.9), (9.0, 2.6), (9.0, 9.9), (8.3, 10.6), (1.0, 10.6)], False), ([(1.5, 5.8), (9.0, 5.8)], False)],
+    '4': [([(7.6, 1.9), (1.0, 8.2)], False), ([(0.0, 8.6), (11.0, 8.6)], False), ([(8.0, 1.0), (8.0, 11.6)], False)],
+    '5': [([(9.0, 1.9), (1.0, 1.9), (1.0, 5.6), (8.2, 5.6), (9.0, 6.4), (9.0, 9.8), (8.2, 10.6), (0.0, 10.6)], False)],
+    '6': [([(10.0, 1.9), (4.0, 1.9), (1.9, 4.0), (1.9, 9.2), (3.3, 10.6), (8.3, 10.6), (9.1, 9.8), (9.1, 6.4), (8.3, 5.6), (2.8, 5.6)], False), ([(1.0, 5.6), (3.5, 5.6)], False)],
+    '7': [([(0.0, 1.9), (8.4, 1.9), (9.0, 2.6), (9.0, 3.6), (3.0, 11.6)], False)],
+    '8': [([(2.7, 1.9), (8.3, 1.9), (9.0, 2.6), (9.0, 4.8), (8.3, 5.6), (2.7, 5.6), (2.0, 4.8), (2.0, 2.6)], True),
+          ([(2.4, 5.6), (8.6, 5.6), (9.6, 6.6), (9.6, 9.7), (8.7, 10.6), (2.3, 10.6), (1.4, 9.7), (1.4, 6.6)], True)],
+    '9': [([(7.5, 5.6), (9.9, 5.6)], False), ([(8.1, 5.6), (2.6, 5.6), (1.6, 4.6), (1.6, 2.8), (2.6, 1.9), (8.2, 1.9), (9.0, 2.7), (9.0, 8.4), (7.0, 10.6), (1.0, 10.6)], False)],
+    '0': [([(2.8, 1.9), (8.2, 1.9), (9.4, 3.1), (9.4, 9.3), (8.2, 10.6), (2.8, 10.6), (1.4, 9.3), (1.4, 3.1)], True)],
+}
+
+
+def result_digit(sheet, box, strokes, small):
+    """A digit of the results screen, white, its strokes straight and its corners cut."""
+    x, y, w, h = box
+    if small:
+        place = lambda px, py: (px * 0.86 + 0.25, (py - 1.9) * 0.9 + 0.8)
+        width = 1.65
+    else:
+        place = lambda px, py: (px, py)
+        width = 1.8
+    c = Canvas(w, h)
+    c.paint([thick([place(px, py) for px, py in points], width, closed) for points, closed in strokes], WHITE)
+    wipe(sheet, box)
+    paste(sheet, c, x, y)
+
+
+def line_chains(mask):
+    """A set of one pixel wide lines as chains of pixels, end to end. Pixels touching at a corner
+    are joined only where no pixel beside both already joins them."""
+    def near(p):
+        i, j = p
+        out = [q for q in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)) if q in mask]
+        for di, dj in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
+            q = (i + di, j + dj)
+            if q in mask and (i + di, j) not in mask and (i, j + dj) not in mask:
+                out.append(q)
+        return out
+    links = {p: near(p) for p in mask}
+    seen_edges = set()
+    chains = []
+    starts = [p for p in mask if len(links[p]) != 2] + list(mask)
+    for start in starts:
+        for first in links[start]:
+            if (start, first) in seen_edges:
+                continue
+            chain, here, last = [start, first], first, start
+            seen_edges |= {(start, first), (first, start)}
+            while len(links[here]) == 2:
+                there = links[here][0] if links[here][0] != last else links[here][1]
+                if (here, there) in seen_edges:
+                    break
+                seen_edges |= {(here, there), (there, here)}
+                chain.append(there)
+                last, here = here, there
+            chains.append(chain)
+    lone = [p for p in mask if not links[p]]
+    return chains + [[p] for p in lone]
+
+
+def chain_corners(chain):
+    """The chain's pixels where it changes direction, with its two ends."""
+    out = [chain[0]]
+    for k in range(1, len(chain) - 1):
+        a, b, c = chain[k - 1], chain[k], chain[k + 1]
+        if (b[0] - a[0], b[1] - a[1]) != (c[0] - b[0], c[1] - b[1]):
+            out.append(b)
+    if len(chain) > 1:
+        out.append(chain[-1])
+    return out
+
+
+def blob(component):
+    """Whether a set of pixels has a two by two square in it: then it is a shape, not a line."""
+    return any({(i + 1, j), (i, j + 1), (i + 1, j + 1)} <= component for i, j in component)
+
+
+def components(mask):
+    left, out = set(mask), []
+    while left:
+        stack = [left.pop()]
+        part = set(stack)
+        while stack:
+            i, j = stack.pop()
+            for q in ((i + a, j + b) for a in (-1, 0, 1) for b in (-1, 0, 1)):
+                if q in left:
+                    left.discard(q)
+                    part.add(q)
+                    stack.append(q)
+        out.append(part)
+    return out
+
+
+def centre_lines_over(sheet, pixels, box, inside):
+    """The box's one pixel lines that `inside` accepts, each drawn as a single stroke one pixel wide
+    through its pixels' middles, so slants and straights are the same width and meet clean. Solid
+    shapes among them, like filled arrow heads, are traced by their outline instead."""
+    x, y, w, h = box
+    mask = {(i, j) for j in range(h) for i in range(w) if inside(pixels[y + j][x + i])}
+    if not mask:
+        return
+    near = nearest_colours(pixels, box, inside)
+    colour = lambda px, py: near.get((min(w - 1, max(0, int(px))), min(h - 1, max(0, int(py)))), (0, 0, 0, 0))
+    c = Canvas(w, h)
+    solid = set()
+    strokes = []
+    for part in components(mask):
+        if blob(part):
+            solid |= part
+            continue
+        for chain in line_chains(part):
+            corners = [(i + 0.5, j + 0.5) for i, j in chain_corners(chain)]
+            if len(corners) == 1:
+                cx, cy = corners[0]
+                strokes.append(rect(cx - 0.5, cy - 0.5, 1, 1))
+                continue
+            # Each end reaches its pixel's edge, along the line.
+            for end, nextp in ((0, 1), (-1, -2)):
+                (px, py), (qx, qy) = corners[end], corners[nextp]
+                length = math.hypot(px - qx, py - qy) or 1
+                reach = 0.5 * max(abs(px - qx), abs(py - qy)) / length
+                corners[end] = (px + (px - qx) / length * reach, py + (py - qy) / length * reach)
+            strokes.append(thick(corners, LINE_WIDTH))
+    if strokes:
+        c.paint(strokes, colour)
+    if solid:
+        loops = [slanted(loop) for loop in pixel_loops(solid)]
+        c.paint([as_one_polygon([loop for loop in loops if len(loop) >= 3])], colour)
+    blend(sheet, c, x, y)
+
+
+def texture_filled(pixels, box, taken):
+    """The pixels at `taken` replaced from the same row further right, where the window is bare,
+    so its patterned ground comes back as pattern, not smeared."""
+    x, y, w, h = box
+    out = [list(row) for row in pixels]
+    width = len(pixels[0])
+    for (i, j) in taken:
+        for step in TEXTURE_FROM:
+            a = i + step
+            if 0 <= a < width and (a, j) not in taken and not letter_pixel(pixels[j][a]):
+                out[j][i] = pixels[j][a]
+                break
+    return out
 
 
 def write_sheet(c, pixels, folder):
@@ -439,6 +1779,15 @@ def sheet_of_windows(archive, labels, drawer, out, cross_confirms):
     c = enlarged(archive, picture, pixels, w, h)
     wipe(c, (WINDOW_X, WINDOW_Y, WINDOW_SIZE, WINDOW_SIZE))
     window(c)
+    wipe(c, (BLADE_X, BLADE_Y, BLADE_W, BLADE_H))
+    blade(c, pixels)
+    icon_ring(c, pixels, rects['basic_blade_ico.png'])
+    slider_end(c, pixels, rects['basic_slider_up.png'], True)
+    slider_end(c, pixels, rects['basic_slider_dn.png'], False)
+    # The same arrows in the bar of a row with a value, when it is not the one chosen.
+    bx, by, _, _ = rects['basic_planeon.png']
+    for left, right, direction in BAR_ARROWS:
+        arrow_in_bar(c, pixels, (left, by + 5, right, by + 5 + BAR_ARROW_H), direction)
     # Yes and No are placed to keep their row in the middle, and the others on their own buttons.
     # Back comes first: the edge of its sign reaches into OK, whose wipe then clears it.
     for name, confirm, moved in (('basic_btninfo_modoru.png', False, None), ('basic_btninfo_kettei.png', True, None),
@@ -495,6 +1844,13 @@ def result_hints(archive, labels, drawer, out, made_in, cross_confirms):
     c = Canvas(w, h)
     for y in range(c.h):
         c.data[y * c.w * 4:(y + 1) * c.w * 4] = data[(c.h - 1 - y) * c.w * 4:(c.h - y) * c.w * 4]
+    result_header(archive, picture, pixels, c)
+    rects = layout_of(archive, picture)
+    for star in ('result_star_act.png', 'result_star_white.png'):
+        result_star(c, pixels, rects[star])
+    for digit, strokes in RESULT_DIGITS.items():
+        result_digit(c, rects['result_num_%s.png' % digit], strokes, False)
+        result_digit(c, rects['result_numsm_%s.png' % digit], strokes, True)
     item = labels.get('@375,54,53,13', (0, 'Item'))[1]
     pick = labels.get('@444,54,32,13', (0, 'Pick'))[1]
     y0, x0 = 54, 354
@@ -567,6 +1923,12 @@ def main():
         sheet_of_hints(archive, labels.get('menu_basic02.png', {}), drawer, folder, cross)
         sheet_of_windows(archive, labels.get('menu_basic.png', {}), drawer, folder, cross)
         result_hints(archive, result_labels, drawer, folder, out, cross)
+    titles(archive, out)
+    sheet_of_arrows(archive, out)
+    sheet_of_icons(archive, out)
+    sheet_of_card(archive, out)
+    for picture in ('result_win_nm.png', 'result_win_edit.pn'):
+        sheet_of_result_window(archive, picture, out)
     write_card_swaps(archive, out)
     print('%s: done' % out)
 
