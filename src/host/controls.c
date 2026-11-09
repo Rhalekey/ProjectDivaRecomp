@@ -11,6 +11,8 @@
  */
 
 #include "controls.h"
+
+#include "audio_out.h"
 #include "guest.h"
 #include "extras.h"
 #include "presence.h"
@@ -278,6 +280,7 @@ int controls_hook(uint32_t addr) {
     const int on = psp_read8(song + SONG_ACTIVE) && !psp_read8(song + SONG_OVER) && !psp_read8(song + SONG_LEAVING);
     if (on) psp_render_gl_song_frame();
     presence_song_frame(on);
+    if (on) audio_out_song_frame();
     /* Only the changes, to see in the log that this is what it is thought to be. */
     if (playing != was_playing) fprintf(stderr, "controls: %s\n", playing ? "a song is playing" : "the song stopped");
     if (was_playing && !playing) timing_song_stopped();

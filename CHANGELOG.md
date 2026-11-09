@@ -8,6 +8,7 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 
 ### Controls and notes
 - A press counts when it was made, not when the game next looked at the buttons: the game sees them once a frame, so a press could count up to 16 ms late. The buttons are read about once a millisecond, and the note is judged as it stood then. With this the measure for **Note timing** comes out a few milliseconds nearer zero, so it is worth measuring again.
+- After a hold-up in a song, as a restart or a controller plugged in, the sound no longer stays late to the notes for many seconds: what is left waiting is cut back at once. The measure at the end of a song also says how long the sound waited in each half.
 
 ### Redrawn
 - The Project DIVA badge in the demo's corner and the lists: Miku's head and twin tails in clean lines, with Project DIVA on her front. The game's is too small to trace, so it is drawn anew in its spirit.

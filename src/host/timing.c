@@ -17,6 +17,7 @@
 
 #include "timing.h"
 
+#include "audio_out.h"
 #include "options.h"
 #include "settings.h"
 
@@ -58,6 +59,7 @@ static const struct {
 #define PRESSES_NEEDED 20
 
 static float g_presses[PRESSES_KEPT];
+static float g_queued_at[PRESSES_KEPT];   /* the sound waiting in the queue at each press, in ms */
 static int g_press_count, g_presses_logged;
 static int g_have_measure, g_late_ms;
 static uint64_t g_age_sum_us;   /* how long before their frames the presses came, for the log */
@@ -91,7 +93,10 @@ static void on_press(void) {
         if (left > latest) left = latest;
         psp_cpu.f[PRESS_LEFT_REG] = left;
     }
-    if (g_press_count < PRESSES_KEPT) g_presses[g_press_count++] = -left * 1000.0f;
+    if (g_press_count < PRESSES_KEPT) {
+        g_queued_at[g_press_count] = (float)audio_out_queued_now();
+        g_presses[g_press_count++] = -left * 1000.0f;
+    }
 }
 
 static int by_value(const void *a, const void *b) {
@@ -99,13 +104,15 @@ static int by_value(const void *a, const void *b) {
     return (x > y) - (x < y);
 }
 
-/* The middle of `count` presses from `first` on, leaving those in their order. */
-static float middle_of(int first, int count) {
+/* The middle of `count` values from `first` on, leaving those in their order. */
+static float middle_in(const float *values, int first, int count) {
     static float sorted[PRESSES_KEPT];
-    memcpy(sorted, g_presses + first, (size_t)count * sizeof sorted[0]);
+    memcpy(sorted, values + first, (size_t)count * sizeof sorted[0]);
     qsort(sorted, (size_t)count, sizeof sorted[0], by_value);
     return sorted[count / 2];
 }
+
+static float middle_of(int first, int count) { return middle_in(g_presses, first, count); }
 
 void timing_song_stopped(void) {
     if (g_press_count < PRESSES_NEEDED || g_press_count == g_presses_logged) return;
@@ -118,6 +125,9 @@ void timing_song_stopped(void) {
     fprintf(stderr, "timing: %d presses, %.1f ms late, first half %.1f, second half %.1f, set to %+d, pressed %.1f ms before their frames\n",
             g_press_count, (double)all, (double)middle_of(0, half), (double)middle_of(half, g_press_count - half), g_options.note_timing,
             g_age_count ? (double)g_age_sum_us / g_age_count / 1000.0 : 0.0);
+    /* Sound that waits longer reaches the player later, and the presses that follow it with it. */
+    fprintf(stderr, "timing: sound queued %.1f ms in the first half, %.1f in the second\n", (double)middle_in(g_queued_at, 0, half),
+            (double)middle_in(g_queued_at, half, g_press_count - half));
 }
 
 int timing_last_song(int *late_ms) {

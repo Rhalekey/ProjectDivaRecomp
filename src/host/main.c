@@ -308,7 +308,8 @@ int main(int argc, char **argv) {
         translation_start(lang_dir ? lang_dir : "lang", g_data_dir);
         language_apply(g_options.language);
         /* The picture the title screen starts with: the intros have been and gone by then. */
-        g_ask_language = g_settings.language_prompt || !chosen;
+        /* DIVA_SKIP_LANGUAGE, a test switch, goes on with the language saved, for runs left alone. */
+        g_ask_language = (g_settings.language_prompt || !chosen) && !(chosen && getenv("DIVA_SKIP_LANGUAGE"));
         if (g_ask_language || (g_settings.extras && (g_options.confirm_cross < 0 || getenv("DIVA_ASK_CONFIRM")))) {
             g_disc_dir = argv[2];
             g_ask_at_title = 1;

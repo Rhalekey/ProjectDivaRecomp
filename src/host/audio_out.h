@@ -14,5 +14,9 @@ uint64_t audio_out_underruns(void);
 uint64_t audio_out_trims(void);
 /* In ms on average, how long sound waits in the queues here and at the sound card. */
 void audio_out_waits(double *queued, double *at_card);
+/* In ms, how long the longest queue held at the last buffer made: the sound now waiting here. */
+double audio_out_queued_now(void);
+/* Each frame of a song, as only then is a long queue cut back. */
+void audio_out_song_frame(void);
 
 #endif
