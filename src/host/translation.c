@@ -195,6 +195,13 @@ static void on_text_queue(void) {
     const char *format = guest_text(psp_cpu.r[REG_A2]);
     if (!format) return;
     note_letter(strcmp(format, "%s") == 0 ? guest_text(psp_cpu.r[REG_A3]) : format);
+    /* Queued text is drawn later from the queue's buffer, so this is where its own address is seen. */
+    if (!strcmp(format, "%s")) {
+        const char *queued = guest_text(psp_cpu.r[REG_A3]);
+        if (queued) presence_text(psp_cpu.r[REG_A3] & PSP_ADDR_MASK, queued, 0);
+    } else if (!strchr(format, '%')) {
+        presence_text(psp_cpu.r[REG_A2] & PSP_ADDR_MASK, format, 0);
+    }
     if (!strchr(format, '%')) return;
 
     /* A bare "%s" is finished text, which is translated when it is drawn. */

@@ -287,6 +287,7 @@ void presence_text(uint32_t asked, const char *shown, int placed) {
             best_at = g_seen_at[i];
         }
     }
+    if (best != g_screen) fprintf(stderr, "presence: screen %s\n", best);
     g_screen = best;
     show_now();
 }

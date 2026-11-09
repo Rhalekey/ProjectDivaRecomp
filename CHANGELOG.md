@@ -9,6 +9,9 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 ### Redrawn
 - The Project DIVA badge in the demo's corner and the lists: Miku's head and twin tails in clean lines, with Project DIVA on her front. The game's is too small to trace, so it is drawn anew in its spirit.
 
+### Discord
+- The status now shows Home and Miku's Room. Their words reach the screen through the game's text queue, which the status did not look at.
+
 ## 2026-11-08
 
 ### Controls and notes
