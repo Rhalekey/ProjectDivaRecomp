@@ -21,7 +21,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from hd_font import Drawer, FREE_FONT, GGO_METRICS_ADVANCE, load_font  # noqa: E402
-from hud_vector import SCALE, Canvas, circle, polyline, rect, ring, segment, text_strokes, GLYPHS, letter_strokes  # noqa: E402
+from hud_vector import SCALE, Canvas, circle, ellipse, polyline, rect, ring, segment, text_strokes, GLYPHS, letter_strokes  # noqa: E402
 from lang_images import ARCHIVE, Archive, colour_hash, decode_png, layout_of, plate_rects, smooth_enlarge  # noqa: E402
 
 TEAL = (0, 137, 147)
@@ -1159,7 +1159,82 @@ def icon_ring(sheet, pixels, box):
     paste(sheet, c, x, y)
 
 
-def sheet_of_icons(archive, out):
+BADGE_INK = (55, 55, 62)
+BADGE_LINE = 0.85
+
+
+def through(points, closed=False, steps=8):
+    """A smooth curve through the points (Catmull-Rom), as many short steps."""
+    pts = list(points)
+    n = len(pts)
+    out = []
+    last = n if closed else n - 1
+    for i in range(last):
+        p0 = pts[(i - 1) % n] if closed or i > 0 else pts[0]
+        p1, p2 = pts[i], pts[(i + 1) % n]
+        p3 = pts[(i + 2) % n] if closed or i + 2 < n else pts[-1]
+        for k in range(steps):
+            t = k / steps
+            out.append(tuple(0.5 * (2 * p1[d] + (-p0[d] + p2[d]) * t + (2 * p0[d] - 5 * p1[d] + 4 * p2[d] - p3[d]) * t * t
+                                    + (-p0[d] + 3 * p1[d] - 3 * p2[d] + p3[d]) * t ** 3) for d in (0, 1)))
+    out.append(pts[0] if closed else pts[-1])
+    return out
+
+
+def pen(points, width=BADGE_LINE):
+    """A line with round joins and ends at any width."""
+    return polyline(points, width) + [circle(x, y, width / 2, 12) for x, y in points]
+
+
+def mirrored(points):
+    """The same points, the other way round across the badge."""
+    return [(32 - x, y) for x, y in points]
+
+
+def project_badge(c, family, box):
+    """The Project DIVA badge (in the demo's corner and the lists): drawn anew, as the game's is too
+    small to trace: Miku's head and twin tails in lines, Project DIVA on her front."""
+    wipe(c, box)
+    x0, y0, _, _ = box
+
+    def at(points):
+        return [(x0 + x, y0 + y) for x, y in points]
+    c.paint([rounded(x0 + 0.5, y0 + 0.5, 31, 31, 3.5)], (255, 255, 255))
+    lines = []
+    # the twin tails, down each side behind the head and body
+    tail = [(8.6, 5.2), (5.6, 9.5), (4.4, 16), (4.6, 23), (6.2, 28.2), (9.2, 30.4), (8.6, 26), (8.2, 20.5), (8.6, 16.5)]
+    for t in (tail, mirrored(tail)):
+        lines += pen(at(through(t)))
+    # the head, and the fringe across it
+    head = [(16, 2.2), (21.6, 3.0), (24.3, 7.2), (24.5, 12), (22.6, 15.8), (16, 17.0), (9.4, 15.8), (7.5, 12), (7.7, 7.2), (10.4, 3.0)]
+    c.paint([at(through(head, True))], (255, 255, 255))
+    lines += pen(at(through(head, True)))
+    fringe = [(7.9, 10.5), (10.6, 6.4), (12.6, 4.6), (13.4, 9.2), (15.2, 5.0), (16.4, 4.4), (18.6, 9.2), (19.4, 4.6), (21.4, 6.4), (24.1, 10.5)]
+    lines += pen(at(fringe))
+    # the hair ties on top
+    for cx in (9.4, 22.6):
+        lines.append(at([(cx, 1.9), (cx + 1.3, 3.2), (cx, 4.5), (cx - 1.3, 3.2)]))
+    # the body, with Project DIVA on it
+    body = [(11.4, 16.6), (10.2, 25.8), (21.8, 25.8), (20.6, 16.6)]
+    c.paint([at(body)], (255, 255, 255))
+    lines += pen(at(body + body[:1]))
+    lines += pen(at(through([(16 - 4.8 * math.cos(a), 23.0 + 1.9 * math.sin(a)) for a in [i * math.tau / 24 for i in range(24)]], True, 2)), 0.6)
+    # the feet
+    for cx in (13.2, 18.8):
+        lines += pen(at(through([(cx - 2.2, 25.9), (cx - 2.3, 27.6), (cx, 28.4), (cx + 2.3, 27.6), (cx + 2.2, 25.9)])))
+    c.paint(lines, BADGE_INK)
+    # the face
+    face = []
+    for cx in (12.7, 19.3):
+        face.append(at(ellipse(cx, 12.1, 1.05, 1.5, 0, 24)))
+    face += pen(at(through([(15.0, 14.5), (16, 15.1), (17.0, 14.5)])), 0.65)
+    c.paint(face, BADGE_INK)
+    c.paint([at(circle(12.95, 11.5, 0.42, 12)), at(circle(19.55, 11.5, 0.42, 12))], (255, 255, 255))
+    write_text(c, Drawer(family, int(3.2 * SCALE)), 'DIVA', (x0 + 12, y0 + 21, 8, 4), BADGE_INK, True)
+    write_text(c, Drawer(family, int(3.4 * SCALE)), 'Project', (x0 + 12, y0 + 17, 8, 4), BADGE_INK, True)
+
+
+def sheet_of_icons(archive, family, out):
     """The small icons of the lists, on the sheet that also has the Project DIVA badge and the digits."""
     picture = 'menu_basic03.png'
     w, h, pixels = decode_png(archive.read(archive.find(picture)))
@@ -1169,6 +1244,7 @@ def sheet_of_icons(archive, out):
     icon_note(c, rects['basic_icon_note.png'])
     icon_folder(c, rects['basic_icon_folder.png'])
     icon_set(c, pixels, rects['basic_icon_set.png'])
+    project_badge(c, family, rects['basic_icon_pjd.png'])
     for digit, strokes in DIGITS.items():
         shadowed(c, rects['basic_num_%s.png' % digit], strokes)
     percent_sign(c, rects['basic_num_percent.png'])
@@ -2669,7 +2745,7 @@ def main():
             for name in LOGOS:
                 logo_sheet(archive, name, everyone)
     sheet_of_arrows(archive, out)
-    sheet_of_icons(archive, out)
+    sheet_of_icons(archive, family, out)
     sheet_of_card(archive, out)
     for picture in ('result_win_nm.png', 'result_win_edit.pn'):
         sheet_of_result_window(archive, picture, out)
