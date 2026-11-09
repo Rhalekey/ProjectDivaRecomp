@@ -4,6 +4,11 @@ Everything this project has added to or changed about *Hatsune Miku: Project DIV
 
 The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhalekey/psprecomp/tree/diva-recomp), branch `diva-recomp`. Those this game depends on are listed here too.
 
+## 2026-11-09
+
+### Redrawn
+- The Project DIVA badge in the demo's corner and the lists: Miku's head and twin tails in clean lines, with Project DIVA on her front. The game's is too small to trace, so it is drawn anew in its spirit.
+
 ## 2026-11-08
 
 ### Controls and notes
