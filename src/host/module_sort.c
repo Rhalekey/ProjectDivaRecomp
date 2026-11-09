@@ -258,6 +258,8 @@ void module_sort_input(uint32_t buttons) {
         }
     }
     if (!g_orders_ready) return;
+    /* Its hint in the footer (extra 0 in pieces.txt). */
+    if (g_list) psp_render_gl_footer_extras(FOOTER_SORT);
     static uint32_t held;
     const int pressed = (buttons & B_SELECT) && !(held & B_SELECT);
     held = buttons;

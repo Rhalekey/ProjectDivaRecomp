@@ -8,6 +8,16 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 
 ### Redrawn
 - The Project DIVA badge in the demo's corner and the lists: Miku's head and twin tails in clean lines, with Project DIVA on her front. The game's is too small to trace, so it is drawn anew in its spirit.
+- The title screen's logo: its edges take the colour from inside each part, so they no longer step in a light fringe, and specks are left out.
+- The makers' logos at the start are shown as the game has them again: traced, they came out with too many flaws.
+
+### Menus
+- Hints for what this edition adds, in the footer: **L R: Module** and **SELECT: Sort** in the song list, **SELECT: Sort** on the modules' screen. They come and go with the game's own hints.
+- The footer's hints no longer overlap on screens whose hints change with the row chosen, as Options.
+- The footer's band slides in to its place instead of jumping there once the game's slide has stopped. Where it goes is kept in `footer_places.txt` beside the save, so only a screen never seen before in that size of window can still jump, once.
+
+### Graphics
+- A picture drawn at several times the window's size, as at a high render scale in a small window, is shrunk in halves, so its edges stay smooth.
 
 ### Discord
 - The status now shows Home and Miku's Room. Their words reach the screen through the game's text queue, which the status did not look at.

@@ -735,11 +735,13 @@ def title_sheet(archive, drawer, folder, words):
     box = rects['maintitle.png']
     wipe(c, box)
     smooth_layer(c, pixels, box, lambda p, i, j: p[3] / 255, logo_white, WHITE + (255,))
-    smooth_layer(c, pixels, box, ink_amount(pixels, box), lambda p: p[3] > 200 and logo_colour(p))
+    smooth_layer(c, pixels, box, ink_amount(pixels, box), lambda p: p[3] > 200, colour_pixels=logo_inside(pixels, box),
+                 least=LOGO_SPECK)
     write_sheet(c, pixels, folder)
 
 
-# ---- the demo after the title, with PRESS START in its corner, and the makers' logos at the start
+# ---- the demo after the title, with PRESS START in its corner. The makers' logos before it are left as
+# the game has them: traced, they came out with too many flaws.
 DEMO_WORDS = {'en': 'PRESS START BUTTON', 'de': 'START DRÜCKEN'}
 DEMO_LINE = 'Project DIVA Start...'
 DEMO_SHADOW = (40, 40, 40)
@@ -759,10 +761,6 @@ def demo_start_sheet(archive, family, folder, words):
     small = Drawer(family, 7 * SCALE)
     write_text(c, small, DEMO_LINE, (6, 18, 92, 8), WHITE, False, DEMO_SHADOW)
     write_sheet(c, pixels, folder)
-
-
-LOGOS = ('logo_SEGA.png', 'logo_Crypton.png', 'logo_criware.png', 'logo_dingo.png', 'logo_Alchemy.png', 'logo_Crypton_sr.png',
-         'logo_PIAPRO_sr.png')
 
 
 def logo_colour(p):
@@ -833,23 +831,22 @@ def iso_loops(field, w, h, level=0.5):
     return loops
 
 
-def logo_sheet(archive, name, folder):
-    """A maker's logo: its ground enlarged without it, then the logo traced over that, each part in
-    the colour it has inside."""
-    w, h, pixels = decode_png(archive.read(name))
-    marks = [(x, y) for y in range(h) for x in range(w) if pixels[y][x][3] > 20 and logo_colour(pixels[y][x])]
-    if not marks:
-        return
-    x0, y0 = max(0, min(x for x, _ in marks) - 2), max(0, min(y for _, y in marks) - 2)
-    x1, y1 = min(w, max(x for x, _ in marks) + 3), min(h, max(y for _, y in marks) + 3)
-    box = (x0, y0, x1 - x0, y1 - y0)
-    clean = filled_in(pixels, box, lambda p: p[3] > 20 and logo_colour(p))
-    rows = smooth_enlarge(clean, [], SCALE)
-    c = Canvas(w, h)
-    for y, row in enumerate(rows):
-        c.data[y * c.w * 4:(y + 1) * c.w * 4] = b''.join(bytes(p) for p in row)
-    smooth_layer(c, pixels, box, ink_amount(pixels, box), lambda p: p[3] > 200 and logo_colour(p))
-    write_sheet(c, pixels, folder)
+LOGO_SPECK = 1.5   # square pixels: less than this, traced from a logo, is a speck
+
+
+def logo_inside(pixels, box):
+    """The pixels inside a logo, with all four neighbours of it too; the rest see-through. Its edges
+    were smoothed by mixing with the ground, and coloured from those they would come out in steps."""
+    x0, y0, w, h = box
+    out = [list(row) for row in pixels]
+
+    def logo(i, j):
+        return 0 <= i < w and 0 <= j < h and pixels[y0 + j][x0 + i][3] > 20 and logo_colour(pixels[y0 + j][x0 + i])
+    for j in range(h):
+        for i in range(w):
+            if not (logo(i, j) and logo(i + 1, j) and logo(i - 1, j) and logo(i, j + 1) and logo(i, j - 1)):
+                out[y0 + j][x0 + i] = (0, 0, 0, 0)
+    return out
 
 
 def ink_amount(pixels, box):
@@ -891,15 +888,22 @@ def smoothed_loop(loop, passes=10, reach=3, corner=50):
     return pts
 
 
-def smooth_layer(c, pixels, box, amount, colour_from, fallback=(0, 0, 0, 255)):
+def loop_area(loop):
+    """The area a loop closes, whichever way round it goes."""
+    return abs(sum(ax * by - bx * ay for (ax, ay), (bx, by) in zip(loop, loop[1:] + loop[:1]))) / 2
+
+
+def smooth_layer(c, pixels, box, amount, colour_from, fallback=(0, 0, 0, 255), colour_pixels=None, least=0.0):
     """Paint into the canvas what of the box is more than half `amount`, traced smooth, each point in
-    the colour of the nearest pixel that `colour_from` accepts."""
+    the colour of the nearest pixel that `colour_from` accepts (of `colour_pixels`, if given). Loops
+    closing less than `least` square pixels are specks, and left out."""
     x0, y0, bw, bh = box
     field = [[amount(pixels[y0 + j][x0 + i], i, j) for i in range(bw)] for j in range(bh)]
-    poly = as_one_polygon([[(px + x0, py + y0) for px, py in smoothed_loop(loop)] for loop in iso_loops(field, bw, bh)])
+    loops = [loop for loop in iso_loops(field, bw, bh) if loop_area(loop) >= least]
+    poly = as_one_polygon([[(px + x0, py + y0) for px, py in smoothed_loop(loop)] for loop in loops])
     if not poly:
         return
-    near = nearest_colours(pixels, box, colour_from)
+    near = nearest_colours(colour_pixels or pixels, box, colour_from)
 
     def colour(px, py):
         return near.get((min(bw - 1, max(0, int(px - x0))), min(bh - 1, max(0, int(py - y0)))), fallback)
@@ -2220,6 +2224,19 @@ SPARE_GAP = 2
 # too, with this much more room under it.
 HANGING = set('gjpqy,;')
 SPARE_BELOW = 2
+HINT_ROWS = 11   # a hint's height on the sheet
+
+
+# Hints the game never had, for what this edition adds, drawn in the spare rows too and listed in
+# pieces.txt as "extra <number> <u> <v> <w> <h>": the renderer puts them in the footer when the game
+# says so (psp_render_gl_footer_extras), or, with "extra_with <number> <u> <v>", whenever the game's
+# hint at that place on the sheet is shown, from its first frame. In order: sorting with Select, the
+# module with L and R; both come with the song list's PV hint, which no other screen has.
+EXTRA_HINTS = {
+    'en': (('basic_sele_sort', 'Sort'), ('basic_lr_module', 'Module')),
+    'de': (('basic_sele_sort', 'Sortieren'), ('basic_lr_module', 'Modul')),
+}
+EXTRA_WITH = {'basic_sele_sort': 'basic_tri_pvappr.png', 'basic_lr_module': 'basic_tri_pvappr.png'}
 
 
 def sheet_of_hints(archive, labels, drawer, out, sign_set):
@@ -2253,6 +2270,22 @@ def sheet_of_hints(archive, labels, drawer, out, sign_set):
             hint(c, name.split('.')[0], whole, start, text, drawer, sign_set, SPARE_BELOW)
             pieces.append('hint %d %d %d %d %d %d %d %d' % (x, y, bw, bh, whole[0], whole[1], natural, bh + SPARE_BELOW))
             spare_x += natural + SPARE_GAP
+    language = os.path.basename(os.path.normpath(out)).split('_')[0]
+    for number, (name, text) in enumerate(EXTRA_HINTS.get(language, ())):
+        start = signs_of(name, sign_set)[1]
+        natural = hint_width(name, start, text, drawer)
+        bh = HINT_ROWS
+        if spare_x + natural > w:
+            spare_row, spare_x = spare_row + 1, 0
+        if spare_row >= len(SPARE_ROWS):
+            print('no room in the spare rows for the hint %s' % text)
+            continue
+        whole = (spare_x, SPARE_ROWS[spare_row], natural, bh)
+        hint(c, name, whole, start, text, drawer, sign_set, SPARE_BELOW)
+        pieces.append('extra %d %d %d %d %d' % (number, whole[0], whole[1], natural, bh + SPARE_BELOW))
+        if name in EXTRA_WITH:
+            pieces.append('extra_with %d %d %d' % ((number,) + rects[EXTRA_WITH[name]][:2]))
+        spare_x += natural + SPARE_GAP
     for name in ('basic_btm.png', 'basic_btm_ele01.png', 'basic_btm_ele02.png'):
         pieces.append('band %d %d %d %d' % rects[name])
     with open(os.path.join(out, 'pieces.txt'), 'w') as f:
@@ -2741,9 +2774,6 @@ def main():
             everyone = os.path.dirname(os.path.dirname(os.path.normpath(out)))
             title_sheet(archive, drawer, everyone, TITLE_WORDS['en'])
             demo_start_sheet(archive, family, everyone, DEMO_WORDS['en'])
-            # The logos have no words to translate, so they are made once, for every language.
-            for name in LOGOS:
-                logo_sheet(archive, name, everyone)
     sheet_of_arrows(archive, out)
     sheet_of_icons(archive, family, out)
     sheet_of_card(archive, out)

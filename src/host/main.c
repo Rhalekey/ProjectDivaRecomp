@@ -343,6 +343,8 @@ int main(int argc, char **argv) {
         psp_render_gl_set_present_filter(g_settings.present_linear);
         if (g_settings.extras) psp_render_gl_set_background_dim(g_options.background_dim);
         if (g_settings.extras) language_notes_changed();
+        /* What the renderer learns, kept for the next game: where the footer's pieces go. */
+        psp_render_gl_set_state_dir(g_data_dir);
         /* DIVA_SAVE_TEXTURES saves what is still at the game's own resolution. */
         if (getenv("DIVA_SAVE_TEXTURES")) {
             char dump_dir[1100];
