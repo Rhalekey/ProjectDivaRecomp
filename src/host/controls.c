@@ -11,6 +11,7 @@
  */
 
 #include "controls.h"
+#include "guest.h"
 #include "extras.h"
 #include "presence.h"
 
@@ -150,7 +151,6 @@ static void press_clears_held_message(uint32_t buttons) {
 static volatile int g_song_paused, g_song_asking;
 /* The pause menu's list is the first of the window manager's, and it keeps the row it is on at 16:
  * 0 RESUME, 1 RETRY, 2 RETURN. Asked for and set from the song's own thread. */
-#define WINDOW_MANAGER 0x08C43278u
 #define WINDOW_LIST 0x08AFC55Cu
 #define LIST_ROW 16u
 #define ROW_RETRY 1u
@@ -288,16 +288,9 @@ int controls_hook(uint32_t addr) {
     /* For the quick restart: the pause menu's cursor on RETRY. The game's function is called as at
      * the entry of this one, so the registers it finds are put back after. */
     if (g_restart_put_cursor && g_song_paused) {
-        uint32_t saved[32];
-        memcpy(saved, psp_cpu.r, sizeof saved);
-        psp_cpu.r[REG_A0] = WINDOW_MANAGER;
-        psp_cpu.r[REG_A0 + 1] = 0;
-        psp_cpu.r[REG_A0 + 2] = 0;
-        psp_dispatch(WINDOW_LIST);
-        const uint32_t list = psp_cpu.r[PSP_REG_V0];
-        memcpy(psp_cpu.r, saved, sizeof saved);
+        const uint32_t list = guest_call(WINDOW_LIST, GAME_WINDOW_MANAGER, 0, 0, 0);
         g_restart_put_cursor = 0;
-        if (list >= 0x08800000u && list < 0x0A000000u && psp_read32(list + LIST_ROW) <= 2) {
+        if (guest_in_ram(list) && psp_read32(list + LIST_ROW) <= 2) {
             psp_write32(list + LIST_ROW, ROW_RETRY);
             g_restart_cursor_put = 1;
         }

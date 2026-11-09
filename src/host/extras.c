@@ -11,6 +11,7 @@
  */
 
 #include "extras.h"
+#include "guest.h"
 
 #include "controls.h"
 #include "language.h"
@@ -378,15 +379,8 @@ static void menu_labels(void) {
 /* The game's own sound for changing a value. It is called at the entry of a function of
  * the game's, so that function must find its registers as they were. */
 static void play_sound(void) {
-    uint32_t saved[32];
-    memcpy(saved, psp_cpu.r, sizeof saved);
-    psp_dispatch(GET_MENU_SOUND);
-    psp_cpu.r[PSP_REG_A0] = psp_cpu.r[PSP_REG_V0];
-    psp_cpu.r[PSP_REG_A1] = 0;
-    psp_cpu.r[PSP_REG_A2] = 0;
-    psp_cpu.r[PSP_REG_A3] = 0;
-    psp_dispatch(PLAY_MENU_SOUND);
-    memcpy(psp_cpu.r, saved, sizeof saved);
+    const uint32_t sounds = guest_call(GET_MENU_SOUND, 0, 0, 0, 0);
+    guest_call(PLAY_MENU_SOUND, sounds, 0, 0, 0);
 }
 
 static void change(int row) {

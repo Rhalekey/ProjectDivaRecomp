@@ -14,6 +14,7 @@
  * Addresses are for ULJM05472 v1.01, which Tools\build.ps1 checks.
  */
 #include "song_sort.h"
+#include "guest.h"
 
 #include "language.h"
 #include "options.h"
@@ -33,7 +34,6 @@
 #include <windows.h>
 
 #define SONG_LIST_UPDATE 0x08AC0514u
-#define WINDOW_MANAGER 0x08C43278u
 #define SONG_LIST_OF 0x08ABFC78u     /* (manager): the song list */
 #define LIST_COUNT 4u
 #define LIST_ROW 16u
@@ -155,7 +155,7 @@ static uint32_t g_scene;          /* the song list's scene; its second word is t
 static int g_game_order[MOST_ROWS], g_game_count;
 
 static int valid_song(int song) {
-    return song >= 0 && song < MOST_ROWS && psp_read32(SONG_TABLE + (uint32_t)song * SONG_ENTRY) >= 0x08800000u;
+    return song >= 0 && song < MOST_ROWS && psp_read32(SONG_TABLE + (uint32_t)song * SONG_ENTRY) >= GUEST_RAM_START;
 }
 
 /* What the order is worked out from, read once for each list: each song's name (in romaji if it
@@ -231,7 +231,7 @@ static int is_song_list(uint32_t rows, int count) {
         if (!valid_song(song) || seen[song]) return 0;
         seen[song] = 1;
         const uint32_t words = psp_read32(rows + (uint32_t)i * ROW_SIZE);
-        if (words < 0x08800000u || words >= 0x0A000000u) return 0;
+        if (!guest_in_ram(words)) return 0;
         songs++;
     }
     return songs >= FEWEST_SONGS;
@@ -239,10 +239,10 @@ static int is_song_list(uint32_t rows, int count) {
 
 static void sort_list(uint32_t list) {
     g_songs_in_front = 0;
-    if (list < 0x08800000u || list >= 0x0A000000u) return;
+    if (!guest_in_ram(list)) return;
     const int count = (int)psp_read32(list + LIST_COUNT);
     const uint32_t rows = psp_read32(list + LIST_ROWS);
-    if (count < 2 || count > MOST_ROWS || rows < 0x08800000u || rows >= 0x0A000000u || !is_song_list(rows, count)) return;
+    if (count < 2 || count > MOST_ROWS || !guest_in_ram(rows) || !is_song_list(rows, count)) return;
     int songs[MOST_ROWS], places[MOST_ROWS], n = 0;
     for (int i = 0; i < count; i++) {
         const int song = (int)psp_read32(rows + (uint32_t)i * ROW_SIZE + ROW_SONG);
@@ -299,18 +299,6 @@ static void sort_list(uint32_t list) {
         for (uint32_t b = 0; b < ROW_SIZE; b++) psp_write8(rows + (uint32_t)places[i] * ROW_SIZE + b, copy[from][b]);
         if (order[i] == on) psp_write32(list + LIST_ROW, (uint32_t)places[i]);
     }
-}
-
-/* A game's function, called as at the entry of the hooked one: its registers are put back after. */
-static uint32_t call(uint32_t function, uint32_t a0, uint32_t a1) {
-    uint32_t saved[32];
-    memcpy(saved, psp_cpu.r, sizeof saved);
-    psp_cpu.r[PSP_REG_A0] = a0;
-    psp_cpu.r[PSP_REG_A1] = a1;
-    psp_dispatch(function);
-    const uint32_t result = psp_cpu.r[PSP_REG_V0];
-    memcpy(psp_cpu.r, saved, sizeof saved);
-    return result;
 }
 
 /* Who sings a song. The game makes Kagamine Rin sing songs 32 and 33 and Kagamine Len 34 and 35,
@@ -372,26 +360,9 @@ static const int SINGER_MODULES[2][2] = {{40, 48}, {41, 49}};
 static int g_change_step, g_change_to = -1, g_change_next = -1, g_motions_loaded;
 static ULONGLONG g_change_since;
 
-/* A game's function with four arguments and a float: registers put back after. */
-static uint32_t call_with(uint32_t function, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, float f12) {
-    uint32_t saved[32];
-    const float saved_f12 = psp_cpu.f[12];
-    memcpy(saved, psp_cpu.r, sizeof saved);
-    psp_cpu.r[PSP_REG_A0] = a0;
-    psp_cpu.r[PSP_REG_A1] = a1;
-    psp_cpu.r[PSP_REG_A2] = a2;
-    psp_cpu.r[PSP_REG_A3] = a3;
-    psp_cpu.f[12] = f12;
-    psp_dispatch(function);
-    const uint32_t result = psp_cpu.r[PSP_REG_V0];
-    memcpy(psp_cpu.r, saved, sizeof saved);
-    psp_cpu.f[12] = saved_f12;
-    return result;
-}
-
 static uint32_t change_room(void) {
     const uint32_t room = g_scene ? psp_read32(g_scene + SCENE_GAME) : 0;
-    if (room < 0x08800000u || room >= 0x0A000000u || psp_read32(room + GAME_SCORES) != g_scores) return 0;
+    if (!guest_in_ram(room) || psp_read32(room + GAME_SCORES) != g_scores) return 0;
     return room;
 }
 
@@ -409,7 +380,7 @@ static int change_into(int module) {
         /* Her changing motions are loaded first, as the modules' screen loads them as it opens
          * (08AC10D8); the song list has none of them. */
         g_change_to = module;
-        call_with(MOTIONS_RESTART, room, 0, 0, 0, 0.0f);
+        guest_call_f(MOTIONS_RESTART, room, 0, 0, 0, 0.0f);
         change_go(STEP_LOADING);
     } else if (g_change_step == STEP_LOADING || g_change_step == 1) {
         g_change_to = module;        /* not put on yet */
@@ -428,55 +399,55 @@ static void change_step(void) {
     const int waited_out = GetTickCount64() - g_change_since > CHANGE_WAIT_MS;
     switch (g_change_step) {
     case STEP_LOADING: /* Once her changing motions are loaded, she starts changing. */
-        g_motions_loaded = (call_with(MOTIONS_LOAD, room, CHANGING_MOTIONS, 0, 0, 0.0f) & 0xFF) != 0;
+        g_motions_loaded = (guest_call_f(MOTIONS_LOAD, room, CHANGING_MOTIONS, 0, 0, 0.0f) & 0xFF) != 0;
         if (!g_motions_loaded && !waited_out) return;
-        call_with(EFFECT_START, room + ROOM_EFFECT, 0, 0, 0, 0.0f);
-        call_with(PLAY_SOUND, call_with(SOUNDS, 0, 0, 0, 0, 0.0f), 96, 0, 0, 0.0f);
-        call_with(PLAY_MOTION, room, 7, 0, 0, 0.0f);
+        guest_call_f(EFFECT_START, room + ROOM_EFFECT, 0, 0, 0, 0.0f);
+        guest_call_f(PLAY_SOUND, guest_call_f(SOUNDS, 0, 0, 0, 0, 0.0f), 96, 0, 0, 0.0f);
+        guest_call_f(PLAY_MOTION, room, 7, 0, 0, 0.0f);
         change_go(1);
         return;
     case 1: /* Changing: once that is played, into the module. */
-        if (!call_with(MOTION_DONE, room + ROOM_MOTION, 0, 0, 0, 0.0f) && !waited_out) return;
-        call_with(PLAY_MOTION, room, 8, 0, 0, 0.0f);
-        call_with(ROOM_WEARS, room, (uint32_t)g_change_to, 0, 0, 0.0f);
+        if (!guest_call_f(MOTION_DONE, room + ROOM_MOTION, 0, 0, 0, 0.0f) && !waited_out) return;
+        guest_call_f(PLAY_MOTION, room, 8, 0, 0, 0.0f);
+        guest_call_f(ROOM_WEARS, room, (uint32_t)g_change_to, 0, 0, 0.0f);
         change_go(2);
         return;
     case 2: { /* Once loaded, shown again, coming back. */
-        if (!call_with(SINGER_LOADED, room, 0, 0, 0, 0.0f) && !waited_out) return;
-        const uint32_t sounds = call_with(SOUNDS, 0, 0, 0, 0, 0.0f);
-        call_with(STOP_SOUNDS, sounds, 0, 0, 0, 0.0f);
-        call_with(PLAY_SOUND, sounds, 97, 0, 0, 0.0f);
-        call_with(EFFECT_END, room + ROOM_EFFECT, 0, 0, 0, -1.0f);
+        if (!guest_call_f(SINGER_LOADED, room, 0, 0, 0, 0.0f) && !waited_out) return;
+        const uint32_t sounds = guest_call_f(SOUNDS, 0, 0, 0, 0, 0.0f);
+        guest_call_f(STOP_SOUNDS, sounds, 0, 0, 0, 0.0f);
+        guest_call_f(PLAY_SOUND, sounds, 97, 0, 0, 0.0f);
+        guest_call_f(EFFECT_END, room + ROOM_EFFECT, 0, 0, 0, -1.0f);
         const uint32_t singer = psp_read32(room + ROOM_SINGER);
-        if (singer >= 0x08800000u && singer < 0x0A000000u) {
+        if (guest_in_ram(singer)) {
             const uint32_t methods = psp_read32(singer + 200);
-            const uint32_t show = methods >= 0x08800000u && methods < 0x0A000000u ? psp_read32(methods + 36) : 0;
-            if (show >= 0x08800000u && show < 0x0A000000u) call_with(show, singer, 1, 1, 0, 0.0f);
+            const uint32_t show = guest_in_ram(methods) ? psp_read32(methods + 36) : 0;
+            if (guest_in_ram(show)) guest_call_f(show, singer, 1, 1, 0, 0.0f);
         }
-        call_with(SINGER_STILL, room, 0, 0, 0, 0.0f);
-        call_with(SINGER_POSE, room, 0, 1, 0, 0.0f);
-        call_with(PLAY_MOTION, room, 9, 0, 0, 0.0f);
+        guest_call_f(SINGER_STILL, room, 0, 0, 0, 0.0f);
+        guest_call_f(SINGER_POSE, room, 0, 1, 0, 0.0f);
+        guest_call_f(PLAY_MOTION, room, 9, 0, 0, 0.0f);
         change_go(3);
         return;
     }
     default: /* Back: standing. */
-        if (!call_with(MOTION_DONE, room + ROOM_MOTION, 0, 0, 0, 0.0f) && !waited_out) return;
-        call_with(PLAY_MOTION, room, (uint32_t)-1, 0, 0, 0.0f);
+        if (!guest_call_f(MOTION_DONE, room + ROOM_MOTION, 0, 0, 0, 0.0f) && !waited_out) return;
+        guest_call_f(PLAY_MOTION, room, (uint32_t)-1, 0, 0, 0.0f);
         g_change_step = 0;
         if (g_change_next >= 0 && g_change_next != (int)psp_read32(g_scores + SAVE_WORN)) {
             /* Again, with the motions still loaded. */
             const int next = g_change_next;
             g_change_next = -1;
             g_change_to = next;
-            call_with(EFFECT_START, room + ROOM_EFFECT, 0, 0, 0, 0.0f);
-            call_with(PLAY_SOUND, call_with(SOUNDS, 0, 0, 0, 0, 0.0f), 96, 0, 0, 0.0f);
-            call_with(PLAY_MOTION, room, 7, 0, 0, 0.0f);
+            guest_call_f(EFFECT_START, room + ROOM_EFFECT, 0, 0, 0, 0.0f);
+            guest_call_f(PLAY_SOUND, guest_call_f(SOUNDS, 0, 0, 0, 0, 0.0f), 96, 0, 0, 0.0f);
+            guest_call_f(PLAY_MOTION, room, 7, 0, 0, 0.0f);
             change_go(1);
         } else {
             g_change_next = g_change_to = -1;
             /* Her changing motions let go, as the modules' screen does as it closes (08AC1460). */
             if (g_motions_loaded)
-                for (uint32_t motion = 7; motion <= 9; motion++) call_with(MOTION_FREE, room + ROOM_MOTION, motion, 0, 0, 0.0f);
+                for (uint32_t motion = 7; motion <= 9; motion++) guest_call_f(MOTION_FREE, room + ROOM_MOTION, motion, 0, 0, 0.0f);
             g_motions_loaded = 0;
         }
     }
@@ -495,7 +466,7 @@ static void next_module(int step) {
         const int who = singer == 40 ? 0 : 1;
         const int now = g_options.singer_module[who] == SINGER_MODULES[who][1];
         const int other = SINGER_MODULES[who][!now];
-        if (call(HAS_ITEM, g_scores, FIRST_MODULE_ITEM + (uint32_t)other)) {
+        if (guest_call(HAS_ITEM, g_scores, FIRST_MODULE_ITEM + (uint32_t)other, 0, 0)) {
             g_options.singer_module[who] = other;
             options_save(language_data_dir());
         }
@@ -510,7 +481,7 @@ static void next_module(int step) {
     for (int tries = 1; tries < MODULES; tries++) {
         const int at = ((place + step * tries) % MODULES + MODULES) % MODULES;
         const int module = (int)psp_read32(MODULE_ORDER + (uint32_t)at * 4);
-        if (module < 0 || module >= MODULES || !call(HAS_ITEM, g_scores, FIRST_MODULE_ITEM + (uint32_t)module)) continue;
+        if (module < 0 || module >= MODULES || !guest_call(HAS_ITEM, g_scores, FIRST_MODULE_ITEM + (uint32_t)module, 0, 0)) continue;
         /* Miku behind the menu changes into it as on the modules' screen (see change_step); the
          * save keeps it as she puts it on. */
         if (!change_into(module)) psp_write32(g_scores + SAVE_WORN, (uint32_t)module);
@@ -524,8 +495,8 @@ static void on_song_list(void) {
     const uint32_t scene = psp_cpu.r[PSP_REG_A0];
     g_scene = scene;
     const uint32_t game = psp_read32(scene + SCENE_GAME);
-    g_scores = game >= 0x08800000u && game < 0x0A000000u ? psp_read32(game + GAME_SCORES) : 0;
-    if (g_scores && (g_scores < 0x08800000u || g_scores >= 0x0A000000u)) g_scores = 0;
+    g_scores = guest_in_ram(game) ? psp_read32(game + GAME_SCORES) : 0;
+    if (g_scores && !guest_in_ram(g_scores)) g_scores = 0;
     change_step();
     /* Select goes to the next order; L and R to another module. */
     static uint32_t held;
@@ -539,18 +510,12 @@ static void on_song_list(void) {
         psp_render_gl_show_message(SORT_NAME_SHOWN[g_sort]);
         fprintf(stderr, "song sort: %s\n", SORT_NAME_SHOWN[g_sort]);
     }
-    /* The game's function is called as at the entry of this one, its registers put back after. */
-    uint32_t saved[32];
-    memcpy(saved, psp_cpu.r, sizeof saved);
-    psp_cpu.r[PSP_REG_A0] = WINDOW_MANAGER;
-    psp_dispatch(SONG_LIST_OF);
-    const uint32_t list = psp_cpu.r[PSP_REG_V0];
-    memcpy(psp_cpu.r, saved, sizeof saved);
+    const uint32_t list = guest_call(SONG_LIST_OF, GAME_WINDOW_MANAGER, 0, 0, 0);
     sort_list(list);
     g_cursor_song = -1;
-    if (list >= 0x08800000u && list < 0x0A000000u) {
+    if (guest_in_ram(list)) {
         const uint32_t cursor = psp_read32(list + LIST_ROW), rows = psp_read32(list + LIST_ROWS);
-        if (cursor < psp_read32(list + LIST_COUNT) && cursor < MOST_ROWS && rows >= 0x08800000u && rows < 0x0A000000u)
+        if (cursor < psp_read32(list + LIST_COUNT) && cursor < MOST_ROWS && guest_in_ram(rows))
             g_cursor_song = g_songs_in_front ? (int)psp_read32(rows + cursor * ROW_SIZE + ROW_SONG) : -1;
     }
 }

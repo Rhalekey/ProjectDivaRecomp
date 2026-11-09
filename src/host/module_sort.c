@@ -13,6 +13,7 @@
  * Addresses are for ULJM05472 v1.01, which Tools\build.ps1 checks.
  */
 #include "module_sort.h"
+#include "guest.h"
 
 #include "song_sort.h"
 #include "translation.h"
@@ -33,7 +34,6 @@
 #define SAVE 0x08C2C4A0u
 #define HAS_ITEM 0x08A8C600u        /* (save, item): nonzero if it has been obtained */
 #define FIRST_MODULE_ITEM 122u
-#define WINDOW_MANAGER 0x08C43278u
 #define LIST_COUNT 4u
 #define LIST_ROW 16u
 #define LIST_ROWS 20u
@@ -50,19 +50,6 @@ static long long g_played[MODULES];   /* when a song was last played in each (so
 static int g_sort, g_have_game_order;
 static int g_game_order[MODULES];
 static int g_obtained[MODULES];
-
-/* A game's function, called as at the entry of the hooked one: its registers are put back after. */
-static uint32_t call(uint32_t function, uint32_t a0, uint32_t a1, uint32_t a2) {
-    uint32_t saved[32];
-    memcpy(saved, psp_cpu.r, sizeof saved);
-    psp_cpu.r[PSP_REG_A0] = a0;
-    psp_cpu.r[PSP_REG_A1] = a1;
-    psp_cpu.r[PSP_REG_A2] = a2;
-    psp_dispatch(function);
-    const uint32_t result = psp_cpu.r[PSP_REG_V0];
-    memcpy(psp_cpu.r, saved, sizeof saved);
-    return result;
-}
 
 /* What the order is worked out from, once when it changes: each module's name as shown, whether
  * it has been obtained, and its place in the game's order. */
@@ -81,7 +68,7 @@ static void read_keys(void) {
         original[n] = 0;
         const char *shown = translation_shown(original);
         snprintf(g_name[module], sizeof g_name[module], "%s", shown ? shown : original);
-        g_obtained[module] = call(HAS_ITEM, SAVE, FIRST_MODULE_ITEM + (uint32_t)module, 0) != 0;
+        g_obtained[module] = guest_call(HAS_ITEM, SAVE, FIRST_MODULE_ITEM + (uint32_t)module, 0, 0) != 0;
         g_played[module] = song_sort_module_played(module);
         g_place[module] = MODULES;
     }
@@ -132,10 +119,10 @@ static void work_out_orders(void) {
 /* The list's rows put in the order wanted, by their modules; rows that are no module (number -1)
  * stay where they are. False if the list is not, or no longer, the modules'. */
 static int sort_rows(uint32_t list, const int *wanted) {
-    if (list < 0x08800000u || list >= 0x0A000000u) return 0;
+    if (!guest_in_ram(list)) return 0;
     const int count = (int)psp_read32(list + LIST_COUNT);
     const uint32_t rows = psp_read32(list + LIST_ROWS);
-    if (count < 2 || count > MOST_ROWS || rows < 0x08800000u || rows >= 0x0A000000u) return 0;
+    if (count < 2 || count > MOST_ROWS || !guest_in_ram(rows)) return 0;
     int modules[MOST_ROWS], places[MOST_ROWS], n = 0;
     uint8_t seen[MODULES] = {0};
     for (int i = 0; i < count; i++) {
@@ -144,7 +131,7 @@ static int sort_rows(uint32_t list, const int *wanted) {
         if (module < 0 || module >= MODULES || seen[module]) return 0;
         seen[module] = 1;
         const uint32_t words = psp_read32(rows + (uint32_t)i * ROW_SIZE);
-        if (words < 0x08800000u || words >= 0x0A000000u) return 0;
+        if (!guest_in_ram(words)) return 0;
         places[n] = i;
         modules[n++] = module;
     }
@@ -183,32 +170,31 @@ static int g_orders_ready;
 #define WINDOW_SCENE_LIST 292u
 #define MANAGER_FRONT 720u
 
-static int in_ram(uint32_t at) { return at >= 0x08800000u && at < 0x0A000000u; }
 
 static uint32_t window_list(uint32_t id, uint32_t k) {
     int slot = 1;
     for (; slot >= 0; slot--) {
-        const uint32_t window = WINDOW_MANAGER + (uint32_t)slot * WINDOW_SIZE;
+        const uint32_t window = GAME_WINDOW_MANAGER + (uint32_t)slot * WINDOW_SIZE;
         if (psp_read8(window) && psp_read32(window + WINDOW_ID) == id) break;
     }
     if (slot < 0 || k > 16) return 0;
-    const uint32_t lists = psp_read32(WINDOW_MANAGER + (uint32_t)slot * WINDOW_SIZE + WINDOW_LISTS);
-    return in_ram(lists) ? psp_read32(lists + k * 4) : 0;
+    const uint32_t lists = psp_read32(GAME_WINDOW_MANAGER + (uint32_t)slot * WINDOW_SIZE + WINDOW_LISTS);
+    return guest_in_ram(lists) ? psp_read32(lists + k * 4) : 0;
 }
 
 static uint32_t scene_list(void) {
-    const uint32_t front = psp_read32(WINDOW_MANAGER + MANAGER_FRONT);
+    const uint32_t front = psp_read32(GAME_WINDOW_MANAGER + MANAGER_FRONT);
     if (front > 1) return 0;
-    const uint32_t window = WINDOW_MANAGER + front * WINDOW_SIZE;
+    const uint32_t window = GAME_WINDOW_MANAGER + front * WINDOW_SIZE;
     return window_list(psp_read32(window + WINDOW_ID), psp_read32(window + WINDOW_SCENE_LIST));
 }
 
 /* Whether a list is the modules': each row a module, none twice, its words that module's name. */
 static int is_module_list(uint32_t list) {
-    if (!in_ram(list)) return 0;
+    if (!guest_in_ram(list)) return 0;
     const int count = (int)psp_read32(list + LIST_COUNT);
     const uint32_t rows = psp_read32(list + LIST_ROWS);
-    if (count < 8 || count > MOST_ROWS || !in_ram(rows)) return 0;
+    if (count < 8 || count > MOST_ROWS || !guest_in_ram(rows)) return 0;
     uint8_t seen[MODULES] = {0};
     int n = 0;
     for (int i = 0; i < count; i++) {
