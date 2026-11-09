@@ -14,6 +14,7 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 - The Project DIVA badge in the demo's corner and the lists: Miku's head and twin tails in clean lines, with Project DIVA on her front. The game's is too small to trace, so it is drawn anew in its spirit.
 - The title screen's logo: its edges take the colour from inside each part, so they no longer step in a light fringe, and specks are left out.
 - The makers' logos at the start are shown as the game has them again: traced, they came out with too many flaws.
+- The notes and targets as Xbox or Nintendo letters, or arrows, fill the same square as the PlayStation shapes, B a little narrower as letters are: the letters were narrower, so they looked smaller. Their targets are all of one size too: the game draws each of its shapes at a scale of its own, and that scale had been kept, so the one in place of the square was about a third larger than the one in place of the circle. The letters in the hints' buttons keep their shape.
 
 ### Menus
 - Hints for what this edition adds, in the footer: **L R: Module** and **SELECT: Sort** in the song list, **SELECT: Sort** on the modules' screen. They come and go with the game's own hints.

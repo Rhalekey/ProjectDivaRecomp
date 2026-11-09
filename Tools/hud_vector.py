@@ -644,17 +644,41 @@ ARROW_TURNS = {'up': 0, 'right': 1, 'down': 2, 'left': 3}
 
 
 def arrow_strokes(way, cx, cy, size, width):
+    """Its strokes' middles fill a square `size` across, as wide_letter_strokes' do."""
     turn = ARROW_TURNS[way]
 
     def at(px, py):
         for _ in range(turn):
             px, py = -py, px
         return (cx + px * size, cy + py * size)
-    return polyline([at(0, 0.5), at(0, -0.42)], width) + polyline([at(-0.4, -0.04), at(0, -0.46), at(0.4, -0.04)], width)
+    return polyline([at(0, 0.5), at(0, -0.46)], width) + polyline([at(-0.5, 0.0), at(0, -0.5), at(0.5, 0.0)], width)
+
+
+def wide_letter_strokes(letter, cx, cy, size, width):
+    """A, X or Y with their strokes' middles reaching the sides of a square `size` across, so
+    that with their strokes they fill the same square as the game's shapes do, and B as high but
+    narrower, all in one width of stroke. The buttons in the hints keep the narrower ones of letter_strokes."""
+    def at(px, py):
+        return (cx + px * size, cy + py * size)
+    if letter == 'A':
+        return polyline([at(-0.5, 0.5), at(0, -0.5), at(0.5, 0.5)], width) + polyline([at(-0.28, 0.12), at(0.28, 0.12)], width)
+    if letter == 'X':
+        return polyline([at(-0.5, -0.5), at(0.5, 0.5)], width) + polyline([at(0.5, -0.5), at(-0.5, 0.5)], width)
+    if letter == 'Y':
+        return polyline([at(-0.5, -0.5), at(0, 0.04), at(0.5, -0.5)], width) + polyline([at(0, 0.04), at(0, 0.5)], width)
+    # B is narrower than the others, as letters are: about 22 of their 25 across with its stroke.
+    out = polyline([at(-0.42, -0.5), at(-0.42, 0.5)], width)
+    # The upper bowl a little smaller than the lower, which reaches the right side.
+    for top, reach, across in ((-0.5, 0.08, 0.30), (0.0, 0.10, 0.32)):
+        bowl = [at(-0.42, top)]
+        bowl += [at(reach + across * math.sin(i * math.pi / 12), top + 0.25 - 0.25 * math.cos(i * math.pi / 12)) for i in range(13)]
+        bowl.append(at(-0.42, top + 0.5))
+        out += polyline(bowl, width)
+    return out
 
 
 def sign_strokes(sign, cx, cy, size, width):
-    return letter_strokes(sign, cx, cy, size, width) if len(sign) == 1 else arrow_strokes(sign, cx, cy, size, width)
+    return wide_letter_strokes(sign, cx, cy, size, width) if len(sign) == 1 else arrow_strokes(sign, cx, cy, size, width)
 
 
 # Each colour from light to deep, as the game's own notes are shaded.
