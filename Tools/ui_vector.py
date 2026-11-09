@@ -55,8 +55,12 @@ TITLE_RIGHT = 512
 TITLE_SHADOW_ROWS = 2  # of shadow under a plate with no lines under it
 TITLE_TAIL = 10
 TITLE_EDGE = 3
-TITLE_EDGE_CLEAR_UNDER = 1   # under the plate, cleared from this far left of the cut edge's line on
 TITLE_EDGE_STRIP = 3   # how far left of the plate's cut edge it is redrawn, past any words
+TITLE_BAND_REDRAWN = 8  # under a plate with nothing under it, its band is redrawn from this far left of the edge
+TITLE_BAND_ROWS = 2     # the dark band under a plate
+TITLE_BAND_ROWS_LINES = 4   # and under one with lines: two dark rows, the dotted line's, and a shadow
+TITLE_TAIL_SHADE = 9.5  # the white diagonal's shadow, this far right of the lines' end, a row under the plate
+TITLE_TAIL_SHADE_ROWS = 9
 TITLE_EDGE_TOP = 4     # where that edge starts, under the white band
 TITLE_GREY = (133, 136, 147)
 TITLE_LINES_END = 480  # where the lines under that plate end, and go up to it
@@ -482,48 +486,91 @@ def blade(sheet, pixels):
 
 
 def title_plate_edge(sheet, pixels, y, lines_below):
-    """The cut end of the plate with a menu's name: a grey edge along it, a shadow beside that, and,
-    where two lines run under the plate, the white diagonal that takes them up to meet that edge."""
+    """The cut end of the plate with a menu's name: a grey edge along it, a shadow beside that, the
+    dark band under the plate running on to the same diagonal, and, where two lines run under the
+    plate, the white diagonal that takes them up to meet that edge, with its shadow."""
     h, tail = TITLE_PLATE_H, TITLE_TAIL
     x0 = TITLE_RIGHT - h - tail - 8
     c = Canvas(TITLE_RIGHT - x0, h + tail)
     plate = tuple(pixels[y + 1][x0 - 20])
     under = tail if lines_below else TITLE_SHADOW_ROWS
+    tail_x = TITLE_LINES_END - x0
 
     def edge(row):
         return TITLE_RIGHT - row - x0
 
-    # It starts from what is there: under the plate the game has a dark band and its lines, which
-    # must stay as they are. Only the cut edge, its shadow and the lines' end are drawn over them.
-    # Right of the cut edge, where its old steps and their shadow were, it is cleared first.
+    def tail_right(row):
+        """The right side of the white diagonal, under the plate, and of the lines' end below it."""
+        return tail_x + 6 - min(row - h, 6)
+
+    # It starts from what is there: the plate's words, and under it the game's band and lines,
+    # which run straight. Right of the cut edge, where its old steps and their shadow were, it is
+    # cleared; under the plate, from where the band and lines end on, every diagonal is drawn anew.
     for row in range(c.h):
         src = ((y * SCALE + row) * sheet.w + x0 * SCALE) * 4
         c.data[row * c.w * 4:(row + 1) * c.w * 4] = sheet.data[src:src + c.w * 4]
+    before = bytes(c.data)
+    band_rows = TITLE_BAND_ROWS_LINES if lines_below else TITLE_BAND_ROWS
+    # Under a plate with nothing under it, everything is redrawn from a column a little left of
+    # where the band meets the edge, straight down, so that what is kept and what is drawn meet
+    # on a pixel's side.
+    band_left = edge(h + band_rows) - TITLE_BAND_REDRAWN
+    for row in range(c.h):
         game_row = row / SCALE
-        if game_row >= h and lines_below:
-            continue    # under the plate the game's own band, lines and their end's shadow stay
-        clear_from = edge(game_row) - (TITLE_EDGE_STRIP if game_row < h else TITLE_EDGE_CLEAR_UNDER)
+        if game_row < h:
+            clear_from = edge(game_row) - TITLE_EDGE_STRIP
+        elif lines_below:
+            clear_from = tail_right(game_row)
+        else:
+            clear_from = band_left
         start = max(0, int(clear_from * SCALE))
         c.data[(row * c.w + start) * 4:(row + 1) * c.w * 4] = bytes((c.w - start) * 4)
-    # With no lines under it, a soft shadow; then the plate, its edge, and the small diagonal at the lines' end.
+
+    def along(colour, top, bottom, left=None):
+        """Rows from top to bottom of the band under the plate, ending at the cut edge's diagonal."""
+        if left is None:
+            shape = [(band_left, top), (edge(top) + TITLE_EDGE, top), (edge(bottom) + TITLE_EDGE, bottom), (band_left, bottom)]
+        else:
+            shape = [(left(top), top), (edge(top) + TITLE_EDGE, top), (edge(bottom) + TITLE_EDGE, bottom), (left(bottom), bottom)]
+        c.paint([shape], colour)
+
+    # The dark band runs on as it is a little to the left, every row of it, so that no seam shows.
+    column = int((tail_x - 6 if lines_below else band_left - 1) * SCALE)
+
+    def band(_px, py):
+        at = (min(int(py * SCALE), c.h - 1) * c.w + column) * 4
+        return tuple(before[at:at + 4])
+    along(band, h, h + band_rows, tail_right if lines_below else None)
+    # With no lines under it, a soft shadow; then the shadow beside the edge, the plate and its edge.
     if not lines_below:
-        c.paint([[(0, h), (edge(h) + TITLE_EDGE, h), (edge(h + under) + TITLE_EDGE, h + under), (0, h + under)]], (42, 42, 42), 32)
+        c.paint([[(0, h + band_rows), (edge(h + band_rows) + TITLE_EDGE, h + band_rows),
+                  (edge(h + under) + TITLE_EDGE, h + under), (0, h + under)]], (42, 42, 42), 32)
     # Its first rows are the white band above, which runs on to the edge of the picture. The shadow
-    # beside the edge runs its whole length, from where the edge starts to the plate's bottom, or on to
-    # the bottom of the picture where no lines are under it: as the game's, which stops at the lines.
+    # beside the edge runs its whole length, from where the edge starts on down past the band, as
+    # the game's does.
     top = TITLE_EDGE_TOP
-    end = h if lines_below else h + under
-    c.paint([[(edge(top), top), (edge(top) + 5, top), (edge(end) + 5, end), (edge(end), end)]], (20, 20, 20), 80)
+    end = h + band_rows
+    c.paint([[(edge(top), top), (edge(top) + 5, top), (edge(h) + 5, h), (edge(h), h)]], (20, 20, 20), 80)
+    c.paint([[(edge(h) + TITLE_EDGE, h), (edge(h) + 5, h), (edge(end) + 5, end), (edge(end) + TITLE_EDGE, end)]], (20, 20, 20), 80)
     c.paint([[(0, 0), (c.w / SCALE, 0), (c.w / SCALE, top), (edge(top), top), (edge(h), h), (0, h)]], plate)
     c.paint([[(edge(top), top), (edge(top) + TITLE_EDGE, top), (edge(h) + TITLE_EDGE, h), (edge(h), h)]], TITLE_GREY)
-    tail_x = TITLE_LINES_END - x0
     if lines_below:
+        # The white diagonal's shadow: a soft line beside it, from the band down past the lines.
+        def shade(width, alpha):
+            x_at = lambda row: tail_x + TITLE_TAIL_SHADE - (row - h)
+            first, last = h + band_rows - 1, h + TITLE_TAIL_SHADE_ROWS
+            c.paint([[(x_at(first) - width / 2, first), (x_at(first) + width / 2, first),
+                      (x_at(last) + width / 2, last), (x_at(last) - width / 2, last)]], (20, 20, 20), alpha)
+        shade(3.0, 40)
+        shade(1.2, 70)
         c.paint([[(tail_x + 6, h), (tail_x + 3, h), (tail_x - 3, h + 6), (tail_x, h + 6)]], plate)
         c.paint([rect(tail_x - 3, h + 5, 3, 1)], plate)
         c.paint([rect(tail_x - 3, h + 2, 1, 1)], plate)    # the last dot of the line above it
     # On the plate's rows only a narrow strip by its edge is laid down, where the old steps were: a long
     # name runs nearly to the edge, and must not be painted over. Under the plate, from the tail on.
-    paste_over(sheet, c, x0, y, keep_left=tail_x - 3, plate_rows=h, strip=lambda row: edge(row) - TITLE_EDGE_STRIP)
+    keep = tail_x - 3 if lines_below else 0
+    paste_over(sheet, c, x0, y, keep_left=keep, plate_rows=h,
+               strip=lambda row: edge(row) - TITLE_EDGE_STRIP)
 
 
 def paste_over(sheet, piece, x, y, keep_left, plate_rows=0, strip=None):
