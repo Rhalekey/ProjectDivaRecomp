@@ -202,16 +202,18 @@ if ($FontFile) {
 }
 
 # ---- pictures with words in them, made from the game's own, for each language. These use
-# the font as well, so they are made again when it or the words change.
+# the font as well, so they are made again when it or the words change. Their large versions go in
+# the language's own folder, which the game looks in first: the shared one would hold whichever
+# language was made last, and show it in the others, Japanese included.
 $LangTool = Join-Path $Root "Tools\lang_images.py"
 foreach ($Language in @("en", "de")) {
     $LangArt = Join-Path $env:LOCALAPPDATA "ProjectDivaRecomp\lang\$Language"
     $LangTable = Join-Path $Root "lang\$($Language)_images.txt"
     $LangStamp = Join-Path $HdDir "pictures_$($Language)_made_from.txt"
-    $LangWanted = "$($FontFile.Name) $((Get-FileHash $LangTable).Hash) $((Get-FileHash $LangTool).Hash)"
+    $LangWanted = "$($FontFile.Name) $((Get-FileHash $LangTable).Hash) $((Get-FileHash $LangTool).Hash) large in lang"
     if (Is-Stale $LangStamp $LangWanted) {
         Step "translating the pictures ($Language)"
-        python $LangTool $Game $LangTable $LangArt $FontFile.FullName $HdDir *>> $Log
+        python $LangTool $Game $LangTable $LangArt $FontFile.FullName $LangArt *>> $Log
         if ($LASTEXITCODE -ne 0) { Fail "translate the pictures" }
         $LangWanted | Set-Content $LangStamp
     }

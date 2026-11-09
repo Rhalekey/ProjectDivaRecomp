@@ -17,6 +17,7 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 - The footer's band slides in to its place instead of jumping there once the game's slide has stopped. Where it goes is kept in `footer_places.txt` beside the save, so only a screen never seen before in that size of window can still jump, once.
 
 ### Graphics
+- Pictures with words are kept per language. Those of the last language made were also kept for all, so Japanese showed the German ones, and English only showed its own from copies left by older builds. About 220 MB less on disk.
 - A picture drawn at several times the window's size, as at a high render scale in a small window, is shrunk in halves, so its edges stay smooth.
 
 ### Discord
