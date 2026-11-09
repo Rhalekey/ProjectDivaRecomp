@@ -206,6 +206,13 @@ GLYPHS = {
     'S': [[(6, 1), (5, 0), (1, 0), (0, 1), (0, 3), (1, 4), (5, 4), (6, 5), (6, 7), (5, 8), (1, 8), (0, 7)]],
     'T': [[(0, 0), (6, 0)], [(3, 0), (3, 8)]],
     'W': [[(0, 0), (1, 8), (3, 3), (5, 8), (6, 0)]],
+    'U': [[(0, 0), (0, 7), (1, 8), (5, 8), (6, 7), (6, 0)]],
+    'P': [[(0, 8), (0, 0), (5, 0), (6, 1), (6, 3), (5, 4), (0, 4)]],
+    'K': [[(0, 0), (0, 8)], [(0, 4), (2, 4), (6, 0)], [(2, 4), (6, 8)]],
+    'x': [[(0.3, 1.2), (5.7, 6.8)], [(5.7, 1.2), (0.3, 6.8)]],
+    '-': [[(1, 4), (5, 4)]],
+    'Ü': [[(0, 2.2), (0, 7), (1, 8), (5, 8), (6, 7), (6, 2.2)], [(1.6, 0), (1.7, 0)], [(4.3, 0), (4.4, 0)]],
+    'Y': [[(0, 0), (3, 4), (6, 0)], [(3, 4), (3, 8)]],
 }
 GRID_W, GRID_H = 6, 8
 
@@ -612,6 +619,110 @@ def draw_targets(c):
     c.paint([rect(72, 74, 2, 2)], TARGET_RIM)
 
 
+# ---- notes and targets in other styles: letters as on Xbox and Nintendo pads, or arrow keys
+def letter_strokes(letter, cx, cy, size, width):
+    """A, B, X or Y, `size` high around (cx, cy), in strokes with round ends."""
+    def at(px, py):
+        return (cx + px * size, cy + py * size)
+    if letter == 'A':
+        return polyline([at(-0.36, 0.5), at(0, -0.5), at(0.36, 0.5)], width) + polyline([at(-0.2, 0.17), at(0.2, 0.17)], width * 0.9)
+    if letter == 'X':
+        return polyline([at(-0.33, -0.5), at(0.33, 0.5)], width) + polyline([at(0.33, -0.5), at(-0.33, 0.5)], width)
+    if letter == 'Y':
+        return polyline([at(-0.34, -0.5), at(0, 0.02), at(0.34, -0.5)], width) + polyline([at(0, 0.02), at(0, 0.5)], width)
+    out = polyline([at(-0.32, -0.5), at(-0.32, 0.5)], width)
+    for top, reach in ((-0.5, 0.03), (0.0, 0.06)):
+        bowl = [at(-0.32, top)]
+        bowl += [at(reach + 0.25 * math.sin(i * math.pi / 12), top + 0.25 - 0.25 * math.cos(i * math.pi / 12)) for i in range(13)]
+        bowl.append(at(-0.32, top + 0.5))
+        out += polyline(bowl, width)
+    return out
+
+
+# An arrow pointing up, as a shaft and a head, `size` long; turned for the other ways.
+ARROW_TURNS = {'up': 0, 'right': 1, 'down': 2, 'left': 3}
+
+
+def arrow_strokes(way, cx, cy, size, width):
+    turn = ARROW_TURNS[way]
+
+    def at(px, py):
+        for _ in range(turn):
+            px, py = -py, px
+        return (cx + px * size, cy + py * size)
+    return polyline([at(0, 0.5), at(0, -0.42)], width) + polyline([at(-0.4, -0.04), at(0, -0.46), at(0.4, -0.04)], width)
+
+
+def sign_strokes(sign, cx, cy, size, width):
+    return letter_strokes(sign, cx, cy, size, width) if len(sign) == 1 else arrow_strokes(sign, cx, cy, size, width)
+
+
+# Each colour from light to deep, as the game's own notes are shaded.
+NOTE_GREEN = ((205, 255, 175), (95, 205, 60), (35, 140, 25))
+RED_NOTE = ((255, 195, 185), (240, 70, 60), (170, 20, 25))
+NOTE_BLUE = ((185, 225, 255), (55, 135, 240), (20, 70, 185))
+NOTE_YELLOW = ((255, 248, 175), (252, 205, 45), (205, 140, 0))
+NOTE_PINK = ((255, 195, 250), (250, 120, 235), (205, 55, 195))
+TEAL_NOTE = ((190, 255, 235), (70, 240, 190), (15, 170, 130))
+NOTE_CORAL = ((255, 190, 205), (255, 95, 130), (215, 15, 70))
+NOTE_SKY = ((170, 240, 255), (70, 190, 255), (25, 110, 235))
+# For each style, what each of the game's notes becomes, by where its button is, and its colour:
+# Circle on the right, Cross below, Square on the left, Triangle above.
+NOTE_STYLES = {
+    'xbox': {'circle': ('B', RED_NOTE), 'cross': ('A', NOTE_GREEN), 'square': ('X', NOTE_BLUE), 'triangle': ('Y', NOTE_YELLOW)},
+    'nintendo': {'circle': ('A', RED_NOTE), 'cross': ('B', NOTE_YELLOW), 'square': ('Y', NOTE_GREEN), 'triangle': ('X', NOTE_BLUE)},
+    'keyboard': {'circle': ('right', NOTE_CORAL), 'cross': ('down', NOTE_SKY), 'square': ('left', NOTE_PINK), 'triangle': ('up', TEAL_NOTE)},
+}
+NOTE_FILES = {'circle': NOTE_CIRCLE, 'cross': NOTE_CROSS, 'square': NOTE_SQUARE, 'triangle': NOTE_TRIANGLE}
+# Where each target is on the targets sheet, by quarter: column and row.
+TARGET_QUARTERS = {'circle': (0, 0), 'triangle': (1, 0), 'square': (0, 1), 'cross': (1, 1)}
+STYLE_TARGETS_SIDE = 256     # in the units of its texture coordinates; four game texels to each
+
+
+def draw_styled_note(c, sign, colours):
+    x, y = NOTE_MIDDLE_X, NOTE_MIDDLE_Y
+    size, width = 2 * NOTE_REACH - 6.4, 6.4
+    light, middle, deep = colours
+    edge = tuple(v // 7 for v in deep)
+    c.paint(sign_strokes(sign, x + SHADOW_OFFSET, y + SHADOW_OFFSET, size, width + 0.6), SHADOW, SHADOW_ALPHA)
+    c.paint(sign_strokes(sign, x, y, size, width), edge)
+    c.paint(sign_strokes(sign, x, y, size, width - 2.0), gradient(y - 11, y + 11, [(0, light), (0.45, middle), (1, deep)]))
+
+
+def draw_styled_targets(c, signs):
+    """The targets: each sign drawn wide, a white rim round a dark inside, on a clear ground."""
+    quarter = STYLE_TARGETS_SIDE // 2
+    for button, (col, row) in TARGET_QUARTERS.items():
+        sign = signs[button][0]
+        x, y = col * quarter + quarter / 2, row * quarter + quarter / 2
+        size, width = quarter * 0.66, quarter * 0.17
+        c.paint(sign_strokes(sign, x, y, size, width + 13), HAND_EDGE, 170)
+        c.paint(sign_strokes(sign, x, y, size, width + 9), TARGET_RIM)
+        c.paint(sign_strokes(sign, x, y, size, width), TARGET_FILL)
+
+
+def write_styled_targets(c, path):
+    """Its size, its side in texture units, then its rows, bottom first."""
+    with open(path, 'wb') as f:
+        f.write(struct.pack('<III', c.w, c.h, STYLE_TARGETS_SIDE))
+        for y in range(c.h - 1, -1, -1):
+            f.write(c.data[y * c.w * 4:(y + 1) * c.w * 4])
+
+
+def note_styles(out):
+    for style, signs in NOTE_STYLES.items():
+        folder = os.path.join(out, 'notes', style)
+        os.makedirs(folder, exist_ok=True)
+        for button, (sign, colours) in signs.items():
+            c = Canvas(NOTE_SIDE, NOTE_SIDE)
+            draw_styled_note(c, sign, colours)
+            c.write(os.path.join(folder, NOTE_FILES[button] + '.rgba'))
+        c = Canvas(STYLE_TARGETS_SIDE, STYLE_TARGETS_SIDE)
+        draw_styled_targets(c, signs)
+        write_styled_targets(c, os.path.join(folder, 'targets.rgba'))
+        print('notes: %s' % style)
+
+
 # ---- music notes that drift across the room and menus
 MUSIC_BLUE = (0, 190, 250)
 
@@ -721,6 +832,7 @@ def main():
     for name, draw in ((NOTE_CIRCLE, draw_circle), (NOTE_CROSS, draw_cross), (NOTE_SQUARE, draw_square), (NOTE_TRIANGLE, draw_triangle)):
         note(os.path.join(out, name + '.rgba'), draw)
         print('note: %s' % name)
+    note_styles(out)
 
 
 if __name__ == '__main__':

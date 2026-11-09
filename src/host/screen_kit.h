@@ -5,8 +5,8 @@
  * a title bar at the top, the game's logo in it, and a strip for the buttons at the bottom, in a
  * window over the game's, which is held for as long as one shows.
  *
- * Everything is placed in units of a 960 x 544 canvas, and drawn at twice that, so that it stays
- * sharp in a large window. Text is placed by the middle of its line. */
+ * Everything is placed in units of a canvas 544 high and at least 960 wide, and drawn at twice
+ * that, so that it stays sharp in a large window. Text is placed by the middle of its line. */
 #include <stdint.h>
 #include <wchar.h>
 
@@ -29,6 +29,14 @@ enum { KIT_GLYPH_CIRCLE, KIT_GLYPH_CROSS, KIT_GLYPH_DPAD, KIT_GLYPH_SQUARE, KIT_
 /* Zero if there is no room or no window for it. Only one can be open. */
 int kit_open(const char *disc);
 void kit_close(void);
+
+/* The canvas is as wide as the window's shape asks for, in the same units, and what belongs at the
+ * right goes with the right edge: kit_right turns a place laid out on the 960 canvas into one that
+ * keeps its distance from the right edge. kit_resized is true once after the canvas changed width,
+ * when the screen is to be drawn again. */
+int kit_width(void);
+int kit_right(int x);
+int kit_resized(void);
 
 /* Back to the background alone, with `title` in the title bar, ready to draw on. */
 void kit_clear(const wchar_t *title);
@@ -58,6 +66,20 @@ void kit_flag(int cx, int cy, int radius, kit_flag_fn fn);
 void kit_glyph(int cx, int cy, int radius, int glyph, uint32_t ring, uint32_t sign);
 /* Light from the accent fading out from a point, behind something large. */
 void kit_halo(int cx, int cy, int radius);
+
+/* A picture made for the renderer: a .rgba file, `header` words of sizes and then rows bottom
+ * first. Kept here with its rows top first. */
+typedef struct {
+    uint32_t *px;
+    int w, h;
+} kit_picture;
+int kit_picture_read(kit_picture *p, const char *path, int header);
+void kit_picture_free(kit_picture *p);
+/* The part of it from (sx, sy), sw by sh, in its own pixels, drawn over x, y, w by h of the canvas.
+ * Pixels near one of the `keys` colours (0xRRGGBB, up to `nkeys`) are left out. A negative `sh`
+ * draws the part upside down. */
+void kit_picture_draw(const kit_picture *p, double sx, double sy, double sw, double sh, double x, double y, double w, double h,
+                      const uint32_t *keys, int nkeys);
 
 /* The buttons that can be pressed, placed from the right edge of the bottom strip leftwards: each
  * call returns where the next one ends. A key is named in a key cap. */

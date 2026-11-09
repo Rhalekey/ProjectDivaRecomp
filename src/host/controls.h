@@ -12,6 +12,8 @@ void controls_change_buttons(void);
 
 /* After the player has chosen which button confirms. */
 void controls_apply(void);
+/* After the player has chosen the style of the button signs: the pictures and the rows follow. */
+void controls_style_changed(void);
 
 /* Nonzero if the hook was this file's. */
 int controls_hook(uint32_t addr);

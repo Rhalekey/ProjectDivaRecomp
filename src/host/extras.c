@@ -72,8 +72,10 @@
 enum { B_RIGHT = 0x0020, B_LEFT = 0x0080 };
 
 /* The game's own are its two volumes. */
-enum { ROW_DIM = 2, ROW_TIMING, ROW_LANGUAGE, ROW_SONGS, ROW_LYRICS, ROW_ASK, ROW_CONFIRM, ROW_BUTTONS, ROW_COUNT };
-enum { G_DISPLAY, G_RESOLUTION, G_SMOOTHING, G_SHAPE, G_FPS, G_COUNT };
+/* In the order shown: what changes a song, the buttons, then the language. */
+enum { ROW_TIMING = 2, ROW_DIM, ROW_NOTES, ROW_SINGERS, ROW_CONFIRM, ROW_ICONS, ROW_BUTTONS, ROW_DPAD, ROW_LANGUAGE, ROW_SONGS, ROW_LYRICS, ROW_ASK, ROW_COUNT };
+#define ROW_FIRST ROW_TIMING   /* the first of these, after the game's two volumes */
+enum { G_DISPLAY, G_RESOLUTION, G_SHAPE, G_BLUR, G_SMOOTHING, G_FPS, G_COUNT };
 
 #define LABEL_WIDTH 22       /* what the game's "%-20s%2d" comes to */
 #define LABEL_SIZE 32u
@@ -93,7 +95,11 @@ static const row_text ROWS[UI_COUNT][ROW_COUNT] = {
         [ROW_LYRICS] = {"Lyrics", "Show lyrics in", "Japanese or romaji."},
         [ROW_ASK] = {"Ask at start", "Ask the language every", "time the game starts."},
         [ROW_CONFIRM] = {"Confirm button", "Which button confirms", "in the menus."},
+        [ROW_ICONS] = {"Icons", "Signs shown for the", "buttons in the menus."},
+        [ROW_NOTES] = {"Notes", "How the notes look:", "letters or arrow keys."},
         [ROW_BUTTONS] = {"Buttons", "Change the keyboard", "and controller buttons."},
+        [ROW_DPAD] = {"Hit notes with", "Also hit the notes with", "the stick or d-pad."},
+        [ROW_SINGERS] = {"Rin & Len songs", "Who sings Rin's and", "Len's songs."},
     },
     [UI_JAPANESE] = {
         [ROW_DIM] = {"\x94w\x8ci\x82\xcc\x88\xc3\x82\xb3", "\x8b\xc8\x82\xcc\x8a\xd4\x81" "A\x94w\x8ci\x82\xf0", "\x88\xc3\x82\xad\x82\xb5\x82\xdc\x82\xb7\x81" "B"},
@@ -103,7 +109,12 @@ static const row_text ROWS[UI_COUNT][ROW_COUNT] = {
         [ROW_LYRICS] = {"\x89\xcc\x8e\x8c", "\x89\xcc\x8e\x8c\x82\xcc\x95\x5c\x8b\x4c\x82\xf0\x95\xcf\x8d\x58\x82\xb5\x82\xdc\x82\xb7", ""},
         [ROW_ASK] = {"\x8b\x4e\x93\xae\x8e\x9e\x82\xc9\x8a\x6d\x94\x46", "\x8b\x4e\x93\xae\x8e\x9e\x82\xc9\x8c\xbe\x8c\xea\x82\xf0\x8a\x6d\x94\x46\x82\xb5\x82\xdc\x82\xb7", ""},
         [ROW_CONFIRM] = {"\x8c\x88\x92\xe8\x83\x7b\x83\x5e\x83\x93", "\x83\x81\x83\x6a\x83\x85\x81\x5b\x82\xc5\x8c\x88\x92\xe8\x82\xc9", "\x8e\x67\x82\xa4\x83\x7b\x83\x5e\x83\x93\x82\xc5\x82\xb7\x81\x42"},
+        [ROW_ICONS] = {"\x83{\x83^\x83\x93\x95\x5c\x8e\xa6", "\x83\x81\x83j\x83\x85\x81[\x82\xcc\x83{\x83^\x83\x93\x82\xcc", "\x95\x5c\x8e\xa6\x82\xf0\x95\xcf\x82\xa6\x82\xdc\x82\xb7\x81" "B"},
+        [ROW_NOTES] = {"\x83m\x81[\x83" "c", "\x83m\x81[\x83" "c\x82\xcc\x8c\xa9\x82\xbd\x96\xda\x82\xf0", "\x95\xcf\x82\xa6\x82\xdc\x82\xb7\x81" "B"},
         [ROW_BUTTONS] = {"\x83\x7b\x83\x5e\x83\x93\x90\xdd\x92\xe8", "\x83\x4c\x81\x5b\x83\x7b\x81\x5b\x83\x68\x82\xc6\x83\x52\x83\x93\x83\x67\x83\x8d\x81\x5b\x83\x89\x81\x5b", "\x82\xcc\x83\x7b\x83\x5e\x83\x93\x82\xf0\x95\xcf\x8d\x58\x82\xb5\x82\xdc\x82\xb7\x81\x42"},
+        [ROW_DPAD] = {"\x83m\x81[\x83" "c\x93\xfc\x97\xcd", "\x83" "A\x83i\x83\x8d\x83O\x82\xe2\x95\xfb\x8c\xfc\x83L\x81[\x82\xc5\x82\xe0", "\x83m\x81[\x83" "c\x82\xf0\x92@\x82\xaf\x82\xdc\x82\xb7\x81" "B"},
+        [ROW_SINGERS] = {"\x83\x8a\x83\x93\x81" "E\x83\x8c\x83\x93\x8b\xc8", "\x83\x8a\x83\x93\x82\xc6\x83\x8c\x83\x93\x82\xcc\x8b\xc8\x82\xf0",
+                         "\x92N\x82\xaa\x89\xcc\x82\xa4\x82\xa9\x82\xf0\x91I\x82\xd1\x82\xdc\x82\xb7\x81" "B"},
     },
     [UI_GERMAN] = {
         [ROW_DIM] = {"Abdunkeln", "Hintergrund im Lied", "abdunkeln."},
@@ -113,7 +124,11 @@ static const row_text ROWS[UI_COUNT][ROW_COUNT] = {
         [ROW_LYRICS] = {"Liedtext", "Liedtext auf Japanisch", "oder in Romaji."},
         [ROW_ASK] = {"Beim Start", "Sprache bei jedem", "Start abfragen."},
         [ROW_CONFIRM] = {"Best\xa1tigen", "Welche Taste in Men\xa3s", "best\xa1tigt."},
+        [ROW_ICONS] = {"Symbole", "Tastensymbole in", "den Men\xa3s."},
+        [ROW_NOTES] = {"Noten", "Aussehen der Noten:", "Buchstaben oder Pfeile."},
         [ROW_BUTTONS] = {"Tasten", "Tastatur und Controller", "belegen."},
+        [ROW_DPAD] = {"Noten mit", "Noten auch mit Stick", "oder Pfeilen treffen."},
+        [ROW_SINGERS] = {"Rin/Len-Lieder", "Wer die Lieder von", "Rin und Len singt."},
     },
 };
 
@@ -123,6 +138,7 @@ static const row_text GRAPHICS_ROWS[UI_COUNT][G_COUNT] = {
         [G_RESOLUTION] = {"Resolution", "The game is drawn at", "0000x0000"},
         [G_SMOOTHING] = {"Smoothing", "Smooth the picture", "as it fits the window."},
         [G_SHAPE] = {"Image shape", "Fits other window shapes.", "Extend is recommended."},
+        [G_BLUR] = {"Blur", "Blurs what is past the", "picture. Turn off at 16:9."},
         [G_FPS] = {"Show FPS", "Show the frame rate", "in the screen corner."},
     },
     [UI_JAPANESE] = {
@@ -130,6 +146,8 @@ static const row_text GRAPHICS_ROWS[UI_COUNT][G_COUNT] = {
         [G_RESOLUTION] = {"\x89\xf0\x91\x9c\x93x", "\x95`\x89\xe6\x82\xb7\x82\xe9\x89\xf0\x91\x9c\x93x:", "0000x0000"},
         [G_SMOOTHING] = {"\x83X\x83\x80\x81[\x83W\x83\x93\x83O", "\x89\xe6\x96\xca\x82\xf0\x82\xc8\x82\xdf\x82\xe7\x82\xa9\x82\xc9", "\x95\x5c\x8e\xa6\x82\xb5\x82\xdc\x82\xb7\x81" "B"},
         [G_SHAPE] = {"\x89\xe6\x96\xca\x94\xe4\x97\xa6", "\x91\xbc\x82\xcc\x94\xe4\x97\xa6\x82\xcc\x83" "E\x83" "B\x83\x93\x83h\x83" "E\x97p\x82\xc5\x82\xb7\x81" "B", "\x81u\x8ag\x92\xa3\x81v\x82\xf0\x82\xa8\x82\xb7\x82\xb7\x82\xdf\x82\xb5\x82\xdc\x82\xb7\x81" "B"},
+        [G_BLUR] = {"\x82\xda\x82\xa9\x82\xb5", "\x89\xe6\x96\xca\x82\xcc\x8aO\x91\xa4\x82\xf0\x82\xda\x82\xa9\x82\xb5\x82\xdc\x82\xb7\x81" "B",
+                    "16:9\x82\xc5\x82\xcd\x83I\x83t\x82\xf0\x8b\xad\x82\xad\x90\x84\x8f\xa7\x81" "B"},
         [G_FPS] = {"FPS\x95\x5c\x8e\xa6", "\x83t\x83\x8c\x81[\x83\x80\x83\x8c\x81[\x83g\x82\xf0\x95\x5c\x8e\xa6\x82\xb5\x82\xdc\x82\xb7", ""},
     },
     [UI_GERMAN] = {
@@ -137,6 +155,7 @@ static const row_text GRAPHICS_ROWS[UI_COUNT][G_COUNT] = {
         [G_RESOLUTION] = {"Aufl\xa2sung", "Spiel wird gezeichnet in", "0000x0000"},
         [G_SMOOTHING] = {"Gl\xa1ttung", "Bild beim Anpassen", "ans Fenster gl\xa1tten."},
         [G_SHAPE] = {"Bildform", "F\xa3r andere Fensterformen.", "Breit wird empfohlen."},
+        [G_BLUR] = {"Unsch\xa1rfe", "Verwischt die R\xa1nder.", "Bei 16:9 unbedingt aus."},
         [G_FPS] = {"FPS zeigen", "Bildrate in der", "Ecke anzeigen."},
     },
 };
@@ -169,6 +188,18 @@ static const char *const TIMING_LATE[UI_COUNT] = {" ms late", " " "m" "s" " " "\
 static const char *const TIMING_EARLY[UI_COUNT] = {" ms early", " " "m" "s" " " "\x91" "\x81" "\x82" "\xa2", " ms fr\xa3h"};
 static const char *const TIMING_ON_TIME[UI_COUNT] = {"on time", "\x82" "\xd2" "\x82" "\xc1" "\x82" "\xbd" "\x82" "\xe8", "genau"};
 #define TIMING_LINE_SIZE 48u
+static const char *const STYLE_NAME[OPTIONS_STYLE_COUNT] = {"PlayStation", "Xbox", "Nintendo"};
+static const char *const WORD_KEYBOARD[UI_COUNT] = {"Keyboard", "\x83L\x81[\x83{\x81[\x83h", "Tastatur"};
+/* What hits notes besides the buttons. */
+static const char *const WORD_STICK[UI_COUNT] = {"Stick", "\x83" "A\x83i\x83\x8d\x83O", "Stick"};
+static const char *const WORD_DPAD[UI_COUNT] = {"D-pad", "\x95\xfb\x8c\xfc\x83L\x81[", "Pfeile"};
+/* Who sings Rin's and Len's songs: they, as the game has it, or the module worn. */
+static const char *const WORD_RIN_LEN[UI_COUNT] = {"Rin/Len", "\x83\x8a\x83\x93\x81" "E\x83\x8c\x83\x93", "Rin/Len"};
+static const char *const WORD_MODULE[UI_COUNT] = {"Module", "\x83\x82\x83W\x83\x85\x81[\x83\x8b", "Modul"};
+static const char *const WORD_BOTH[UI_COUNT] = {"Both", "\x97\xbc\x95\xfb", "Beide"};
+/* The sides of the pad the confirm button can be on. */
+static const char *const WORD_SOUTH[UI_COUNT] = {"South", "\x89\xba", "S\xa3" "d"};
+static const char *const WORD_EAST[UI_COUNT] = {"East", "\x89" "E", "Ost"};
 #define WORD_CIRCLE "\x81\x9b"
 #define WORD_CROSS "\x81\x7e"
 
@@ -232,11 +263,27 @@ static const char *value_of(int row) {
         return WORD_ENGLISH[g_ui];
     case ROW_ASK:
         return g_settings.language_prompt ? WORD_YES[g_ui] : WORD_NO[g_ui];
+    case ROW_ICONS:
+        return STYLE_NAME[g_options.button_style];
+    case ROW_NOTES:
+        return g_options.note_style == OPTIONS_NOTES_KEYBOARD ? WORD_KEYBOARD[g_ui] : STYLE_NAME[g_options.note_style];
     default:
-    case ROW_CONFIRM:
-        return g_options.confirm_cross == 1 ? WORD_CROSS : WORD_CIRCLE;
+    case ROW_CONFIRM: {
+        /* Its sign in the style chosen, and which side of the pad it is on. */
+        static char text[24];
+        const int cross = g_options.confirm_cross == 1, letter = options_letter_for(cross);
+        char sign[3] = {(char)letter, 0, 0};
+        if (!letter) snprintf(sign, sizeof sign, "%s", cross ? WORD_CROSS : WORD_CIRCLE);
+        snprintf(text, sizeof text, "%s %s", sign, cross ? WORD_SOUTH[g_ui] : WORD_EAST[g_ui]);
+        return text;
+    }
+    case ROW_DPAD:
+        return g_options.dpad_notes == OPTIONS_HIT_STICK ? WORD_STICK[g_ui] : g_options.dpad_notes == OPTIONS_HIT_DPAD ? WORD_DPAD[g_ui] :
+               g_options.dpad_notes == OPTIONS_HIT_BOTH  ? WORD_BOTH[g_ui]  : WORD_OFF[g_ui];
     case ROW_BUTTONS:
         return WORD_CHANGE[g_ui];
+    case ROW_SINGERS:
+        return g_options.free_singers ? WORD_MODULE[g_ui] : WORD_RIN_LEN[g_ui];
     }
 }
 
@@ -290,6 +337,8 @@ static const char *graphics_value_of(int row) {
         return size;
     case G_SMOOTHING:
         return g_settings.present_linear ? WORD_ON[g_ui] : WORD_OFF[g_ui];
+    case G_BLUR:
+        return g_options.blur ? WORD_ON[g_ui] : WORD_OFF[g_ui];
     case G_SHAPE:
         return g_options.wide_view == 0 ? WORD_BARS[g_ui] : g_options.wide_view == 1 ? WORD_CROP[g_ui] : WORD_EXTEND[g_ui];
     default:
@@ -307,7 +356,7 @@ static void write_graphics_label(int row) {
 
 static void write_all_labels(void) {
     if (!g_labels[ROW_COUNT - 1] || !g_graphics_labels[0]) return;  /* no memory for them */
-    for (int row = ROW_DIM; row < ROW_COUNT; row++) write_label(row);
+    for (int row = ROW_FIRST; row < ROW_COUNT; row++) write_label(row);
     for (int row = 0; row < G_COUNT; row++) write_graphics_label(row);
 }
 
@@ -364,10 +413,29 @@ static void change(int row) {
         g_options.confirm_cross = g_options.confirm_cross != 1;
         controls_apply();
         break;
+    case ROW_ICONS:
+        g_options.button_style = (g_options.button_style + 1) % OPTIONS_STYLE_COUNT;
+        controls_style_changed();
+        write_label(ROW_CONFIRM);
+        break;
+    case ROW_NOTES:
+        g_options.note_style = (g_options.note_style + 1) % OPTIONS_NOTES_COUNT;
+        language_notes_changed();
+        break;
+    case ROW_SINGERS:
+        g_options.free_singers = !g_options.free_singers;
+        break;
     case ROW_BUTTONS:
         controls_change_buttons();
         g_held = psp_window_buttons();
         break;
+    case ROW_DPAD: {
+        /* Stick, d-pad, both, off, and round again. */
+        static const int NEXT[4] = {[OPTIONS_HIT_STICK] = OPTIONS_HIT_DPAD, [OPTIONS_HIT_DPAD] = OPTIONS_HIT_BOTH,
+                                    [OPTIONS_HIT_BOTH] = OPTIONS_HIT_OFF, [OPTIONS_HIT_OFF] = OPTIONS_HIT_STICK};
+        g_options.dpad_notes = NEXT[g_options.dpad_notes & 3];
+        break;
+    }
     default:
         return;
     }
@@ -403,6 +471,10 @@ static void change_graphics(int row, int step) {
     case G_SHAPE:
         g_options.wide_view = stepped(g_options.wide_view, 3, step);
         psp_render_gl_set_wide_view(g_options.wide_view);
+        break;
+    case G_BLUR:
+        g_options.blur = !g_options.blur;
+        psp_render_gl_set_blur(g_options.blur);
         break;
     default:
         g_options.show_fps = !g_options.show_fps;
@@ -470,7 +542,7 @@ static void on_window_update(void) {
     if (!(pressed & (B_LEFT | B_RIGHT))) return;
     if (g_graphics) {
         if (row < G_COUNT) change_graphics((int)row, pressed & B_LEFT ? -1 : 1);
-    } else if (row > ROW_TIMING && row < ROW_COUNT) {
+    } else if (row >= ROW_FIRST && row < ROW_COUNT) {
         change((int)row);
     }
 }
@@ -497,7 +569,7 @@ static void on_window_draw(void) {
         if (row < G_COUNT) fill_lines(lines, g_graphics_lines[g_ui][row]);
         return;
     }
-    if (row < ROW_DIM) {
+    if (row < ROW_FIRST) {
         /* Rows of two lines, so this is the size of the font in use. */
         const int gap = (int)psp_read32(lines + LINE_SIZE + 8) - (int)psp_read32(lines + 8);
         if (psp_read32(lines + LINE_SIZE) && gap > 0) g_line_height = gap;
@@ -596,7 +668,7 @@ void extras_start(const char *data_dir) {
     if (!translation_has_song_romaji()) snprintf(g_options.song_names, sizeof g_options.song_names, "japanese");
     if (!translation_has_lyric_romaji()) snprintf(g_options.lyrics, sizeof g_options.lyrics, "japanese");
     apply_scripts();
-    for (int row = ROW_DIM; row < ROW_COUNT; row++) {
+    for (int row = ROW_FIRST; row < ROW_COUNT; row++) {
         g_labels[row] = psp_sysmem_alloc(LABEL_SIZE, 1);
         int have_memory = g_labels[row] != 0;
         for (int ui = 0; ui < UI_COUNT; ui++) {

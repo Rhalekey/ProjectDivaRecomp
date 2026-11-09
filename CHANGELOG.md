@@ -4,6 +4,39 @@ Everything this project has added to or changed about *Hatsune Miku: Project DIV
 
 The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhalekey/psprecomp/tree/diva-recomp), branch `diva-recomp`. Those this game depends on are listed here too.
 
+## 2026-11-08
+
+### Controls and notes
+- **Button icons** in Options: PlayStation, or A, B, X and Y as on Xbox or Nintendo controllers, by where each button is. The menus, the screens over the game and the card before a song follow it.
+- **Notes** in Options: the notes and their targets as PlayStation shapes, Xbox or Nintendo letters in their colours, or arrow keys. A target takes the shape of its letter or arrow, with the game's own clock hand.
+- At first start, after the language: the button icons, then the confirm button drawn in them, then the notes, each with a preview. Back goes a step back.
+- The face buttons are named by where they are: South, East, West and North.
+- **Hit notes with** in Options: the stick, the d-pad (arrow keys included), both or neither also hit notes in songs, each way the button on that side: up Triangle, right Circle, down Cross, left Square.
+- The left stick works as the d-pad, past half way, in menus and songs.
+- **Quick restart**: L and R together in a song play it again from the start. Its keyboard key and controller buttons can be changed in Controls. It puts the pause menu's cursor on RETRY itself.
+- **Sorting**: Select in the Free Play song list goes through the game's order, by name, by best score and by BPM (slowest first, as the song list shows it) and last played first (kept in `PLAYED.INI` beside `OPTIONS.INI`, as the game keeps no such thing); on the modules' screen, through the game's order, by name, those obtained first and those last played in first. Out of the game's order, songs not unlocked and modules not obtained go last.
+- **Quick module change**: L and R in the song list change the module worn, between those obtained, of any singer, as the game allows. Miku behind the menu changes into it as on the modules' screen, with her changing motions. On Kagamine Rin's and Len's songs they change theirs, between their own and their swimwear.
+- **Rin & Len songs** in Options: the game puts Kagamine Rin and Len in their own songs whatever is worn. Set to Module, those songs are sung in the module worn, as all the others are.
+- The Controls screen no longer waits for ever on a button or key that never reads as let go.
+
+### Graphics
+- **Blur** in Graphics turns the blurred copies past a picture's sides off. Strongly recommended off in 16:9.
+- In windows wider than 16:9, up to 32:9: the footer, the results and the language screen keep to the corners, the start menu is no longer stretched, the combo stays with its notes, the meter and lyrics no longer stick to the middle at a song's start or after a chance time, and the card before a song shows again.
+- Pictures of a song's stage get a blurred copy beside them, and the white light over some stages reaches the window's edges.
+- Faster blurs, drawn from a smaller copy of the picture, and nothing drawn past what the window shows.
+
+### Redrawn
+- The language and controls screens, in a plain modern look in the game's teal. Their hints name keys or a controller's buttons by what was pressed last.
+- The menus' footer is laid out at the widths of its words, and its band follows them.
+- The title screen: its logo, traced smooth from the player's copy, and its menu and PRESS START in the game's squared letters, in English and German. The PRESS START of the demo that plays after it too.
+- The makers' logos at the start, traced smooth.
+- The notes and targets in their other styles, and the card's and results' signs for them.
+- The card before a song: difficulty, stars, numbers, ON and OFF, START and RETURN, and its buttons.
+- The results: the rank (PERFECT to MISS×TAKE, in both of its flashing colours), the difficulty, and the colons of the list.
+
+### Options
+- Options and Graphics are in a new order: what changes a song, the buttons, then the language.
+
 ## 2026-11-07
 
 - On the results screen in a taller window, NOT CLEAR goes down with the bottom band.

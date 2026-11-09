@@ -8,6 +8,8 @@
 
 #include "screen_kit.h"
 
+#include "options.h"
+
 #include <psprecomp/window.h>
 
 #include <math.h>
@@ -17,10 +19,14 @@
 #define COBJMACROS
 #include <windows.h>
 
-/* Canvas pixels for each unit of the layout. */
+/* Canvas pixels for each unit of the layout. The canvas is as wide as the window's shape asks for,
+ * from KIT_CANVAS_W to KIT_WIDEST units, at KIT_CANVAS_H high. */
 #define S 2
-#define CW (KIT_CANVAS_W * S)
+#define KIT_WIDEST 1936
+#define CW g_cw
 #define CH (KIT_CANVAS_H * S)
+static int g_lw = KIT_CANVAS_W, g_cw = KIT_CANVAS_W * S;
+static int g_resized;
 
 #define LOGO_PICTURE "title.png"
 #define LOGO_X 0
@@ -176,6 +182,7 @@ static uint32_t *g_px;     /* the canvas */
 static uint32_t *g_base;   /* the same with what never changes, and nothing else */
 static HDC g_canvas;
 static HDC g_logo;
+static int g_frames;       /* since the canvas last changed or the window moved */
 
 static void blend(int x, int y, colour c, double a) {
     if (x < 0 || y < 0 || x >= CW || y >= CH || a <= 0) return;
@@ -317,7 +324,7 @@ static void draw_base(void) {
     const colour accent = rgb(KIT_ACCENT);
     for (int y = 0; y < CH; y++) {
         for (int x = 0; x < CW; x++) {
-            const double dx = (x - 660.0 * S) / (330.0 * S), dy = (y - 250.0 * S) / (250.0 * S);
+            const double dx = (x - (660.0 + g_lw - KIT_CANVAS_W) * S) / (330.0 * S), dy = (y - 250.0 * S) / (250.0 * S);
             const double d = 1 - sqrt(dx * dx + dy * dy);
             if (d > 0) blend(x, y, accent, d * d * 0.20);
         }
@@ -362,6 +369,7 @@ static void draw_base(void) {
 
 void kit_clear(const wchar_t *title) {
     memcpy(g_px, g_base, (size_t)CW * CH * 4);
+    g_frames = 0;   /* drawn again: shown again for the next few frames */
     if (title) write(TITLE_X * S, BAR_H * S / 2, 24, 1, 0, KIT_TEXT, title, KIT_LEFT);
 }
 
@@ -432,11 +440,65 @@ void kit_flag(int cx, int cy, int radius, kit_flag_fn fn) {
     ring(x0, y0, r0 - 0.5 * S, 1.0 * S, rgb(KIT_TEXT), 0.35);
 }
 
+/* A or B, `size` high around (x, y), in strokes with round ends: the same shapes as the menus'. */
+static void letter_strokes(int letter, double x, double y, double size, double stroke, colour c) {
+    double pts[16][2];
+    int n = 0;
+#define AT(px, py) (pts[n][0] = x + (px) * size, pts[n][1] = y + (py) * size, n++)
+#define DRAW()                                                                               \
+    do {                                                                                      \
+        for (int i = 0; i + 1 < n; i++) segment(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], stroke, c, 1.0); \
+        n = 0;                                                                                \
+    } while (0)
+    if (letter == 'A') {
+        AT(-0.36, 0.5), AT(0.0, -0.5), AT(0.36, 0.5);
+        DRAW();
+        AT(-0.2, 0.17), AT(0.2, 0.17);
+        DRAW();
+    } else if (letter == 'X') {
+        AT(-0.33, -0.5), AT(0.33, 0.5);
+        DRAW();
+        AT(0.33, -0.5), AT(-0.33, 0.5);
+        DRAW();
+    } else if (letter == 'Y') {
+        AT(-0.34, -0.5), AT(0.0, 0.02), AT(0.34, -0.5);
+        DRAW();
+        AT(0.0, 0.02), AT(0.0, 0.5);
+        DRAW();
+    } else {
+        /* The stem, then each bowl from the stem round to it again. */
+        AT(-0.32, -0.5), AT(-0.32, 0.5);
+        DRAW();
+        for (int bowl = 0; bowl < 2; bowl++) {
+            const double top = bowl ? 0.0 : -0.5, reach = bowl ? 0.06 : 0.03;
+            AT(-0.32, top);
+            for (int i = 0; i <= 12; i++) {
+                const double t = i * 3.14159265358979 / 12;
+                AT(reach + 0.25 * sin(t), top + 0.25 - 0.25 * cos(t));
+            }
+            AT(-0.32, top + 0.5);
+            DRAW();
+        }
+    }
+#undef AT
+#undef DRAW
+}
+
 void kit_glyph(int cx, int cy, int radius, int glyph, uint32_t ring_rgb, uint32_t sign_rgb) {
     const double x = cx * S, y = cy * S, r = radius * S, width = radius > 20 ? 3.0 * S : 1.0 * S;
     const colour sign = rgb(sign_rgb);
     ring(x, y, r - width / 2, width, rgb(ring_rgb), 0.9);
     const double k = r * 0.42, stroke = radius > 20 ? r * 0.13 : 1.1 * S;
+    /* In a style with letters, the face buttons are letters. */
+    const int letter = glyph == KIT_GLYPH_CROSS      ? options_face_letter(OPTIONS_FACE_CROSS)
+                       : glyph == KIT_GLYPH_CIRCLE   ? options_face_letter(OPTIONS_FACE_CIRCLE)
+                       : glyph == KIT_GLYPH_SQUARE   ? options_face_letter(OPTIONS_FACE_SQUARE)
+                       : glyph == KIT_GLYPH_TRIANGLE ? options_face_letter(OPTIONS_FACE_TRIANGLE)
+                                                     : 0;
+    if (letter) {
+        letter_strokes(letter, x, y, k * 2.3, stroke * 1.1, sign);
+        return;
+    }
     switch (glyph) {
     case KIT_GLYPH_CIRCLE:
         ring(x, y, k, stroke, sign, 1.0);
@@ -478,6 +540,80 @@ void kit_halo(int cx, int cy, int radius) {
     }
 }
 
+int kit_picture_read(kit_picture *p, const char *path, int header) {
+    p->px = NULL;
+    p->w = p->h = 0;
+    FILE *f = fopen(path, "rb");
+    if (!f) return 0;
+    uint32_t sizes[4] = {0, 0, 0, 0};
+    if (header < 2 || header > 4 || fread(sizes, 4, (size_t)header, f) != (size_t)header || !sizes[0] || sizes[0] > 4096 || !sizes[1] ||
+        sizes[1] > 4096) {
+        fclose(f);
+        return 0;
+    }
+    const int w = (int)sizes[0], h = (int)sizes[1];
+    uint32_t *px = (uint32_t *)malloc((size_t)w * h * 4);
+    int ok = px != NULL;
+    for (int y = h - 1; ok && y >= 0; y--) ok = fread(px + (size_t)y * w, 4, (size_t)w, f) == (size_t)w;
+    fclose(f);
+    if (!ok) {
+        free(px);
+        return 0;
+    }
+    p->px = px;
+    p->w = w;
+    p->h = h;
+    return 1;
+}
+
+void kit_picture_free(kit_picture *p) {
+    free(p->px);
+    p->px = NULL;
+    p->w = p->h = 0;
+}
+
+void kit_picture_draw(const kit_picture *p, double sx, double sy, double sw, double sh, double x, double y, double w, double h,
+                      const uint32_t *keys, int nkeys) {
+    if (!p->px || w <= 0 || h <= 0) return;
+    /* A part given with a height below zero is drawn upside down, from its bottom row up. */
+    const int flip = sh < 0;
+    if (flip) {
+        sy += sh;
+        sh = -sh;
+    }
+    const int x0 = (int)floor(x * S), x1 = (int)ceil((x + w) * S), y0 = (int)floor(y * S), y1 = (int)ceil((y + h) * S);
+    /* Enough looks at the picture for each canvas pixel to take in all of what it covers. */
+    const double per_x = sw / (w * S), per_y = sh / (h * S);
+    const int nx = per_x > 1 ? (int)ceil(per_x) < 6 ? (int)ceil(per_x) : 6 : 1, ny = per_y > 1 ? (int)ceil(per_y) < 6 ? (int)ceil(per_y) : 6 : 1;
+    for (int py = y0; py < y1; py++) {
+        for (int px = x0; px < x1; px++) {
+            double r = 0, g = 0, b = 0, a = 0;
+            for (int j = 0; j < ny; j++) {
+                for (int i = 0; i < nx; i++) {
+                    const double ty = ((py + (j + 0.5) / ny) / S - y) / h;
+                    const double fx = sx + ((px + (i + 0.5) / nx) / S - x) / w * sw, fy = sy + (flip ? 1.0 - ty : ty) * sh;
+                    const int ix = (int)fx, iy = (int)fy;
+                    if (fx < sx || fy < sy || fx >= sx + sw || fy >= sy + sh || ix < 0 || iy < 0 || ix >= p->w || iy >= p->h) continue;
+                    const uint32_t c = p->px[(size_t)iy * p->w + ix];
+                    const double cr = c & 255, cg = c >> 8 & 255, cb = c >> 16 & 255;
+                    double ca = (c >> 24) / 255.0;
+                    for (int k = 0; k < nkeys; k++) {
+                        const double kr = keys[k] >> 16 & 255, kg = keys[k] >> 8 & 255, kb = keys[k] & 255;
+                        const double d = fabs(cr - kr) + fabs(cg - kg) + fabs(cb - kb);
+                        if (d < 60) ca *= d / 60;
+                    }
+                    r += cr * ca;
+                    g += cg * ca;
+                    b += cb * ca;
+                    a += ca;
+                }
+            }
+            if (a <= 0) continue;
+            blend(px, py, (colour){r / a, g / a, b / a}, a / (nx * ny));
+        }
+    }
+}
+
 #define HINT_Y 518
 #define HINT_TEXT 15
 #define HINT_GAP 26
@@ -500,7 +636,7 @@ int kit_hint_key(int right, const wchar_t *key, const wchar_t *word) {
 }
 
 void kit_hint_note(const wchar_t *s) {
-    kit_text(KIT_CANVAS_W - 32, HINT_Y, HINT_TEXT, 1, KIT_ACCENT, s, KIT_RIGHT);
+    kit_text(g_lw - 32, HINT_Y, HINT_TEXT, 1, KIT_ACCENT, s, KIT_RIGHT);
 }
 
 /* ---- the window ---------------------------------------------------------- */
@@ -556,11 +692,30 @@ static HWND g_window, g_parent;
 static HBITMAP g_bitmap;
 static HGDIOBJ g_old_bitmap;
 static RECT g_last_client;
-static int g_frames;
-static uint32_t g_shown_sum;
 
-int kit_open(const char *disc) {
-    g_parent = (HWND)psp_window_handle();
+/* How wide the canvas is for the window's shape. */
+static int width_for(const RECT *client) {
+    if (client->right <= 0 || client->bottom <= 0) return KIT_CANVAS_W;
+    const int w = (int)((long long)KIT_CANVAS_H * client->right / client->bottom);
+    return w < KIT_CANVAS_W ? KIT_CANVAS_W : w > KIT_WIDEST ? KIT_WIDEST : w;
+}
+
+static void free_canvas(void) {
+    if (!g_canvas) return;
+    SelectObject(g_canvas, g_old_bitmap);
+    DeleteDC(g_canvas);
+    DeleteObject(g_bitmap);
+    free(g_base);
+    g_canvas = NULL;
+    g_base = NULL;
+    g_px = NULL;
+}
+
+/* A canvas `lw` units wide, with its background drawn. */
+static int make_canvas(int lw) {
+    free_canvas();
+    g_lw = lw;
+    g_cw = lw * S;
     BITMAPINFO bi;
     ZeroMemory(&bi, sizeof bi);
     bi.bmiHeader.biSize = sizeof bi.bmiHeader;
@@ -584,10 +739,17 @@ int kit_open(const char *disc) {
     g_canvas = CreateCompatibleDC(NULL);
     g_old_bitmap = SelectObject(g_canvas, bitmap);
     SetBkMode(g_canvas, TRANSPARENT);
+    draw_base();
+    return 1;
+}
 
+int kit_open(const char *disc) {
+    g_parent = (HWND)psp_window_handle();
     if (!g_logo) g_logo = load_picture(disc, LOGO_PICTURE);
     if (!g_logo) fprintf(stderr, "screen: the game's logo could not be read\n");
-    draw_base();
+    GetClientRect(g_parent, &g_last_client);
+    if (!make_canvas(width_for(&g_last_client))) return 0;
+    g_resized = 0;
 
     WNDCLASSW wc;
     ZeroMemory(&wc, sizeof wc);
@@ -597,7 +759,6 @@ int kit_open(const char *disc) {
     RegisterClassW(&wc);
     /* Over the game's window, which must not draw over this in turn. */
     SetWindowLongPtrW(g_parent, GWL_STYLE, GetWindowLongPtrW(g_parent, GWL_STYLE) | WS_CLIPCHILDREN);
-    GetClientRect(g_parent, &g_last_client);
     g_window = CreateWindowW(wc.lpszClassName, L"", WS_CHILD | WS_VISIBLE, 0, 0, g_last_client.right, g_last_client.bottom,
                              g_parent, NULL, wc.hInstance, NULL);
     if (!g_window) {
@@ -605,29 +766,23 @@ int kit_open(const char *disc) {
         return 0;
     }
     g_frames = 0;
-    g_shown_sum = 0;
     return 1;
 }
 
 void kit_close(void) {
     DestroyWindow(g_window);
     pump();
-    SelectObject(g_canvas, g_old_bitmap);
-    DeleteDC(g_canvas);
-    DeleteObject(g_bitmap);
-    free(g_base);
-    g_base = NULL;
-    g_px = NULL;
+    free_canvas();
 }
 
-/* A cheap sum of a few rows, to know when the canvas has changed. */
-static uint32_t canvas_sum(void) {
-    uint32_t sum = 0;
-    for (int y = 0; y < CH; y += 7) {
-        const uint32_t *row = g_px + (size_t)y * CW;
-        for (int x = 0; x < CW; x += 3) sum = sum * 31 + row[x];
-    }
-    return sum;
+int kit_width(void) { return g_lw; }
+
+int kit_right(int x) { return x + g_lw - KIT_CANVAS_W; }
+
+int kit_resized(void) {
+    const int was = g_resized;
+    g_resized = 0;
+    return was;
 }
 
 /* Windows can paint over a child of a window that is being redrawn, so it is put there again
@@ -641,21 +796,31 @@ void kit_frame(void) {
         MoveWindow(g_window, 0, 0, client.right, client.bottom, FALSE);
         g_last_client = client;
         g_frames = 0;
-    }
-    const uint32_t sum = canvas_sum();
-    if (sum != g_shown_sum) {
-        g_shown_sum = sum;
-        g_frames = 0;
+        /* Another shape: a canvas of its width, which the screen draws on again. */
+        const int lw = width_for(&client);
+        if (lw != g_lw && make_canvas(lw)) g_resized = 1;
     }
     if (g_frames < 10 || g_frames % 10 == 0) show(g_window);
     g_frames++;
 }
 
+/* It gives up after a while: something can be held for ever, as a controller's button that never
+ * reads as let go or a key some program holds down, and the screen must not wait on it. */
+#define RELEASE_GIVE_UP_MS 2000
+
 void kit_wait_for_release(void) {
+    const ULONGLONG until = GetTickCount64() + RELEASE_GIVE_UP_MS;
     for (;;) {
-        int down = psp_window_buttons() != 0 || psp_window_pad_raw() != 0;
-        for (int vk = 0x08; vk <= 0xFE && !down; vk++) down = (GetAsyncKeyState(vk) & 0x8000) != 0;
-        if (!down || psp_window_closed()) return;
+        const uint32_t buttons = psp_window_buttons(), pad = psp_window_pad_raw();
+        int key = 0;
+        for (int vk = 0x08; vk <= 0xFE && !key; vk++)
+            if (GetAsyncKeyState(vk) & 0x8000) key = vk;
+        if ((!buttons && !pad && !key) || psp_window_closed()) return;
+        if (GetTickCount64() >= until) {
+            fprintf(stderr, "screen: still held after %d ms, going on: buttons %08X, controller %08X, key %02X\n", RELEASE_GIVE_UP_MS,
+                    (unsigned)buttons, (unsigned)pad, (unsigned)key);
+            return;
+        }
         kit_frame();
         Sleep(16);
     }

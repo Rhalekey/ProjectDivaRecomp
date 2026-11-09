@@ -543,6 +543,16 @@ void translation_romaji_start(const char *dir) {
 }
 
 int translation_has_song_romaji(void) { return g_has[KIND_SONG]; }
+
+const char *translation_shown(const char *original) {
+    const uint32_t guest = find(original);
+    return guest ? guest_text(guest) : NULL;
+}
+
+const char *translation_song_romaji(const char *original) {
+    const entry *e = in_table(original, KIND_SONG);
+    return e ? guest_text(e->guest) : NULL;
+}
 int translation_has_lyric_romaji(void) { return g_has[KIND_LYRIC]; }
 
 void translation_set_romaji(int song_names, int lyrics) {

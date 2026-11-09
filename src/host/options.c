@@ -18,7 +18,28 @@ diva_options g_options = {
     {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
     0,
     0,
+    1,
+    OPTIONS_STYLE_PLAYSTATION,
+    OPTIONS_NOTES_PLAYSTATION,
+    0,
+    0,
+    {40, 41},
+    OPTIONS_HIT_BOTH,
+    0,
 };
+
+int options_face_letter(int face) {
+    /* Below, right, left, above. */
+    static const char XBOX[4] = {'A', 'B', 'X', 'Y'}, NINTENDO[4] = {'B', 'A', 'Y', 'X'};
+    if (face < 0 || face > 3) return 0;
+    if (g_options.button_style == OPTIONS_STYLE_XBOX) return XBOX[face];
+    if (g_options.button_style == OPTIONS_STYLE_NINTENDO) return NINTENDO[face];
+    return 0;
+}
+
+int options_letter_for(int cross) {
+    return options_face_letter(cross ? OPTIONS_FACE_CROSS : OPTIONS_FACE_CIRCLE);
+}
 
 static void folder(const char *data_dir, char *out, size_t cap) {
     snprintf(out, cap, "%s\\ms\\PSP\\SAVEDATA\\ULJM05472RECOMP", data_dir);
@@ -53,6 +74,24 @@ int options_load(const char *data_dir) {
             g_options.smoothing = number != 0;
         } else if (sscanf(line, "wide_view = %d", &number) == 1) {
             if (number >= 0 && number <= 2) g_options.wide_view = number;
+        } else if (sscanf(line, "button_style = %d", &number) == 1) {
+            if (number >= 0 && number < OPTIONS_STYLE_COUNT) g_options.button_style = number;
+        } else if (sscanf(line, "rin_module = %d", &number) == 1) {
+            if (number == 40 || number == 48) g_options.singer_module[0] = number;
+        } else if (sscanf(line, "len_module = %d", &number) == 1) {
+            if (number == 41 || number == 49) g_options.singer_module[1] = number;
+        } else if (sscanf(line, "restart_pad = %d", &number) == 1) {
+            g_options.restart_pad = number;
+        } else if (sscanf(line, "restart_key = %d", &number) == 1) {
+            if (number >= 0 && number < 256) g_options.restart_key = number;
+        } else if (sscanf(line, "dpad_notes = %d", &number) == 1) {
+            if (number >= OPTIONS_HIT_OFF && number <= OPTIONS_HIT_BOTH) g_options.dpad_notes = number;
+        } else if (sscanf(line, "free_singers = %d", &number) == 1) {
+            g_options.free_singers = number != 0;
+        } else if (sscanf(line, "note_style = %d", &number) == 1) {
+            if (number >= 0 && number < OPTIONS_NOTES_COUNT) g_options.note_style = number;
+        } else if (sscanf(line, "blur = %d", &number) == 1) {
+            g_options.blur = number != 0;
         } else if (sscanf(line, "background_dim = %d", &number) == 1) {
             if (number >= 0 && number <= 100) g_options.background_dim = number;
         } else if (sscanf(line, "note_timing = %d", &number) == 1) {
@@ -91,6 +130,10 @@ void options_save(const char *data_dir) {
             g_options.lyrics, g_options.show_fps);
     fprintf(f, "display_mode = %d\nwide_view = %d\nbackground_dim = %d\nnote_timing = %d\n", g_options.display_mode, g_options.wide_view,
             g_options.background_dim, g_options.note_timing);
+    fprintf(f, "restart_pad = %d\nrin_module = %d\nlen_module = %d\nfree_singers = %d\n", g_options.restart_pad, g_options.singer_module[0],
+            g_options.singer_module[1], g_options.free_singers);
+    fprintf(f, "blur = %d\nbutton_style = %d\nnote_style = %d\ndpad_notes = %d\nrestart_key = %d\n", g_options.blur, g_options.button_style, g_options.note_style,
+            g_options.dpad_notes, g_options.restart_key);
     if (g_options.render_scale) fprintf(f, "render_scale = %d\n", g_options.render_scale);
     if (g_options.smoothing >= 0) fprintf(f, "smoothing = %d\n", g_options.smoothing);
     if (g_options.ask_language >= 0) fprintf(f, "ask_language = %d\n", g_options.ask_language);

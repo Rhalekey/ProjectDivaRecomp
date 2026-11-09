@@ -9,8 +9,10 @@ with the dotted texture of its plates taken out (see smooth_enlarge in lang_imag
 Each piece stays where the game's layout files say it goes, so the game goes on placing and
 animating it as ever, and the renderer shows these in place of its pictures.
 
-Everything is made twice: the output folder has the pictures for Circle confirming, and the
-same folder with _x after its name has those that differ when Cross does.
+What has the buttons' signs is made six times: the output folder has the pictures for Circle
+confirming, and the same folder with _x after its name has those that differ when Cross does;
+with _xa, _xb, _na and _nb, those for the styles with letters, Xbox or Nintendo with A or B
+confirming, with the card's buttons.
 """
 import math
 import os
@@ -19,7 +21,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from hd_font import Drawer, FREE_FONT, GGO_METRICS_ADVANCE, load_font  # noqa: E402
-from hud_vector import SCALE, Canvas, circle, polyline, rect, ring, segment  # noqa: E402
+from hud_vector import SCALE, Canvas, circle, polyline, rect, ring, segment, text_strokes, GLYPHS, letter_strokes  # noqa: E402
 from lang_images import ARCHIVE, Archive, colour_hash, decode_png, layout_of, plate_rects, smooth_enlarge  # noqa: E402
 
 TEAL = (0, 137, 147)
@@ -194,6 +196,30 @@ def sign_cross(c, x):
     c.paint([segment(x + 1, 0.8, x + 9, 9.2, 2.7), segment(x + 9, 0.8, x + 1, 9.2, 2.7)], TEAL)
 
 
+def letter_sign(letter):
+    """A teal disc with the letter taken out of it, as the stick's sign is."""
+    def sign(c, x):
+        c.paint([circle(x + 5, 5, 5)], TEAL)
+        punch(c, letter_strokes(letter, x + 5, 5, 6, 1.35))
+    return sign
+
+
+# For each set of pictures, the signs of: what confirms, what goes back, Square and Triangle. Xbox
+# has A below, B right, X left and Y above; Nintendo B below, A right, Y left and X above.
+SIGN_SETS = {
+    'o': ('circle', 'cross', 'square', 'triangle'), 'x': ('cross', 'circle', 'square', 'triangle'),
+    'xa': ('A', 'B', 'X', 'Y'), 'xb': ('B', 'A', 'X', 'Y'),
+    'na': ('A', 'B', 'Y', 'X'), 'nb': ('B', 'A', 'Y', 'X'),
+}
+# The folder for each, after the language's own name.
+SET_FOLDERS = (('', 'o'), ('_x', 'x'), ('_xa', 'xa'), ('_xb', 'xb'), ('_na', 'na'), ('_nb', 'nb'))
+
+
+def hint_sign(kind):
+    """A hint's sign by its kind: a letter, or one of the PSP's own signs."""
+    return letter_sign(kind) if len(kind) == 1 else globals()['sign_' + kind]
+
+
 def sign_square(c, x):
     c.paint([rect(x, 0, 10, 2), rect(x, 8, 10, 2), rect(x, 0, 2, 10), rect(x + 8, 0, 2, 10)], TEAL)
 
@@ -257,13 +283,13 @@ def sign_slash(c, x):
     c.paint([segment(x + 4, 1, x + 0.5, 9, 1.0)], GREY)
 
 
-def signs_of(name, cross_confirms):
+def signs_of(name, sign_set):
     """What a hint starts with, as (x, sign) pairs, and where its words start."""
     # Named for what they do, not for the sign they have, so those go by what the picture shows.
     left_right = ('basic_cross_4idou', 'basic_cross_rhythm', 'basic_cross_preset', 'basic_randl_change',
                   'basic_crolr_bpm', 'basic_crolr_camerasp', 'basic_crolr_bank')
     up_down = ('basic_cross_koumoku', 'basic_cross_zoom')
-    confirm, cancel = (sign_cross, sign_circle) if cross_confirms else (sign_circle, sign_cross)
+    confirm, cancel, square, triangle = (hint_sign(kind) for kind in SIGN_SETS[sign_set])
     if name in left_right:
         return ((0, sign_left_right),), 15
     if name in up_down:
@@ -294,15 +320,15 @@ def signs_of(name, cross_confirms):
     if name.startswith('basic_batsu_'):
         return ((0, cancel),), 14
     if name.startswith('basic_shikaku_'):
-        return ((0, sign_square),), 15
+        return ((0, square),), 15
     if name.startswith('basic_tri_'):
-        return ((0, sign_triangle),), 15
+        return ((0, triangle),), 15
     return None, 0
 
 
-def hint(sheet, name, box, start, text, drawer, cross_confirms, below=0):
+def hint(sheet, name, box, start, text, drawer, sign_set, below=0):
     x, y, w, h = box
-    signs, usual_start = signs_of(name, cross_confirms)
+    signs, usual_start = signs_of(name, sign_set)
     if not signs:
         return 1.0
     start = start if start is not None else usual_start
@@ -639,6 +665,245 @@ TITLES = (
     ('menu_title_adhok.png', title_short_lines, (29, 29, 483, 17), 46, False),
     ('menu_title_gallery.png', title_short_lines, (29, 29, 483, 17), 46, False),
 )
+
+
+# ---- the title screen: its menu's words and PRESS START drawn in each language in the game's
+# squared letters, the notice below them in the font, and the logo traced from its own pixels.
+TITLE_WORDS = {
+    'en': ('NEW GAME', 'LOAD GAME', 'ADHOC MODE', 'PRESS START BUTTON'),
+    'de': ('NEUES SPIEL', 'SPIEL LADEN', 'AD-HOC-MODUS', 'START DRÜCKEN'),
+}
+TITLE_NOTICE = '©SEGA / ©Crypton Future Media, Inc.'
+TITLE_NAVY = (36, 67, 85)
+TITLE_DIM = (70, 100, 118)
+
+
+def title_word(c, text, box, chosen):
+    """A word of the title's menu: white going grey inside a navy edge when chosen, navy when not."""
+    x, y, w, h = box
+    stroke, edge = 2.3, 2.2
+    units = len(text) * 6 + (len(text) - 1) * 1.6
+    ux = min(1.7, (w - 8 - stroke - edge) / units)
+    width = units * ux + stroke
+    left, top, height = x + 6, y + 2, 12
+    c.paint(text_strokes(text, left, top, width, height, stroke + edge), TITLE_NAVY)
+    fill = gradient_fill(top, top + height, ((0, (255, 255, 255)), (0.55, (225, 228, 232)), (1, (150, 176, 190)))) if chosen else TITLE_DIM
+    c.paint(text_strokes(text, left + edge / 2, top + edge / 2, width - edge, height - edge, stroke), fill)
+
+
+def gradient_fill(y0, y1, stops):
+    def fn(_x, y):
+        t = min(1.0, max(0.0, (y - y0) / ((y1 - y0) or 1)))
+        for (a, ca), (b, cb) in zip(stops, stops[1:]):
+            if t <= b:
+                k = 0 if b == a else (t - a) / (b - a)
+                return tuple(int(ca[i] + (cb[i] - ca[i]) * k) for i in range(3))
+        return stops[-1][1]
+    return fn
+
+
+def logo_white(p):
+    return p[3] > 200 and lum(p) > 200 and max(p[:3]) - min(p[:3]) < 40
+
+
+def title_sheet(archive, drawer, folder, words):
+    picture = 'title.png'
+    w, h, pixels = decode_png(archive.read(picture))
+    rects = layout_of(archive, picture)
+    c = enlarged(archive, picture, pixels, w, h)
+    for k, name in enumerate(('new_game', 'load_game', 'adhoc_mode')):
+        for state in ('00', '01'):
+            box = rects['%s%s.png' % (name, state)]
+            wipe(c, box)
+            title_word(c, words[k], box, state == '00')
+    x, y, pw, ph = rects['press01.png']
+    wipe(c, rects['press01.png'])
+    text = words[3]
+    units = len(text) * 6 + (len(text) - 1) * 1.6
+    ux = min(1.25, (pw - 24) / units)
+    width = units * ux + 1.8
+    c.paint(text_strokes(text, x + 106 - width / 2, y + 4, width, 9, 1.8), TITLE_NAVY)
+    c.paint([rect(x + 15, y + 16, pw - 15, 1)], TITLE_NAVY)
+    # The notice in the free font if the one chosen has no copyright sign.
+    notice = drawer if all(drawer.draws(ch) for ch in TITLE_NOTICE if ch != ' ') else Drawer(load_font(FREE_FONT), HINT_H * SCALE)
+    for name in ('press01.png', 'press02.png'):
+        px0, py0, _, _ = rects[name]
+        if name == 'press02.png':
+            wipe(c, rects[name])
+        write_text(c, notice, TITLE_NOTICE, (px0 + 20, py0 + 17, 180, 12), TITLE_NAVY)
+    # The logo, traced smooth: its white outline over all of it, then its colours over that.
+    box = rects['maintitle.png']
+    wipe(c, box)
+    smooth_layer(c, pixels, box, lambda p, i, j: p[3] / 255, logo_white, WHITE + (255,))
+    smooth_layer(c, pixels, box, ink_amount(pixels, box), lambda p: p[3] > 200 and logo_colour(p))
+    write_sheet(c, pixels, folder)
+
+
+# ---- the demo after the title, with PRESS START in its corner, and the makers' logos at the start
+DEMO_WORDS = {'en': 'PRESS START BUTTON', 'de': 'START DRÜCKEN'}
+DEMO_LINE = 'Project DIVA Start...'
+DEMO_SHADOW = (40, 40, 40)
+
+
+def demo_start_sheet(archive, family, folder, words):
+    """PRESS START, its line, and the words under it: white, with a soft shadow below."""
+    picture = 'start.png'
+    w, h, pixels = decode_png(archive.read(picture))
+    c = Canvas(w, h)
+    units = len(words) * 6 + (len(words) - 1) * 1.6
+    stroke = 1.5
+    width = min(110.0, units * 1.0 + stroke)
+    c.paint(text_strokes(words, 5.7, 7.9, width, 6, stroke), DEMO_SHADOW, 170)
+    c.paint(text_strokes(words, 5, 7, width, 6, stroke), WHITE)
+    c.paint([rect(0, 16, 120, 1)], WHITE)
+    small = Drawer(family, 7 * SCALE)
+    write_text(c, small, DEMO_LINE, (6, 18, 92, 8), WHITE, False, DEMO_SHADOW)
+    write_sheet(c, pixels, folder)
+
+
+LOGOS = ('logo_SEGA.png', 'logo_Crypton.png', 'logo_criware.png', 'logo_dingo.png', 'logo_Alchemy.png', 'logo_Crypton_sr.png',
+         'logo_PIAPRO_sr.png')
+
+
+def logo_colour(p):
+    """Part of a logo: anything not white, or of a colour of its own."""
+    return lum(p) < 215 or max(p[:3]) - min(p[:3]) > 50
+
+
+def iso_loops(field, w, h, level=0.5):
+    """Where a field, given at the middles of pixels, crosses `level`: closed loops of points, found
+    square by square between four middles and placed between them by how far each is from it, so
+    that an edge the picture smoothed comes out smooth. Past the field is nothing."""
+    def at(i, j):
+        return field[j][i] if 0 <= i < w and 0 <= j < h else 0.0
+
+    def cut(p, q, vp, vq):
+        t = (level - vp) / (vq - vp) if vq != vp else 0.5
+        return (p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t)
+    links = {}
+
+    def link(a, b):
+        a, b = (round(a[0], 4), round(a[1], 4)), (round(b[0], 4), round(b[1], 4))
+        links.setdefault(a, []).append(b)
+        links.setdefault(b, []).append(a)
+    for j in range(-1, h):
+        for i in range(-1, w):
+            v = (at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1))
+            inside = [x >= level for x in v]
+            if all(inside) or not any(inside):
+                continue
+            corners = ((i + 0.5, j + 0.5), (i + 1.5, j + 0.5), (i + 1.5, j + 1.5), (i + 0.5, j + 1.5))
+            crossings = []
+            for k in range(4):
+                if inside[k] != inside[(k + 1) % 4]:
+                    crossings.append((k, cut(corners[k], corners[(k + 1) % 4], v[k], v[(k + 1) % 4])))
+            if len(crossings) == 2:
+                link(crossings[0][1], crossings[1][1])
+            else:
+                # A saddle: which way it joins by the middle of the square.
+                middle = sum(v) / 4 >= level
+                p = [c[1] for c in crossings]
+                if middle == inside[0]:
+                    link(p[0], p[1])
+                    link(p[2], p[3])
+                else:
+                    link(p[0], p[3])
+                    link(p[1], p[2])
+    loops = []
+    while links:
+        start = next(iter(links))
+        loop, here, before = [start], start, None
+        while True:
+            ends = links.get(here, [])
+            there = next((e for e in ends if e != before), None)
+            if there is None:
+                break
+            ends.remove(there)
+            links[there].remove(here)
+            if not ends:
+                del links[here]
+            if not links.get(there):
+                links.pop(there, None)
+            before, here = here, there
+            if here == start:
+                break
+            loop.append(here)
+        if len(loop) >= 3:
+            loops.append(loop)
+    return loops
+
+
+def logo_sheet(archive, name, folder):
+    """A maker's logo: its ground enlarged without it, then the logo traced over that, each part in
+    the colour it has inside."""
+    w, h, pixels = decode_png(archive.read(name))
+    marks = [(x, y) for y in range(h) for x in range(w) if pixels[y][x][3] > 20 and logo_colour(pixels[y][x])]
+    if not marks:
+        return
+    x0, y0 = max(0, min(x for x, _ in marks) - 2), max(0, min(y for _, y in marks) - 2)
+    x1, y1 = min(w, max(x for x, _ in marks) + 3), min(h, max(y for _, y in marks) + 3)
+    box = (x0, y0, x1 - x0, y1 - y0)
+    clean = filled_in(pixels, box, lambda p: p[3] > 20 and logo_colour(p))
+    rows = smooth_enlarge(clean, [], SCALE)
+    c = Canvas(w, h)
+    for y, row in enumerate(rows):
+        c.data[y * c.w * 4:(y + 1) * c.w * 4] = b''.join(bytes(p) for p in row)
+    smooth_layer(c, pixels, box, ink_amount(pixels, box), lambda p: p[3] > 200 and logo_colour(p))
+    write_sheet(c, pixels, folder)
+
+
+def ink_amount(pixels, box):
+    """How much of each pixel is a logo's colour rather than white: its own opacity, times how far it
+    has come from white towards the colour inside the logo nearest it."""
+    core = nearest_colours(pixels, box, lambda p: p[3] > 200 and logo_colour(p) and lum(p) < 200)
+
+    def amount(p, i, j):
+        if p[3] <= 20:
+            return 0.0
+        inside = core.get((i, j), (0, 0, 0))
+        towards = min(1.0, max(0.0, (255 - lum(p)) / max(1.0, 255 - lum(inside))))
+        saturated = min(1.0, (max(p[:3]) - min(p[:3])) / max(1.0, max(inside[:3]) - min(inside[:3])))
+        return p[3] / 255 * max(towards, saturated)
+    return amount
+
+
+def smoothed_loop(loop, passes=10, reach=3, corner=50):
+    """A traced loop with the stairs of its pixels taken out: each point moved towards its
+    neighbours and back a little less (so the shape does not shrink), over and over, but corners,
+    where the way the loop goes turns by more than `corner` degrees over `reach` points, stay put."""
+    n = len(loop)
+    if n < 2 * reach + 3:
+        return loop
+
+    def turn(i):
+        ax, ay = loop[(i - reach) % n]
+        bx, by = loop[i]
+        cx, cy = loop[(i + reach) % n]
+        a1, a2 = math.atan2(by - ay, bx - ax), math.atan2(cy - by, cx - bx)
+        return abs((math.degrees(a2 - a1) + 180) % 360 - 180)
+    pinned = [turn(i) > corner for i in range(n)]
+    pts = list(loop)
+    for _ in range(passes):
+        for k in (0.5, -0.53):
+            pts = [p if pinned[i] else (p[0] + k * ((pts[i - 1][0] + pts[(i + 1) % n][0]) / 2 - p[0]),
+                                        p[1] + k * ((pts[i - 1][1] + pts[(i + 1) % n][1]) / 2 - p[1]))
+                   for i, p in enumerate(pts)]
+    return pts
+
+
+def smooth_layer(c, pixels, box, amount, colour_from, fallback=(0, 0, 0, 255)):
+    """Paint into the canvas what of the box is more than half `amount`, traced smooth, each point in
+    the colour of the nearest pixel that `colour_from` accepts."""
+    x0, y0, bw, bh = box
+    field = [[amount(pixels[y0 + j][x0 + i], i, j) for i in range(bw)] for j in range(bh)]
+    poly = as_one_polygon([[(px + x0, py + y0) for px, py in smoothed_loop(loop)] for loop in iso_loops(field, bw, bh)])
+    if not poly:
+        return
+    near = nearest_colours(pixels, box, colour_from)
+
+    def colour(px, py):
+        return near.get((min(bw - 1, max(0, int(px - x0))), min(bh - 1, max(0, int(py - y0)))), fallback)
+    c.paint([poly], colour)
 
 
 def titles(archive, out):
@@ -1545,6 +1810,11 @@ RESULT_WINDOW_WORDS = (
 )
 
 
+RESULT_COLON_COLUMNS = (118, 120)   # the columns of the colons' dots
+RESULT_COLON_ROWS = (55, 185)      # the rows of the list they are in
+RESULT_COLON_R = 1.2
+
+
 def word_strokes(word, x0, x1, top, height):
     """The word's letters as polygons, spread to fill the columns it had."""
     total = sum(GLYPH_W[ch] for ch in word) + GLYPH_GAP * (len(word) - 1)
@@ -1577,6 +1847,19 @@ def result_window_words(archive, picture, pixels):
             for i in range(x0 - 1, x1 + 1):
                 if letter_pixel(pixels[j][i]):
                     taken |= {(i + di, j + dj) for di in (-1, 0, 1) for dj in (-1, 0, 1)}
+    # The colons after the words: dots of two by two white pixels, drawn again as round dots.
+    dots = []
+    x0, x1 = RESULT_COLON_COLUMNS
+    run = None
+    for j in range(RESULT_COLON_ROWS[0], RESULT_COLON_ROWS[1] + 1):
+        white = j < RESULT_COLON_ROWS[1] and any(pixels[j][i][3] > 200 and lum(pixels[j][i]) > 180 for i in range(x0, x1))
+        if white and run is None:
+            run = j
+        elif not white and run is not None:
+            dots.append((run, j))
+            run = None
+    for top, bottom in dots:
+        taken |= {(i, j) for i in range(x0 - 1, x1 + 1) for j in range(top - 1, bottom + 1)}
     clean = texture_filled(pixels, (0, 0, w, h), taken)
     c = enlarged(archive, picture, clean, w, h)
     for word, x0, x1, top, height in words:
@@ -1615,6 +1898,8 @@ def result_window_words(archive, picture, pixels):
         letters.paint(move(outer), darkest)
         letters.paint(move(inner), lambda px, py: colour(px + x0 - 2, py + top - 2))
         blend(c, letters, x0 - 2, top - 2)
+    middle = sum(RESULT_COLON_COLUMNS) / 2
+    c.paint([circle(middle, (top + bottom) / 2, RESULT_COLON_R, 24) for top, bottom in dots], WHITE)
     return c
 
 
@@ -1841,7 +2126,7 @@ def write_sheet(c, pixels, folder):
 
 def hint_width(name, start, text, drawer):
     """How wide a hint is with its words at their own widths, in the sheet's pixels."""
-    signs, usual_start = signs_of(name, False)
+    signs, usual_start = signs_of(name, 'o')
     if not signs:
         return None
     start = start if start is not None else usual_start
@@ -1861,7 +2146,7 @@ HANGING = set('gjpqy,;')
 SPARE_BELOW = 2
 
 
-def sheet_of_hints(archive, labels, drawer, out, cross_confirms):
+def sheet_of_hints(archive, labels, drawer, out, sign_set):
     picture = 'menu_basic02.png'
     w, h, pixels = decode_png(archive.read(archive.find(picture)))
     rects = layout_of(archive, picture)
@@ -1873,7 +2158,7 @@ def sheet_of_hints(archive, labels, drawer, out, cross_confirms):
         if name in labels:
             start, text = labels[name]
             wipe(c, box)
-            squeeze = hint(c, name.split('.')[0], box, start, text, drawer, cross_confirms)
+            squeeze = hint(c, name.split('.')[0], box, start, text, drawer, sign_set)
             if squeeze < 0.8:
                 tight.append('%s %d%%' % (text, squeeze * 100))
             natural = hint_width(name.split('.')[0], start, text, drawer)
@@ -1889,7 +2174,7 @@ def sheet_of_hints(archive, labels, drawer, out, cross_confirms):
                 print('no room in the spare rows for the hint %s' % text)
                 continue
             whole = (spare_x, SPARE_ROWS[spare_row], natural, bh)
-            hint(c, name.split('.')[0], whole, start, text, drawer, cross_confirms, SPARE_BELOW)
+            hint(c, name.split('.')[0], whole, start, text, drawer, sign_set, SPARE_BELOW)
             pieces.append('hint %d %d %d %d %d %d %d %d' % (x, y, bw, bh, whole[0], whole[1], natural, bh + SPARE_BELOW))
             spare_x += natural + SPARE_GAP
     for name in ('basic_btm.png', 'basic_btm_ele01.png', 'basic_btm_ele02.png'):
@@ -1904,7 +2189,7 @@ def sheet_of_hints(archive, labels, drawer, out, cross_confirms):
     wipe(c, (32, 174, 480, 22))
     line_art(c, 32, 174)
     write_sheet(c, pixels, out)
-    if tight and not cross_confirms:
+    if tight and sign_set == 'o':
         print('narrowed: ' + ', '.join(tight))
 
 
@@ -1968,9 +2253,13 @@ def centred_on_button(drawer, text, button_width):
     return max(0, int(button_width - BUTTON_WORD_AT - word) // 2)
 
 
-def button_sign(c, x, y, circle_sign):
+def button_sign(c, x, y, kind):
     """A sign with a white edge all the way round, twelve pixels across, and the colon after it."""
-    if circle_sign:
+    if kind in ('A', 'B'):
+        c.paint([circle(x + 6, y + 6.5, 6)], WHITE)
+        c.paint([circle(x + 6, y + 6.5, 5)], BUTTON_TEAL)
+        c.paint(letter_strokes(kind, x + 6, y + 6.5, 6, 1.45), WHITE)
+    elif kind == 'circle':
         c.paint(ring(x + 6, y + 6.5, 6, 2), WHITE)
         c.paint(ring(x + 6, y + 6.5, 5, 3), BUTTON_TEAL)
     else:
@@ -1982,7 +2271,7 @@ def button_sign(c, x, y, circle_sign):
     c.paint([rect(x + 15, y + 4, 1.4, 2), rect(x + 15, y + 8, 1.4, 2)], WHITE)
 
 
-def sheet_of_windows(archive, labels, drawer, out, cross_confirms):
+def sheet_of_windows(archive, labels, drawer, out, sign_set):
     picture = 'menu_basic.png'
     w, h, pixels = decode_png(archive.read(archive.find(picture)))
     rects = layout_of(archive, picture)
@@ -2009,7 +2298,7 @@ def sheet_of_windows(archive, labels, drawer, out, cross_confirms):
         if moved is None:
             moved = centred_on_button(drawer, labels[name][1], bw)
         wipe(c, rects[name])
-        button_sign(c, x + moved, y, confirm != cross_confirms)
+        button_sign(c, x + moved, y, SIGN_SETS[sign_set][0 if confirm else 1])
         write_text(c, drawer, labels[name][1], (x + moved + BUTTON_WORD_AT, y, bw - moved - BUTTON_WORD_AT, bh), WORD, False, WORD_EDGE)
     for name, word in (('basic_flwin_resume.png', 'RESUME'), ('basic_flwin_retry.png', 'RETRY'), ('basic_flwin_return.png', 'RETURN')):
         wipe(c, rects[name])
@@ -2038,7 +2327,103 @@ def sheet_clean(archive, picture, out):
     write_sheet(enlarged(archive, entry, pixels, w, h), pixels, out)
 
 
-def result_hints(archive, labels, drawer, out, made_in, cross_confirms):
+# The words of the results: the rank, twice in other colours to flash between, and the difficulty.
+# Each letter stands in its own columns, so it is drawn again in them, in the game's squared
+# letters, and coloured as the game coloured it there. (picture's name, text, stroke)
+RESULT_RANK_WORDS = (
+    ('result_perfect01.png', 'PERFECT', 3.8), ('result_perfect02.png', 'PERFECT', 3.8),
+    ('result_great01.png', 'GREAT', 3.8), ('result_great02.png', 'GREAT', 3.8),
+    ('result_cheap01.png', 'CHEAP', 3.8), ('result_cheap02.png', 'CHEAP', 3.8),
+    ('result_miss01.png', 'MISSxTAKE', 3.8), ('result_miss02.png', 'MISSxTAKE', 3.8),
+    ('result_normal01.png', 'STANDARD', 3.8), ('result_normal02.png', 'STANDARD', 3.8),
+    ('result_level_easy.png', 'EASY', 2.0), ('result_level_normal.png', 'NORMAL', 2.0), ('result_level_hard.png', 'HARD', 2.0),
+)
+INK = 0x60
+
+
+def letter_boxes(pixels, box):
+    """Each run of columns with something drawn in it, and the rows that run has drawn, in the picture."""
+    x0, y0, w, h = box
+    runs, start = [], None
+    for i in range(w + 1):
+        inked = i < w and any(pixels[y][x0 + i][3] > INK for y in range(y0, y0 + h))
+        if inked and start is None:
+            start = i
+        elif not inked and start is not None:
+            rows = [y for y in range(y0, y0 + h) if any(pixels[y][x][3] > INK for x in range(x0 + start, x0 + i))]
+            runs.append((x0 + start, rows[0], x0 + i, rows[-1] + 1))
+            start = None
+    return runs
+
+
+def colour_field(pixels, box):
+    """The game's colours in a box, taken from inside its letters only (not their shaded edges),
+    carried out to the empty pixels nearest them and softened, as fn(x, y)."""
+    x0, y0, w, h = box
+    def solid(x, y):
+        return all(0 <= x + dx - x0 < w and 0 <= y + dy - y0 < h and pixels[y + dy][x + dx][3] > 200
+                   for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)))
+    field = [[None] * w for _ in range(h)]
+    front = []
+    for j in range(h):
+        for i in range(w):
+            if solid(x0 + i, y0 + j):
+                field[j][i] = tuple(pixels[y0 + j][x0 + i][:3])
+                front.append((i, j))
+    if not front:
+        for j in range(h):
+            for i in range(w):
+                if pixels[y0 + j][x0 + i][3] > INK:
+                    field[j][i] = tuple(pixels[y0 + j][x0 + i][:3])
+                    front.append((i, j))
+    while front:
+        nxt = []
+        for i, j in front:
+            for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                a, b = i + di, j + dj
+                if 0 <= a < w and 0 <= b < h and field[b][a] is None:
+                    field[b][a] = field[j][i]
+                    nxt.append((a, b))
+        front = nxt
+    soft = [[tuple(sum(field[b][a][k] for a in range(max(0, i - 1), min(w, i + 2)) for b in range(max(0, j - 1), min(h, j + 2))) //
+                   (len(range(max(0, i - 1), min(w, i + 2))) * len(range(max(0, j - 1), min(h, j + 2)))) for k in range(3))
+             for i in range(w)] for j in range(h)]
+
+    def fn(x, y):
+        fx = min(w - 1.0, max(0.0, x - x0 - 0.5))
+        fy = min(h - 1.0, max(0.0, y - y0 - 0.5))
+        i, j = int(fx), int(fy)
+        i1, j1 = min(w - 1, i + 1), min(h - 1, j + 1)
+        tx, ty = fx - i, fy - j
+        return tuple(int((soft[j][i][k] * (1 - tx) + soft[j][i1][k] * tx) * (1 - ty) + (soft[j1][i][k] * (1 - tx) + soft[j1][i1][k] * tx) * ty)
+                     for k in range(3))
+    return fn
+
+
+def squared_letters(text, boxes, stroke):
+    """The squared letters, each fitted to its own box."""
+    polys = []
+    for ch, (x0, y0, x1, y1) in zip(text, boxes):
+        left, top = x0 + stroke / 2, y0 + stroke / 2
+        ux, uy = (x1 - x0 - stroke) / 6, (y1 - y0 - stroke) / 8
+        for line in GLYPHS[ch]:
+            polys += polyline([(left + px * ux, top + py * uy) for px, py in line], stroke)
+    return polys
+
+
+def result_words(c, pixels, rects):
+    for name, text, stroke in RESULT_RANK_WORDS:
+        box = rects[name]
+        boxes = letter_boxes(pixels, box)
+        if len(boxes) != len(text):
+            print('results: %s has %d letters, not %d; left as it is' % (name, len(boxes), len(text)))
+            continue
+        colour = colour_field(pixels, box)
+        wipe(c, box)
+        c.paint(squared_letters(text, boxes, stroke), colour)
+
+
+def result_hints(archive, labels, drawer, out, made_in, sign_set):
     """The two hints the results screen has in its own picture, in line with those elsewhere."""
     picture = 'menu_result.png'
     w, h, pixels = decode_png(archive.read(picture))
@@ -2061,6 +2446,7 @@ def result_hints(archive, labels, drawer, out, made_in, cross_confirms):
     for digit, strokes in RESULT_DIGITS.items():
         result_digit(c, rects['result_num_%s.png' % digit], strokes, False)
         result_digit(c, rects['result_numsm_%s.png' % digit], strokes, True)
+    result_words(c, pixels, rects)
     item = labels.get('@375,54,53,13', (0, 'Item'))[1]
     pick = labels.get('@444,54,32,13', (0, 'Pick'))[1]
     y0, x0 = 54, 354
@@ -2071,7 +2457,11 @@ def result_hints(archive, labels, drawer, out, made_in, cross_confirms):
     piece.paint([rect(12, 4.5, 2, 2), rect(12, 7.5, 2, 2)], WHITE)
     write_text(piece, drawer, item, (15, 0, 50, 13), WHITE)
     at = 68
-    if cross_confirms:
+    confirm = SIGN_SETS[sign_set][0]
+    if confirm in ('A', 'B'):
+        piece.paint([circle(at + 5, 6.5, 5)], WHITE)
+        punch(piece, letter_strokes(confirm, at + 5, 6.5, 6, 1.35))
+    elif confirm == 'cross':
         piece.paint([segment(at + 1, 2.3, at + 9, 10.7, 2.7), segment(at + 9, 2.3, at + 1, 10.7, 2.7)], WHITE)
     else:
         piece.paint(ring(at + 5, 6.5, 5, 3.1), WHITE)
@@ -2096,6 +2486,135 @@ def write_card_swaps(archive, out):
             rects = layout_of(archive, entry)
             o, x = rects['button_o.png'], rects['button_x.png']
             f.write('%08X %d %d %d %d %d %d %d\n' % (colour_hash(pixels), o[0], o[1], x[0], x[1], o[2], o[3], w))
+
+
+# ---- the card before a song: its words, numbers, stars and buttons, in the game's squared letters
+CARD_SIGN = 24
+CARD_TEAL = (51, 221, 187)
+CARD_EDGE = (24, 26, 38)
+CARD_DISC = (38, 41, 56)
+CARD_RING = (200, 204, 216)
+CARD_MARK = (240, 240, 244)
+
+
+def card_button(c, cx, cy, kind):
+    """A flat dark disc with a thin light edge, and its sign in light strokes."""
+    r = 9.6
+    c.paint([circle(cx, cy, r)], CARD_DISC)
+    c.paint(ring(cx, cy, r, r - 1.1), CARD_RING)
+    if kind == 'circle':
+        c.paint(ring(cx, cy, 4.6, 2.9), CARD_MARK)
+    elif kind == 'cross':
+        c.paint(polyline([(cx - 3.6, cy - 3.6), (cx + 3.6, cy + 3.6)], 1.9) + polyline([(cx + 3.6, cy - 3.6), (cx - 3.6, cy + 3.6)], 1.9), CARD_MARK)
+    else:
+        c.paint(letter_strokes(kind, cx, cy, 8.4, 1.9), CARD_MARK)
+
+
+def card_signs(sign_set, out):
+    """The card's two buttons with letters, the one by Start above the one by Back. The renderer
+    draws them in place of its Circle and Cross."""
+    c = Canvas(CARD_SIGN, CARD_SIGN * 2)
+    for slot, letter in enumerate(SIGN_SETS[sign_set][:2]):
+        card_button(c, 11.5, CARD_SIGN * slot + 12, letter)
+    c.write(os.path.join(out, 'card_signs.rgba'))
+
+
+def square_word(text, x, y, ux, h, stroke):
+    """The game's squared letters, `ux` wide for each unit of their grid, `h` high."""
+    units = len(text) * 6 + (len(text) - 1) * 1.6
+    return text_strokes(text, x, y, units * ux + stroke, h, stroke)
+
+
+def square_width(text, ux, stroke):
+    return (len(text) * 6 + (len(text) - 1) * 1.6) * ux + stroke
+
+
+def star(cx, cy, r, inner=0.48):
+    return [(cx + (r if i % 2 == 0 else r * inner) * math.sin(i * math.pi / 5),
+             cy - (r if i % 2 == 0 else r * inner) * math.cos(i * math.pi / 5)) for i in range(10)]
+
+
+def card_piece(name, w, h):
+    """One of the card's pieces drawn anew, or None if it is not one of those."""
+    c = Canvas(w, h)
+    if name.startswith('difficulty_'):
+        c.paint(square_word(name[11:-4].upper(), 7, 6, 1.745, 11, 2.2), CARD_TEAL)
+    elif name.startswith('level_number'):
+        c.paint(text_strokes(name[12:14][-1], 2, 3, 12, 11, 2.2), CARD_TEAL)
+    elif name in ('start.png', 'return.png'):
+        word = name[:-4].upper()
+        c.paint(square_word(word, 3.0, 2.8, 1.45, 10, 1.9 + 1.6), CARD_EDGE)
+        c.paint(square_word(word, 3.8, 3.6, 1.45, 8.4, 1.9), WHITE)
+    elif name.startswith('star_'):
+        colour = WHITE if name == 'star_empty.png' else CARD_TEAL
+        if name == 'star_flash01.png':
+            for grow, alpha in ((1.55, 40), (1.3, 70), (1.12, 110)):
+                c.paint([star(12.5, 12.4, 7.3 * grow, 0.52)], colour, alpha)
+        c.paint([star(12.5, 12.4, 7.3)], colour)
+    elif name == 'button_o.png':
+        card_button(c, 11.5, 12, 'circle')
+    elif name == 'button_x.png':
+        card_button(c, 11.5, 12, 'cross')
+    else:
+        return None
+    return c
+
+
+def card_toggle(word, w, h, left):
+    """The part of the button sound's row after its name: arrows either side of ON or OFF."""
+    c = Canvas(w, h)
+    c.paint([[(58 - left, 8.5), (65 - left, 4.5), (65 - left, 12.5)], [(113 - left, 8.5), (106 - left, 4.5), (106 - left, 12.5)]], CARD_TEAL)
+    c.paint(square_word(word, 85.5 - left - square_width(word, 1.3, 2.2) / 2, 3, 1.3, 11, 2.2), CARD_TEAL)
+    return c
+
+
+def paste_halved(data, fw, fh, piece, x, y):
+    """A piece drawn at four times put in a sheet kept at twice the game's size, in place of what
+    was there. Rows of the sheet are bottom first."""
+    k = SCALE // 2
+    for row in range(piece.h // k):
+        at = ((fh - 1 - (y * 2 + row)) * fw + x * 2) * 4
+        for col in range(piece.w // k):
+            r = g = b = a = 0
+            for dy in range(k):
+                for dx in range(k):
+                    i = ((row * k + dy) * piece.w + col * k + dx) * 4
+                    pa = piece.data[i + 3]
+                    r += piece.data[i] * pa
+                    g += piece.data[i + 1] * pa
+                    b += piece.data[i + 2] * pa
+                    a += pa
+            o = at + col * 4
+            if a:
+                data[o:o + 4] = bytes((r // a, g // a, b // a, a // (k * k)))
+            else:
+                data[o:o + 4] = b'\0\0\0\0'
+
+
+def sheets_of_cards(archive, out):
+    """Each card's sheet, as lang_images.py made it, with its pieces drawn anew."""
+    toggles = {'se_on.png': 'ON', 'se_off.png': 'OFF'}
+    name_ends = 50   # where the button sound's name ends, as the words for it are placed
+    for entry in sorted({e[0] for e in archive.entries if e[0].startswith('pv_start_') and '.p' in e[0]}):
+        w, h, pixels = decode_png(archive.read(entry))
+        path = os.path.join(out, '%08X.rgba' % colour_hash(pixels))
+        if not os.path.exists(path):
+            continue
+        with open(path, 'rb') as f:
+            fw, fh = struct.unpack('<II', f.read(8))
+            data = bytearray(f.read())
+        if fw != w * 2 or fh != h * 2:
+            continue
+        for name, (x, y, pw, ph) in layout_of(archive, entry).items():
+            if name in toggles:
+                paste_halved(data, fw, fh, card_toggle(toggles[name], pw - name_ends, ph, name_ends), x + name_ends, y)
+                continue
+            piece = card_piece(name, pw, ph)
+            if piece:
+                paste_halved(data, fw, fh, piece, x, y)
+        with open(path, 'wb') as f:
+            f.write(struct.pack('<II', fw, fh))
+            f.write(data)
 
 
 def read_labels(path):
@@ -2123,23 +2642,39 @@ def main():
     words = {ch for pieces in labels.values() for _, text in pieces.values() for ch in text}
     if any(ch != ' ' and not probe.draws(ch) for ch in words):
         family = load_font(FREE_FONT)
-    os.makedirs(out, exist_ok=True)
-    os.makedirs(out + '_x', exist_ok=True)
+    for ending, _ in SET_FOLDERS:
+        os.makedirs(out + ending, exist_ok=True)
     drawer = Drawer(family, HINT_H * SCALE)
     for picture in CLEAN_ONLY:
         sheet_clean(archive, picture, out)
     result_labels = labels.get('menu_result.png', {})
-    for folder, cross in ((out, False), (out + '_x', True)):
-        sheet_of_hints(archive, labels.get('menu_basic02.png', {}), drawer, folder, cross)
-        sheet_of_windows(archive, labels.get('menu_basic.png', {}), drawer, folder, cross)
-        result_hints(archive, result_labels, drawer, folder, out, cross)
+    for ending, sign_set in SET_FOLDERS:
+        folder = out + ending
+        sheet_of_hints(archive, labels.get('menu_basic02.png', {}), drawer, folder, sign_set)
+        sheet_of_windows(archive, labels.get('menu_basic.png', {}), drawer, folder, sign_set)
+        result_hints(archive, result_labels, drawer, folder, out, sign_set)
+        if SIGN_SETS[sign_set][0] in ('A', 'B'):
+            card_signs(sign_set, folder)
     titles(archive, out)
+    language = os.path.basename(os.path.normpath(out))
+    if language in TITLE_WORDS:
+        title_sheet(archive, drawer, out, TITLE_WORDS[language])
+        # Japanese has no pictures of its own here, and its title has these words in English.
+        demo_start_sheet(archive, family, out, DEMO_WORDS[language])
+        if language == 'en':
+            everyone = os.path.dirname(os.path.dirname(os.path.normpath(out)))
+            title_sheet(archive, drawer, everyone, TITLE_WORDS['en'])
+            demo_start_sheet(archive, family, everyone, DEMO_WORDS['en'])
+            # The logos have no words to translate, so they are made once, for every language.
+            for name in LOGOS:
+                logo_sheet(archive, name, everyone)
     sheet_of_arrows(archive, out)
     sheet_of_icons(archive, out)
     sheet_of_card(archive, out)
     for picture in ('result_win_nm.png', 'result_win_edit.pn'):
         sheet_of_result_window(archive, picture, out)
     write_card_swaps(archive, out)
+    sheets_of_cards(archive, out)
     print('%s: done' % out)
 
 

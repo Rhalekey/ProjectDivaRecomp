@@ -16,6 +16,43 @@ What has changed is in the [changelog](CHANGELOG.md). To install and play, see [
 
 Check it again if you change your headphones, speakers or monitor. Bluetooth headphones in particular can add a lot. This setting is in the recommended edition, which is the default.
 
+## What this version adds
+
+Everything below is in the recommended edition, the default. The [changelog](CHANGELOG.md) has the details and dates.
+
+**Picture**
+- Resolution from 1x to 8x the PSP's, window, borderless or full screen, and smoothing on or off.
+- The image fits any window shape, from 4:3 to 32:9, with no stretching: more of the 3D scene shows, and the HUD and menus keep to the window's corners.
+- A blurred copy fills what the game never drew in wider windows, and can be turned off.
+- 60 fps in songs, where the PSP ran them at about 30.
+
+**Redrawn**
+- The song screen's HUD, notes and targets, and the menus' pieces in English and German, as vectors at four times the size.
+- The title screen's logo and menu, the makers' logos at the start, the card before a song and the results screen.
+- Letters spaced by their real widths, from a free font or one of your own.
+- New screens for the language, the confirm button, the button icons, the notes and the controls.
+
+**Playing**
+- **Note timing**, measured by each song, so that presses on time count as on time.
+- **Background dim** for songs.
+- Notes as PlayStation shapes, Xbox or Nintendo letters, or arrow keys, with targets in the same shape.
+- The d-pad, the arrow keys and the stick can hit notes too.
+- **Quick restart** with L and R together.
+
+**Controls**
+- Keyboard and controller buttons can be changed, with a second key for each.
+- Xbox, PlayStation, Nintendo and other controllers, all at once.
+- The confirm button, Circle or Cross, and the buttons' icons, PlayStation or A, B, X and Y, by where each button is.
+
+**Menus**
+- The Free Play songs can be sorted with Select by name, best score, BPM or last played; the modules by name, those obtained or last played in.
+- L and R in the song list change the module worn, and Miku behind the menu changes into it.
+- Kagamine Rin's and Len's songs can be sung in the module worn, which the original game does not allow.
+
+**Languages and mods**
+- English and German, besides the game's Japanese, with song names and lyrics in romaji if wanted.
+- Mods as folders of files that replace the game's, with nothing on disk changed.
+
 ## Suggestions welcome
 
 I am accepting suggestions for things to add to the game. If there is something you would like to see, [open an issue](https://github.com/Rhalekey/ProjectDivaRecomp/issues).
@@ -51,7 +88,9 @@ To play, double-click `Play.bat` once it is built. For development, a `dev.ini` 
 
 ## Graphics
 
-The recommended edition adds a **Graphics** row to the main menu: display mode (window, borderless or full screen), resolution (1x to 8x), smoothing, image shape (bars, crop or extend) and the frame rate counter. F11 or Alt+Enter switches between the window and full screen.
+The recommended edition adds a **Graphics** row to the main menu: display mode (window, borderless or full screen), resolution (1x to 8x), smoothing, image shape (bars, crop or extend), blur and the frame rate counter. F11 or Alt+Enter switches between the window and full screen.
+
+**Blur** fills the parts of a wider window that the game never drew with a blurred copy of the picture beside them. In a 16:9 window nothing is wider than the game's own picture, so the blur does nothing useful there and only costs time on the graphics card. **If you play in 16:9, turning Blur off is strongly recommended.** Keep it on for wider windows, such as 21:9 or 32:9.
 
 The frame rate cannot be chosen yet: the game's speed follows its refresh rate, so it stays at 60.
 
@@ -79,7 +118,9 @@ The game can be played in Japanese, English and German. It asks which language t
 
 The German translation was written without a native speaker and has not been reviewed by one yet, so expect some awkward or wrong wording. Corrections are welcome in `lang/de.txt` and `lang/de_images.txt`.
 
-The recommended edition adds rows to the game's own Options window: language, song names and lyrics in romaji (each on its own), whether to ask the language at each start, the confirm button, and the keyboard and controller buttons, with a second key if wanted. It also adds a background dim for songs, from off to 100%, and [Note timing](#before-you-play-set-note-timing), from -100 to +300 ms. The song names come from `lang\romaji_titles.txt`. The lyrics are never in this repository: `Tools\romaji.py` makes them during the build from your copy of the game, using a dictionary, so a line can come out misread. The language changes at once. These are kept in the same file, and the row that asks wins over `language_prompt`. Put `extras = 0` in `settings.ini` to leave the window as the game has it.
+The recommended edition adds rows to the game's own Options window: language, song names and lyrics in romaji (each on its own), whether to ask the language at each start, the confirm button, the button icons (PlayStation, or A and B as on Xbox or Nintendo controllers, where A and B are swapped), and the keyboard and controller buttons, with a second key if wanted. It also adds a background dim for songs, from off to 100%, and [Note timing](#before-you-play-set-note-timing), from -100 to +300 ms. The song names come from `lang\romaji_titles.txt`. The lyrics are never in this repository: `Tools\romaji.py` makes them during the build from your copy of the game, using a dictionary, so a line can come out misread. The language changes at once. These are kept in the same file, and the row that asks wins over `language_prompt`. Put `extras = 0` in `settings.ini` to leave the window as the game has it.
+
+In the Free Play song list, Select sorts the songs (the game's order, by name, by best score, by BPM, or last played first) and L and R change the module worn, between those obtained; on Rin's and Len's songs, between their own and their swimwear. On the modules' screen, Select sorts them (the game's order, by name, obtained first, or last played in first). When each song and module was last played is kept in `PLAYED.INI`, beside the options. The Options row **Rin & Len songs** set to Module has their songs sung in the module worn, as all the others are. In a song, L and R together play it again from the start (the key and buttons for this can be changed in Controls).
 
 The Japanese is never replaced. `lang\en.txt` lists the address of each original text and its English, and the game's words are swapped as they reach the screen. Song names, lyrics and illustrator credits have no lines in it, so they stay as they are. `lang\en_images.txt` does the same for words drawn into pictures: `Tools\lang_images.py` makes those pictures from your copy of the game each time it builds, in a folder outside this repository.
 
@@ -129,6 +170,18 @@ The MIT license below covers this project's code. `fonts\` is under its own lice
 
 The build downloads [SDL3](https://www.libsdl.org/), under the zlib license, from its official release and checks its hash. It reads controllers other than Xbox ones.
 
+## Legal notice and trademarks
+
+This is an unofficial fan project, made for preservation and personal use. It is not affiliated with, endorsed by or sponsored by any of the companies named here, and it is not an official product of theirs.
+
+*Hatsune Miku: Project DIVA* is © SEGA. Hatsune Miku, Kagamine Rin, Kagamine Len, Megurine Luka, MEIKO and KAITO are characters of Crypton Future Media, INC., and Hatsune Miku is © Crypton Future Media, INC., www.piapro.net. SEGA and the SEGA logo are registered trademarks or trademarks of SEGA Corporation or its affiliates. Crypton Future Media and piapro are trademarks of Crypton Future Media, INC. The songs, their lyrics and their videos belong to their creators.
+
+PlayStation and PSP are registered trademarks or trademarks of Sony Interactive Entertainment Inc. Xbox is a trademark of the Microsoft group of companies. Nintendo is a trademark of Nintendo. CRIWARE is a trademark of CRI Middleware Co., Ltd. Discord is a trademark of Discord Inc. All other trademarks belong to their respective owners. They are named only to say what the game, its controllers and its tools are, not to suggest any connection.
+
+No part of the game is in this repository: no executable, no code generated from it, no pictures, sound, video, text or fonts. Everything the project shows of the game is made on your computer, at build time, from a copy you legally own and dumped yourself. Do not share the files the build makes from your copy, and do not ask for or offer copies of the game.
+
+If you hold rights in anything here and believe something should not be, please [open an issue](https://github.com/Rhalekey/ProjectDivaRecomp/issues) and it will be dealt with promptly.
+
 ## License
 
-The code in this repository is under the [MIT License](LICENSE). It does not cover the game or its assets, which belong to their respective owners. This project is not affiliated with SEGA or Crypton Future Media. The `lang\` tables are unofficial fan translations.
+The code in this repository is under the [MIT License](LICENSE). It does not cover the game or its assets, which belong to their respective owners. The `lang\` tables are unofficial fan translations.

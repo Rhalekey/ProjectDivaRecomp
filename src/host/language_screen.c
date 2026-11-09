@@ -99,17 +99,19 @@ static void draw_screen(int selected) {
         kit_text(row_x + 58, y + ROW_H / 2, 19, 1, on ? KIT_INK : KIT_TEXT, LANGUAGES[i].name, KIT_LEFT);
     }
 
-    kit_halo(HERO_X, HERO_Y, HERO_R * 2);
-    kit_flag(HERO_X, HERO_Y, HERO_R, LANGUAGES[selected].flag);
+    /* The list keeps to the left edge, and what it shows to the right one. */
+    const int hero_x = kit_right(HERO_X), card_x = kit_right(CARD_X);
+    kit_halo(hero_x, HERO_Y, HERO_R * 2);
+    kit_flag(hero_x, HERO_Y, HERO_R, LANGUAGES[selected].flag);
 
-    kit_panel(CARD_X, CARD_Y, CARD_W, CARD_H);
-    kit_mark(CARD_X + 24, CARD_Y + 22);
-    kit_text(CARD_X + 24, CARD_Y + 48, 14, 0, KIT_SOFT, LANGUAGES[selected].name, KIT_LEFT);
+    kit_panel(card_x, CARD_Y, CARD_W, CARD_H);
+    kit_mark(card_x + 24, CARD_Y + 22);
+    kit_text(card_x + 24, CARD_Y + 48, 14, 0, KIT_SOFT, LANGUAGES[selected].name, KIT_LEFT);
     for (int i = 0; i < 4; i++) {
-        kit_text(CARD_X + 24, CARD_Y + 78 + i * 22, 16, 0, KIT_TEXT, LANGUAGES[selected].note[i], KIT_LEFT);
+        kit_text(card_x + 24, CARD_Y + 78 + i * 22, 16, 0, KIT_TEXT, LANGUAGES[selected].note[i], KIT_LEFT);
     }
 
-    int right = KIT_CANVAS_W - 32;
+    int right = kit_width() - 32;
     /* The button the player confirms with, Circle until they have chosen. */
     right = kit_hint(right, g_options.confirm_cross == 1 ? KIT_GLYPH_CROSS : KIT_GLYPH_CIRCLE, LANGUAGES[selected].select);
     kit_hint(right, KIT_GLYPH_DPAD, LANGUAGES[selected].move);
@@ -141,7 +143,7 @@ const char *language_screen_run(const char *current, const char *disc) {
             selected = (selected + 1) % NUM_LANGUAGES;
             changed = 1;
         }
-        if (changed) draw_screen(selected);
+        if (changed || kit_resized()) draw_screen(selected);
         if (pressed & (B_START | B_CIRCLE | B_CROSS)) chosen = 1;
         Sleep(16);
     }

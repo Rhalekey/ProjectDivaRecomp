@@ -336,9 +336,13 @@ int main(int argc, char **argv) {
         if (g_settings.extras || getenv("DIVA_WIDE")) {
             psp_render_gl_set_wide(1);
             psp_render_gl_set_wide_view(g_options.wide_view);
+            psp_render_gl_set_blur(g_options.blur);
+            /* title.png: the title screen's logo and words sit on its 3D scene, which is not moved. */
+            psp_render_gl_keep_in_place(0x6EDA8883u);
         }
         psp_render_gl_set_present_filter(g_settings.present_linear);
         if (g_settings.extras) psp_render_gl_set_background_dim(g_options.background_dim);
+        if (g_settings.extras) language_notes_changed();
         /* DIVA_SAVE_TEXTURES saves what is still at the game's own resolution. */
         if (getenv("DIVA_SAVE_TEXTURES")) {
             char dump_dir[1100];
