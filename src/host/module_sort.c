@@ -15,6 +15,7 @@
 #include "module_sort.h"
 #include "guest.h"
 
+#include "language.h"
 #include "song_sort.h"
 #include "translation.h"
 
@@ -43,8 +44,13 @@
 
 enum { B_SELECT = 0x0001 };
 enum { SORT_GAME, SORT_NAME, SORT_OBTAINED, SORT_RECENT, SORT_COUNT };
-static const char *const SORT_SHOWN[SORT_COUNT] = {"Modules in the game's order", "Modules by name", "Modules obtained first",
-                                                   "Modules last played first"};
+/* Shown as the order changes, in English, Japanese and German (UI_ENGLISH, UI_JAPANESE, UI_GERMAN). */
+static const char *const SORT_SHOWN[SORT_COUNT][UI_COUNT] = {
+    {"Modules in the game's order", "\xE3\x83\xA2\xE3\x82\xB8\xE3\x83\xA5\xE3\x83\xBC\xE3\x83\xAB\xEF\xBC\x9A\xE6\xA8\x99\xE6\xBA\x96\xE3\x81\xAE\xE9\xA0\x86", "Module in der Reihenfolge des Spiels"},
+    {"Modules by name", "\xE3\x83\xA2\xE3\x82\xB8\xE3\x83\xA5\xE3\x83\xBC\xE3\x83\xAB\xEF\xBC\x9A\xE5\x90\x8D\xE5\x89\x8D\xE9\xA0\x86", "Module nach Namen"},
+    {"Modules obtained first", "\xE3\x83\xA2\xE3\x82\xB8\xE3\x83\xA5\xE3\x83\xBC\xE3\x83\xAB\xEF\xBC\x9A\xE5\x85\xA5\xE6\x89\x8B\xE6\xB8\x88\xE3\x81\xBF\xE3\x82\x92\xE5\x85\x88\xE3\x81\xAB", "Erhaltene Module zuerst"},
+    {"Modules last played first", "\xE3\x83\xA2\xE3\x82\xB8\xE3\x83\xA5\xE3\x83\xBC\xE3\x83\xAB\xEF\xBC\x9A\xE6\x9C\x80\xE8\xBF\x91\xE4\xBD\xBF\xE3\x81\xA3\xE3\x81\x9F\xE9\xA0\x86", "Zuletzt gespielte Module zuerst"},
+};
 static long long g_played[MODULES];   /* when a song was last played in each (song_sort.c keeps it) */
 
 static int g_sort, g_have_game_order;
@@ -256,6 +262,6 @@ void module_sort_input(uint32_t buttons) {
         g_sort = was;
         return;
     }
-    psp_render_gl_show_message(SORT_SHOWN[g_sort]);
-    fprintf(stderr, "module sort: %s\n", SORT_SHOWN[g_sort]);
+    psp_render_gl_show_message(SORT_SHOWN[g_sort][language_ui()]);
+    fprintf(stderr, "module sort: %s\n", SORT_SHOWN[g_sort][UI_ENGLISH]);
 }

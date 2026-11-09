@@ -65,8 +65,14 @@
 
 enum { B_SELECT = 0x0001, B_L = 0x0100, B_R = 0x0200 };
 enum { SORT_GAME, SORT_NAME, SORT_SCORE, SORT_BPM, SORT_RECENT, SORT_COUNT };
-static const char *const SORT_NAME_SHOWN[SORT_COUNT] = {"Songs in the game's order", "Songs by name", "Songs by best score", "Songs by BPM",
-                                                        "Songs last played first"};
+/* Shown as the order changes, in English, Japanese and German (UI_ENGLISH, UI_JAPANESE, UI_GERMAN). */
+static const char *const SORT_NAME_SHOWN[SORT_COUNT][UI_COUNT] = {
+    {"Songs in the game's order", "\xE6\x9B\xB2\xEF\xBC\x9A\xE6\xA8\x99\xE6\xBA\x96\xE3\x81\xAE\xE9\xA0\x86", "Lieder in der Reihenfolge des Spiels"},
+    {"Songs by name", "\xE6\x9B\xB2\xEF\xBC\x9A\xE5\x90\x8D\xE5\x89\x8D\xE9\xA0\x86", "Lieder nach Namen"},
+    {"Songs by best score", "\xE6\x9B\xB2\xEF\xBC\x9A\xE3\x83\x8F\xE3\x82\xA4\xE3\x82\xB9\xE3\x82\xB3\xE3\x82\xA2\xE9\xA0\x86", "Lieder nach Bestwert"},
+    {"Songs by BPM", "\xE6\x9B\xB2\xEF\xBC\x9A" "BPM\xE9\xA0\x86", "Lieder nach BPM"},
+    {"Songs last played first", "\xE6\x9B\xB2\xEF\xBC\x9A\xE6\x9C\x80\xE8\xBF\x91\xE3\x83\x97\xE3\x83\xAC\xE3\x82\xA4\xE3\x81\x97\xE3\x81\x9F\xE9\xA0\x86", "Zuletzt gespielte Lieder zuerst"},
+};
 
 /* ---- when each song was last played, kept here as the game keeps no such thing: in PLAYED.INI
  * beside OPTIONS.INI, a line "song N = seconds since 1970" for each song played. */
@@ -321,11 +327,9 @@ static void show_module(const char *before, int module, const char *after) {
         n++;
     }
     name[n] = 0;
-    const char *shown = translation_shown(name);
-    wchar_t wide[128];
     char utf8[384], line[512];
-    if (!MultiByteToWideChar(932, 0, shown ? shown : name, -1, wide, 128) || !WideCharToMultiByte(CP_UTF8, 0, wide, -1, utf8, sizeof utf8, NULL, NULL))
-        snprintf(utf8, sizeof utf8, "Module %d", module + 1);
+    translation_shown_utf8(name, utf8, sizeof utf8);
+    if (!utf8[0]) snprintf(utf8, sizeof utf8, "Module %d", module + 1);
     snprintf(line, sizeof line, "%s%s%s", before, utf8, after);
     psp_render_gl_show_message(line);
 }
@@ -507,8 +511,8 @@ static void on_song_list(void) {
     if (fresh && shoulders != (B_L | B_R) && g_songs_in_front) next_module(fresh & B_R ? 1 : -1);
     if (pressed) {
         g_sort = (g_sort + 1) % SORT_COUNT;
-        psp_render_gl_show_message(SORT_NAME_SHOWN[g_sort]);
-        fprintf(stderr, "song sort: %s\n", SORT_NAME_SHOWN[g_sort]);
+        psp_render_gl_show_message(SORT_NAME_SHOWN[g_sort][language_ui()]);
+        fprintf(stderr, "song sort: %s\n", SORT_NAME_SHOWN[g_sort][UI_ENGLISH]);
     }
     const uint32_t list = guest_call(SONG_LIST_OF, GAME_WINDOW_MANAGER, 0, 0, 0);
     sort_list(list);

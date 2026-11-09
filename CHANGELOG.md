@@ -6,6 +6,9 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 
 ## 2026-11-09
 
+### Controls and notes
+- A press counts when it was made, not when the game next looked at the buttons: the game sees them once a frame, so a press could count up to 16 ms late. The buttons are read about once a millisecond, and the note is judged as it stood then. With this the measure for **Note timing** comes out a few milliseconds nearer zero, so it is worth measuring again.
+
 ### Redrawn
 - The Project DIVA badge in the demo's corner and the lists: Miku's head and twin tails in clean lines, with Project DIVA on her front. The game's is too small to trace, so it is drawn anew in its spirit.
 - The title screen's logo: its edges take the colour from inside each part, so they no longer step in a light fringe, and specks are left out.
@@ -15,6 +18,9 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 - Hints for what this edition adds, in the footer: **L R: Module** and **SELECT: Sort** in the song list, **SELECT: Sort** on the modules' screen. They come and go with the game's own hints.
 - The footer's hints no longer overlap on screens whose hints change with the row chosen, as Options.
 - The footer's band slides in to its place instead of jumping there once the game's slide has stopped. Where it goes is kept in `footer_places.txt` beside the save, so only a screen never seen before in that size of window can still jump, once.
+- The messages for sorting are in the language played: English, German or Japanese.
+- A module's name in the message as it changes keeps its German letters, as ß.
+- Thin letters, as l and i, no longer have a sliver of the next letter beside them.
 
 ### Graphics
 - Pictures with words are kept per language. Those of the last language made were also kept for all, so Japanese showed the German ones, and English only showed its own from copies left by older builds. About 220 MB less on disk.

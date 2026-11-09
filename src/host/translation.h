@@ -1,6 +1,7 @@
 #ifndef DIVA_TRANSLATION_H
 #define DIVA_TRANSLATION_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 /* Load the table of each language in <dir>. None is shown until asked for. */
@@ -15,6 +16,9 @@ int translation_has_song_romaji(void);
 /* What is shown in place of a text of the game's in the language being played, or NULL if it is
  * shown as it is. */
 const char *translation_shown(const char *original);
+/* The same as UTF-8, for text the renderer draws itself, the original's when it is shown as it is.
+ * The table's letters the game's font lacks, as ä or ß, are kept in places of their own there. */
+void translation_shown_utf8(const char *original, char *out, size_t size);
 /* A song name in romaji, whether or not it is being shown, or NULL if it has none. */
 const char *translation_song_romaji(const char *original);
 int translation_has_lyric_romaji(void);

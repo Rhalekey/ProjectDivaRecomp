@@ -41,6 +41,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <windows.h>
 
 #define TEXT_DRAW  0x0883D598u
 #define TEXT_QUEUE 0x08851CD8u
@@ -554,6 +555,31 @@ int translation_has_song_romaji(void) { return g_has[KIND_SONG]; }
 const char *translation_shown(const char *original) {
     const uint32_t guest = find(original);
     return guest ? guest_text(guest) : NULL;
+}
+
+void translation_shown_utf8(const char *original, char *out, size_t size) {
+    /* The places to_font_letters gives the letters the game's font lacks, in its order. */
+    static const wchar_t LETTERS[] = {0x00E4, 0x00F6, 0x00FC, 0x00C4, 0x00D6, 0x00DC, 0x00DF};
+    const char *shown = translation_shown(original);
+    const char *text = shown ? shown : original;
+    wchar_t wide[512];
+    size_t n = 0;
+    for (const unsigned char *c = (const unsigned char *)text; *c && n + 1 < sizeof wide / sizeof wide[0];) {
+        if (shown && *c >= 0xA1 && *c <= 0xA7) {
+            wide[n++] = LETTERS[*c - 0xA1];
+            c++;
+            continue;
+        }
+        /* Shift-JIS: a lead byte and the one after it, or one byte. */
+        const int pair = ((*c >= 0x81 && *c <= 0x9F) || (*c >= 0xE0 && *c <= 0xFC)) && c[1];
+        wchar_t got[2];
+        const int made = MultiByteToWideChar(932, 0, (const char *)c, pair ? 2 : 1, got, 2);
+        for (int k = 0; k < made && n + 1 < sizeof wide / sizeof wide[0]; k++) wide[n++] = got[k];
+        c += pair ? 2 : 1;
+    }
+    wide[n] = 0;
+    if (!size) return;
+    if (!WideCharToMultiByte(CP_UTF8, 0, wide, -1, out, (int)size, NULL, NULL)) out[0] = '\0';
 }
 
 const char *translation_song_romaji(const char *original) {
