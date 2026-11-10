@@ -4,6 +4,12 @@ Everything this project has added to or changed about *Hatsune Miku: Project DIV
 
 The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhalekey/psprecomp/tree/diva-recomp), branch `diva-recomp`. Those this game depends on are listed here too.
 
+## 2026-11-10
+
+### System screens
+- **Export song**: in Rhythm Game Edit's lists to load or delete from, Triangle (E on the keyboard) writes a zip of the chosen Edit's song to `Documents\Project DIVA Recomp\Export`: every Edit made with that song, and its MP3 if it is your own. A zip put in `Documents\Project DIVA Recomp\Import` is brought in when the list to load from opens: its Edits go into free slots, its MP3 into the Memory Stick's MUSIC, and the zip is moved to `Import\Imported`.
+- For it, in the recompiler: the host's list of saves can ask for the slots to be read again and the player asked again.
+
 ## 2026-11-09
 
 ### System screens

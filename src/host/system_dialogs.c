@@ -2,11 +2,13 @@
 #include "system_dialogs.h"
 
 #include "controls.h"
+#include "edit_share.h"
 #include "language.h"
 #include "options.h"
 #include "screen_kit.h"
 
 #include <psprecomp/hle.h>
+#include <psprecomp/window.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -31,6 +33,7 @@ static const wchar_t *const TITLE_KEYBOARD[UI_COUNT] = {L"Enter text", L"\x6587\
 static const wchar_t *const WORD_SPACE[UI_COUNT] = {L"Space", L"\x30b9\x30da\x30fc\x30b9", L"Leerzeichen"};
 static const wchar_t *const WORD_ERASE[UI_COUNT] = {L"Erase", L"\x4e00\x6587\x5b57\x524a\x9664", L"Zeichen l\x00f6schen"};
 static const wchar_t *const WORD_DONE[UI_COUNT] = {L"Done", L"\x5b8c\x4e86", L"Fertig"};
+static const wchar_t *const WORD_EXPORT[UI_COUNT] = {L"Export song", L"\x66f2\x3092\x66f8\x304d\x51fa\x3057", L"Lied exportieren"};
 static const wchar_t *const WORD_TYPE[UI_COUNT] = {L"Type", L"\x5165\x529b", L"Tippen"};
 
 /* ---- what both screens share --------------------------------------------------------------- */
@@ -101,6 +104,7 @@ static void save_names(const psp_save_slot *s, wchar_t *name, int name_cap, wcha
 
 static int g_rows[MOST_ROWS];     /* each row's slot, -1 for new data */
 static int g_row_count;
+static wchar_t g_message[400];    /* what came of an export or an import, under the list */
 
 static void draw_list(int purpose, const psp_save_slot *slots, int top, int chosen, int ui) {
     const wchar_t *const *title = purpose == PSP_SAVE_CHOOSE_SAVE ? TITLE_SAVE : purpose == PSP_SAVE_CHOOSE_LOAD ? TITLE_LOAD : TITLE_DELETE;
@@ -134,7 +138,23 @@ static void draw_list(int purpose, const psp_save_slot *slots, int top, int chos
     if (top > 0) kit_text(kit_width() / 2, LIST_Y - 12, 14, 1, KIT_ACCENT, L"\x25b2", KIT_CENTRE);
     if (top + ROWS_SHOWN < g_row_count)
         kit_text(kit_width() / 2, LIST_Y + ROWS_SHOWN * (ROW_H + ROW_GAP) + ROW_GAP + 14, 14, 1, KIT_ACCENT, L"\x25bc", KIT_CENTRE);
-    hints_choose_back(ui);
+    if (g_message[0]) kit_text(kit_width() / 2, 470, 14, 1, KIT_ACCENT, g_message, KIT_CENTRE);
+    const int right = hints_choose_back(ui);
+    /* A song's Edits, and its MP3 if it is the player's own, can be exported from the lists of
+     * Rhythm Game Edit's data. */
+    if (purpose != PSP_SAVE_CHOOSE_SAVE && chosen < g_row_count && g_rows[chosen] >= 0 && !strncmp(slots[g_rows[chosen]].name, "EDIT", 4)) {
+        if (controls_screen_from_pad()) kit_hint(right, KIT_GLYPH_TRIANGLE, WORD_EXPORT[ui]);
+        else kit_hint_key(right, L"E", WORD_EXPORT[ui]);
+    }
+}
+
+/* Triangle on a controller or E on the keyboard, just pressed. */
+static int export_pressed(void) {
+    static int was = 1;
+    const int now = (psp_window_pad_raw() >> 3 & 1) || (GetAsyncKeyState('E') & 0x8000);
+    const int pressed = now && !was;
+    was = now;
+    return pressed;
 }
 
 /* Yes or no over the list. Gives back 1 for yes. */
@@ -180,6 +200,20 @@ static int choose_save(int purpose, const psp_save_slot *slots, int count, const
     int main_save = 1;
     for (int i = 0; i < count && main_save; i++) main_save = strncmp(slots[i].name, "MAIN", 4) == 0;
     if (main_save) return PSP_SAVE_CHOOSE_DEFAULT;
+    /* Before the list to load from, what waits in the Import folder is brought in; if anything came,
+     * the slots are read again and this is asked again, with what came of it shown. */
+    static int keep_message;
+    if (!keep_message) g_message[0] = 0;
+    keep_message = 0;
+    if (purpose == PSP_SAVE_CHOOSE_LOAD) {
+        wchar_t said[400];
+        const int brought = edit_share_import(slots, count, said, 400);
+        if (said[0]) swprintf(g_message, 400, L"%ls", said);
+        if (brought > 0) {
+            keep_message = 1;
+            return PSP_SAVE_CHOOSE_AGAIN;
+        }
+    }
     /* To save: new data, in the first slot left empty, then what is there to save over. To load or
      * delete: only what holds data. */
     g_row_count = 0;
@@ -212,6 +246,7 @@ static int choose_save(int purpose, const psp_save_slot *slots, int count, const
     controls_input was = {1, 1, 1, 1, 1, 1};
     int redraw = 1;
     fprintf(stderr, "saves: the list opens, %d rows\n", g_row_count);
+    export_pressed();
     for (;;) {
         if (redraw) {
             if (chosen < top) top = chosen;
@@ -227,6 +262,10 @@ static int choose_save(int purpose, const psp_save_slot *slots, int count, const
         const int ok = in.ok && !was.ok, back = in.back && !was.back;
         was = in;
         if (back) break;
+        if (export_pressed() && purpose != PSP_SAVE_CHOOSE_SAVE && g_rows[chosen] >= 0 && !strncmp(slots[g_rows[chosen]].name, "EDIT", 4)) {
+            edit_share_export(slots, count, g_rows[chosen], g_message, 400);
+            redraw = 1;
+        }
         if (ok) {
             kit_wait_for_release();
             const int slot = g_rows[chosen] < 0 ? new_slot : g_rows[chosen];
