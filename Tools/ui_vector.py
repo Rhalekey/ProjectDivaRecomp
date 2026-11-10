@@ -1828,23 +1828,34 @@ def drop_shadow(layer, darkest, colour=(0, 0, 0)):
     dark as `darkest` under a line one pixel wide, darker under what is filled."""
     w, h = layer.w, layer.h
     r = max(1, int(CARD_SHADOW_SPREAD * SCALE))
-    spread = box_blur([layer.data[i * 4 + 3] for i in range(w * h)], w, h, r)
+    dx, dy = int(CARD_SHADOW_AT[0] * SCALE), int(CARD_SHADOW_AT[1] * SCALE)
+    # A piece is laid beside others, its lines going on into theirs: so a line that reaches its
+    # edge is taken to go on past it, as far as the shadow reaches, and the shadow is the same on
+    # both sides of where two pieces meet instead of stopping at it.
+    pad = r + max(dx, dy) + 1
+    pw, ph = w + 2 * pad, h + 2 * pad
+    alpha = [0] * (pw * ph)
+    for y in range(ph):
+        sy = min(h - 1, max(0, y - pad))
+        for x in range(pw):
+            sx = min(w - 1, max(0, x - pad))
+            alpha[y * pw + x] = layer.data[(sy * w + sx) * 4 + 3]
+    padded = box_blur(alpha, pw, ph, r)
+    # What falls into the piece from just past its top and left edge.
+    spread_from = lambda x, y: padded[(y + pad) * pw + x + pad]
     # How high a one pixel line comes out of the same blur.
     probe_w = 8 * r
     line = [255.0 if probe_w // 2 - SCALE // 2 <= i < probe_w // 2 + SCALE // 2 else 0.0 for i in range(probe_w)]
     peak = max(box_blur(line, probe_w, 1, r))
     shadow = Canvas(w // SCALE, h // SCALE)
-    dx, dy = int(CARD_SHADOW_AT[0] * SCALE), int(CARD_SHADOW_AT[1] * SCALE)
-    for y in range(h):
-        for x in range(w):
-            v = spread[y * w + x]
+    for ty in range(h):
+        for tx in range(w):
+            v = spread_from(tx - dx, ty - dy)
             if v <= 0.5:
                 continue
-            tx, ty = x + dx, y + dy
-            if 0 <= tx < w and 0 <= ty < h:
-                at = (ty * w + tx) * 4
-                shadow.data[at:at + 3] = bytes(colour)
-                shadow.data[at + 3] = min(255, int(v / peak * darkest))
+            at = (ty * w + tx) * 4
+            shadow.data[at:at + 3] = bytes(colour)
+            shadow.data[at + 3] = min(255, int(v / peak * darkest))
     return shadow
 
 
@@ -1865,12 +1876,15 @@ def sheet_of_card(archive, out):
             for i in range(bx, bx + bw):
                 if card_line(pixels[j][i]):
                     near_line |= {(i + di, j + dj) for di in range(-1, CARD_SHADOW_REACH + 1) for dj in range(-1, CARD_SHADOW_REACH + 1)}
+    # What is taken out is filled with what is around it, not left clear: the panel's own soft dark
+    # is shadow-coloured too, and a clear hole in it showed lighter, as if the shadow were cut.
+    taken_out = (1, 2, 3, 4)
     clean = [list(row) for row in pixels]
     for (i, j) in near_line:
         if 0 <= j < len(pixels) and 0 <= i < len(pixels[0]) and card_shadow(pixels[j][i]):
-            clean[j][i] = (0, 0, 0, 0)
+            clean[j][i] = taken_out
     for box in boxes:
-        clean = filled_in(clean, box, card_line)
+        clean = filled_in(clean, box, lambda p: p == taken_out or card_line(p))
     c = enlarged(archive, picture, clean, w, h)
     lines = without_card_circles(pixels)
     for name, box in zip(names, boxes):
@@ -2873,7 +2887,14 @@ def colour_field(pixels, box):
 
 
 def squared_letters(text, boxes, stroke):
-    """The squared letters, each fitted to its own box."""
+    """The squared letters, each fitted to its own columns, and to the rows most of the word's
+    letters share when its own are within two of them: a round letter of the picture's reaches a
+    row past the others. A letter small on purpose, as the x of MISSxTAKE, keeps its own."""
+    tops, bottoms = [b[1] for b in boxes], [b[3] for b in boxes]
+    top_row = max(set(tops), key=tops.count)
+    bottom_row = max(set(bottoms), key=bottoms.count)
+    boxes = [(x0, top_row, x1, bottom_row) if abs(y0 - top_row) <= 2 and abs(y1 - bottom_row) <= 2 else (x0, y0, x1, y1)
+             for x0, y0, x1, y1 in boxes]
     polys = []
     for ch, (x0, y0, x1, y1) in zip(text, boxes):
         left, top = x0 + stroke / 2, y0 + stroke / 2

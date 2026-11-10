@@ -28,6 +28,7 @@ typedef struct {
     int singer_module[2]; /* the module Kagamine Rin, then Len, sing their own songs in */
     int dpad_notes;      /* what hits notes in songs besides the buttons: OPTIONS_HIT_ bits */
     int free_singers;    /* Rin's and Len's songs sung in the module worn, not forced to them */
+    int keep_vocal;      /* a missed note leaves the singing on, where the game silences it */
 } diva_options;
 
 /* The note timing can be set this far either way. Past 130 before, a note could never be late. */

@@ -13,12 +13,20 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 - The system's message, which the game asks for only to report an error by its number (the Memory Stick full, save data damaged or missing, the stick not read or written), is told over the game as "Game saved" is, in the game's language with the error's number, and stays until a button is pressed. Before, it was answered unseen. In the recompiler, the message's kind, number, text and buttons are passed to the host.
 
 ### Interface
+- The hit effects of the song screen, the rings of light, the gold flare, the bubbles with a note and a ring, the stars, sparks, crescent and lightning, are drawn from shapes and gradients at four times their size (`Tools/fx_vector.py`), in place of the game's small pictures.
+- In every style of notes, X is PlayStation's cross, as in Mega Mix, in the style's colour.
+- The results screen's words have their letters at one height: a round letter of the picture's, as the O of NORMAL, no longer comes out larger.
+- The description frame's shadow no longer has gaps: taking the old shadow out of the picture took the panel's own dark with it.
+- Graphics is in the main menu just after Options, and within it the rows go Display, Image shape, Resolution, Smoothing, Blur, Show FPS.
+- Options' Buttons row is a button: the confirm button opens it.
+- Triangle on a song whose PV is still locked says so, as "Game saved" is told, besides the game's sound.
 - The song card's three small icons, the star, the clapperboard and the crown, are drawn as shapes in the game's blue with a white outline, no longer traced from their pixels.
 
 ### Language
 - German is shown by Austria's flag on the language screen.
 
 ### Controls and notes
+- **Mute on miss** in Options: set to No, a missed note no longer silences the singing.
 - **Note timing by song**: each song learns its own correction, added to Note timing as it starts. After a song with at least 20 presses, how late they were against the setting moves that song's correction towards it, all the way the first time and a third of the way after, at most 80 ms either way. Kept in `SONGTIMING.INI` beside the port's options. The measure in Options leaves the song's correction out.
 
 ## 2026-11-09

@@ -88,6 +88,8 @@ int options_load(const char *data_dir) {
             if (number >= OPTIONS_HIT_OFF && number <= OPTIONS_HIT_BOTH) g_options.dpad_notes = number;
         } else if (sscanf(line, "free_singers = %d", &number) == 1) {
             g_options.free_singers = number != 0;
+        } else if (sscanf(line, "keep_vocal = %d", &number) == 1) {
+            g_options.keep_vocal = number != 0;
         } else if (sscanf(line, "note_style = %d", &number) == 1) {
             if (number >= 0 && number < OPTIONS_NOTES_COUNT) g_options.note_style = number;
         } else if (sscanf(line, "blur = %d", &number) == 1) {
@@ -132,6 +134,7 @@ void options_save(const char *data_dir) {
             g_options.background_dim, g_options.note_timing);
     fprintf(f, "restart_pad = %d\nrin_module = %d\nlen_module = %d\nfree_singers = %d\n", g_options.restart_pad, g_options.singer_module[0],
             g_options.singer_module[1], g_options.free_singers);
+    fprintf(f, "keep_vocal = %d\n", g_options.keep_vocal);
     fprintf(f, "blur = %d\nbutton_style = %d\nnote_style = %d\ndpad_notes = %d\nrestart_key = %d\n", g_options.blur, g_options.button_style, g_options.note_style,
             g_options.dpad_notes, g_options.restart_key);
     if (g_options.render_scale) fprintf(f, "render_scale = %d\n", g_options.render_scale);

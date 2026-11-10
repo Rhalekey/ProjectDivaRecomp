@@ -57,8 +57,10 @@
 #define MENU_LINES 216u
 #define MENU_ROW 208u
 #define MENU_ROW_OPTIONS 5u
-#define MENU_ROW_GRAPHICS 8u
+#define MENU_ROW_GRAPHICS 6u   /* shown after Options; the game's rows from here on come one lower */
 #define MENU_ROWS 9u
+/* The game's lines of description for its rows, four pointers a row. */
+#define MENU_ROW_LINES 0x08B70290u
 
 /* A list of the game's. */
 #define LIST_ROWS 20u
@@ -70,13 +72,13 @@
 #define MENU_LABELS_ADDRESS 0x09FFFF08u
 #define DEFAULT_LINE_HEIGHT 16
 
-enum { B_RIGHT = 0x0020, B_LEFT = 0x0080 };
+enum { B_RIGHT = 0x0020, B_LEFT = 0x0080, B_CIRCLE_KEY = 0x2000, B_CROSS_KEY = 0x4000 };
 
 /* The game's own are its two volumes. */
 /* In the order shown: what changes a song, the buttons, then the language. */
-enum { ROW_TIMING = 2, ROW_DIM, ROW_NOTES, ROW_SINGERS, ROW_CONFIRM, ROW_ICONS, ROW_BUTTONS, ROW_DPAD, ROW_LANGUAGE, ROW_SONGS, ROW_LYRICS, ROW_ASK, ROW_COUNT };
+enum { ROW_TIMING = 2, ROW_DIM, ROW_NOTES, ROW_SINGERS, ROW_VOCAL, ROW_CONFIRM, ROW_ICONS, ROW_BUTTONS, ROW_DPAD, ROW_LANGUAGE, ROW_SONGS, ROW_LYRICS, ROW_ASK, ROW_COUNT };
 #define ROW_FIRST ROW_TIMING   /* the first of these, after the game's two volumes */
-enum { G_DISPLAY, G_RESOLUTION, G_SHAPE, G_BLUR, G_SMOOTHING, G_FPS, G_COUNT };
+enum { G_DISPLAY, G_SHAPE, G_RESOLUTION, G_SMOOTHING, G_BLUR, G_FPS, G_COUNT };   /* window and shape, then the picture, then the extra */
 
 #define LABEL_WIDTH 22       /* what the game's "%-20s%2d" comes to */
 #define LABEL_SIZE 32u
@@ -101,6 +103,7 @@ static const row_text ROWS[UI_COUNT][ROW_COUNT] = {
         [ROW_BUTTONS] = {"Buttons", "Change the keyboard", "and controller buttons."},
         [ROW_DPAD] = {"Hit notes with", "Also hit the notes with", "the stick or d-pad."},
         [ROW_SINGERS] = {"Rin & Len songs", "Who sings Rin's and", "Len's songs."},
+        [ROW_VOCAL] = {"Mute on miss", "Missing a note silences", "the singing until a hit."},
     },
     [UI_JAPANESE] = {
         [ROW_DIM] = {"\x94w\x8ci\x82\xcc\x88\xc3\x82\xb3", "\x8b\xc8\x82\xcc\x8a\xd4\x81" "A\x94w\x8ci\x82\xf0", "\x88\xc3\x82\xad\x82\xb5\x82\xdc\x82\xb7\x81" "B"},
@@ -116,6 +119,8 @@ static const row_text ROWS[UI_COUNT][ROW_COUNT] = {
         [ROW_DPAD] = {"\x83m\x81[\x83" "c\x93\xfc\x97\xcd", "\x83" "A\x83i\x83\x8d\x83O\x82\xe2\x95\xfb\x8c\xfc\x83L\x81[\x82\xc5\x82\xe0", "\x83m\x81[\x83" "c\x82\xf0\x92@\x82\xaf\x82\xdc\x82\xb7\x81" "B"},
         [ROW_SINGERS] = {"\x83\x8a\x83\x93\x81" "E\x83\x8c\x83\x93\x8b\xc8", "\x83\x8a\x83\x93\x82\xc6\x83\x8c\x83\x93\x82\xcc\x8b\xc8\x82\xf0",
                          "\x92N\x82\xaa\x89\xcc\x82\xa4\x82\xa9\x82\xf0\x91I\x82\xd1\x82\xdc\x82\xb7\x81" "B"},
+        [ROW_VOCAL] = {"\x83~\x83X\x8e\x9e\x82\xcc\x89\xcc\x90\xba", "\x83~\x83X\x82\xb7\x82\xe9\x82\xc6\x89\xcc\x90\xba\x82\xaa",
+                       "\x8f\xc1\x82\xa6\x82\xe9\x82\xa9\x82\xf0\x91I\x82\xd1\x82\xdc\x82\xb7\x81" "B"},
     },
     [UI_GERMAN] = {
         [ROW_DIM] = {"Abdunkeln", "Hintergrund im Lied", "abdunkeln."},
@@ -130,6 +135,7 @@ static const row_text ROWS[UI_COUNT][ROW_COUNT] = {
         [ROW_BUTTONS] = {"Tasten", "Tastatur und Controller", "belegen."},
         [ROW_DPAD] = {"Noten mit", "Noten auch mit Stick", "oder Pfeilen treffen."},
         [ROW_SINGERS] = {"Rin/Len-Lieder", "Wer die Lieder von", "Rin und Len singt."},
+        [ROW_VOCAL] = {"Fehler: stumm", "Ein Fehler schaltet den", "Gesang bis zum Treffer ab."},
     },
 };
 
@@ -285,6 +291,8 @@ static const char *value_of(int row) {
         return WORD_CHANGE[g_ui];
     case ROW_SINGERS:
         return g_options.free_singers ? WORD_MODULE[g_ui] : WORD_RIN_LEN[g_ui];
+    case ROW_VOCAL:
+        return g_options.keep_vocal ? WORD_NO[g_ui] : WORD_YES[g_ui];
     }
 }
 
@@ -373,8 +381,12 @@ static void labels(void) {
 /* The same for the main menu, whose own function gives its row names from this table. */
 static void menu_labels(void) {
     const uint32_t row = psp_cpu.r[PSP_REG_A0];
-    psp_cpu.r[PSP_REG_V0] = row == MENU_ROW_GRAPHICS ? g_menu_label[g_ui] : psp_read32(MENU_ROW_NAMES + row * 4);
+    psp_cpu.r[PSP_REG_V0] = row == MENU_ROW_GRAPHICS ? g_menu_label[g_ui]
+                          : psp_read32(MENU_ROW_NAMES + (row > MENU_ROW_GRAPHICS ? row - 1 : row) * 4);
 }
+
+/* The game's row a row shown stands for: the same before Graphics, one lower after it. */
+static uint32_t game_row(uint32_t shown) { return shown > MENU_ROW_GRAPHICS ? shown - 1 : shown; }
 
 /* The game's own sound for changing a value. It is called at the entry of a function of
  * the game's, so that function must find its registers as they were. */
@@ -418,6 +430,10 @@ static void change(int row) {
         break;
     case ROW_SINGERS:
         g_options.free_singers = !g_options.free_singers;
+        break;
+    case ROW_VOCAL:
+        g_options.keep_vocal = !g_options.keep_vocal;
+        fprintf(stderr, "options: mute on miss %s\n", g_options.keep_vocal ? "off" : "on");
         break;
     case ROW_BUTTONS:
         controls_change_buttons();
@@ -533,6 +549,12 @@ static void on_window_update(void) {
         update_slider((int)row, buttons, pressed);
         return;
     }
+    /* Buttons is a button: the player's confirm button opens its screen. The buttons read here
+     * are before the swap that makes it the game's Circle, so it is Cross if Cross was chosen. */
+    if (!g_graphics && row == ROW_BUTTONS) {
+        if (pressed & (g_options.confirm_cross == 1 ? B_CROSS_KEY : B_CIRCLE_KEY)) change((int)row);
+        return;
+    }
     if (!(pressed & (B_LEFT | B_RIGHT))) return;
     if (g_graphics) {
         if (row < G_COUNT) change_graphics((int)row, pressed & B_LEFT ? -1 : 1);
@@ -575,8 +597,18 @@ static void on_window_draw(void) {
 
 /* Choosing a row of the main menu. The graphics row goes as the Options row does, on the other
  * list, so all the game does from here on is what it knows how to do. */
+static int g_back_to_row;   /* a row past Graphics to come back to, 0 for none */
+
 static void on_menu_confirm(void) {
     const uint32_t menu = psp_cpu.r[PSP_REG_A0], row = psp_cpu.r[PSP_REG_A1];
+    /* A row past Graphics is the game's one above it; it leaves the menu for a scene of its own,
+     * and coming back finds the row it was chosen from. */
+    if (row > MENU_ROW_GRAPHICS) {
+        psp_cpu.r[PSP_REG_A1] = game_row(row);
+        psp_write32(menu + MENU_ROW, game_row(row));
+        g_back_to_row = (int)row;
+        return;
+    }
     if (row != MENU_ROW_OPTIONS && row != MENU_ROW_GRAPHICS) return;
     const int graphics = row == MENU_ROW_GRAPHICS;
     if (graphics != g_graphics) g_list_changed = 1;
@@ -591,21 +623,43 @@ static void on_menu_confirm(void) {
 
 static void on_menu_enter(void) {
     if (g_back_to_graphics) psp_write32(MENU_ROW_KEPT, MENU_ROW_GRAPHICS);
+    else if (g_back_to_row && psp_read32(MENU_ROW_KEPT) == game_row((uint32_t)g_back_to_row)) psp_write32(MENU_ROW_KEPT, (uint32_t)g_back_to_row);
     g_back_to_graphics = 0;
+    g_back_to_row = 0;
 }
 
 /* Entering the menu, it has just read its row to ask how to come in: from rows 0, 1, 4 and 5 as it
  * is, and from any other with a white fade, as those leave for scenes of their own. This one is
  * a window, as Options is. */
 static void on_menu_row_read(void) {
-    if (psp_cpu.r[PSP_REG_V1] == MENU_ROW_GRAPHICS) psp_cpu.r[PSP_REG_V1] = MENU_ROW_OPTIONS;
+    const uint32_t row = psp_cpu.r[PSP_REG_V1];
+    psp_cpu.r[PSP_REG_V1] = row == MENU_ROW_GRAPHICS ? MENU_ROW_OPTIONS : game_row(row);
 }
 
 /* The game's tables have nothing for this row, and it has filled the lines from what follows. */
 static void on_menu_draw(void) {
-    const uint32_t menu = psp_cpu.r[PSP_REG_A0];
+    const uint32_t menu = psp_cpu.r[PSP_REG_A0], row = psp_read32(menu + MENU_ROW);
     note_display_mode();
-    if (psp_read32(menu + MENU_ROW) == MENU_ROW_GRAPHICS) fill_lines(menu + MENU_LINES, g_menu_lines[g_ui]);
+    if (row == MENU_ROW_GRAPHICS) {
+        fill_lines(menu + MENU_LINES, g_menu_lines[g_ui]);
+    } else if (row > MENU_ROW_GRAPHICS && row < MENU_ROWS) {
+        /* The game filled the lines of the row below this one's: those of the row it stands for. */
+        const uint32_t from = MENU_ROW_LINES + game_row(row) * LINE_COUNT * 4;
+        uint32_t words[LINE_COUNT];
+        int count = 0;
+        for (uint32_t i = 0; i < LINE_COUNT; i++) {
+            words[i] = psp_read32(from + i * 4);
+            if (words[i]) count = (int)i + 1;
+        }
+        for (uint32_t i = 0; i < LINE_COUNT; i++) {
+            const uint32_t line = menu + MENU_LINES + i * LINE_SIZE;
+            const int used = (int)i < count;
+            psp_write32(line, used ? words[i] : 0);
+            if (!used) continue;
+            psp_write32(line + 4, LINE_X);
+            psp_write32(line + 8, (uint32_t)(LINES_MIDDLE_Y - (g_line_height / 2) * count + g_line_height * (int)i));
+        }
+    }
 }
 
 static void on_window_enter(void) {

@@ -677,7 +677,17 @@ def wide_letter_strokes(letter, cx, cy, size, width):
     return out
 
 
-def sign_strokes(sign, cx, cy, size, width):
+# X in every style is PlayStation's cross, as Mega Mix has it: two straight bars with square ends,
+# reaching as far as draw_cross's do from a note's middle (10.5 of a sign 18.6 across).
+CROSS_REACH = 0.564
+
+
+def sign_strokes(sign, cx, cy, size, width, outermost=None):
+    """`outermost` is the width of the widest layer drawn of the same sign: X's square ends come in
+    by as much as its sides, so the edge round it is as thick at its ends as along them."""
+    if sign == 'X':
+        a = size * CROSS_REACH - ((outermost or width) - width) / 2 / math.sqrt(2)
+        return [segment(cx - a, cy - a, cx + a, cy + a, width), segment(cx + a, cy - a, cx - a, cy + a, width)]
     return wide_letter_strokes(sign, cx, cy, size, width) if len(sign) == 1 else arrow_strokes(sign, cx, cy, size, width)
 
 
@@ -708,9 +718,9 @@ def draw_styled_note(c, sign, colours):
     size, width = 2 * NOTE_REACH - 6.4, 6.4
     light, middle, deep = colours
     edge = tuple(v // 7 for v in deep)
-    c.paint(sign_strokes(sign, x + SHADOW_OFFSET, y + SHADOW_OFFSET, size, width + 0.6), SHADOW, SHADOW_ALPHA)
-    c.paint(sign_strokes(sign, x, y, size, width), edge)
-    c.paint(sign_strokes(sign, x, y, size, width - 2.0), gradient(y - 11, y + 11, [(0, light), (0.45, middle), (1, deep)]))
+    c.paint(sign_strokes(sign, x + SHADOW_OFFSET, y + SHADOW_OFFSET, size, width + 0.6, width + 0.6), SHADOW, SHADOW_ALPHA)
+    c.paint(sign_strokes(sign, x, y, size, width, width + 0.6), edge)
+    c.paint(sign_strokes(sign, x, y, size, width - 2.0, width + 0.6), gradient(y - 11, y + 11, [(0, light), (0.45, middle), (1, deep)]))
 
 
 def draw_styled_targets(c, signs):
@@ -721,8 +731,8 @@ def draw_styled_targets(c, signs):
         x, y = col * quarter + quarter / 2, row * quarter + quarter / 2
         size, width = quarter * 0.66, quarter * 0.17
         c.paint(sign_strokes(sign, x, y, size, width + 13), HAND_EDGE, 170)
-        c.paint(sign_strokes(sign, x, y, size, width + 9), TARGET_RIM)
-        c.paint(sign_strokes(sign, x, y, size, width), TARGET_FILL)
+        c.paint(sign_strokes(sign, x, y, size, width + 9, width + 13), TARGET_RIM)
+        c.paint(sign_strokes(sign, x, y, size, width, width + 13), TARGET_FILL)
 
 
 def write_styled_targets(c, path):

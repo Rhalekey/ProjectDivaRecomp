@@ -572,7 +572,31 @@ static void put_singer_module(void) {
 /* Start is practice's while the song list is in front, and the game's does not get it. */
 int song_sort_list_in_front(void) { return g_songs_in_front && GetTickCount64() - g_list_seen_ms < LIST_SEEN_MS; }
 
+/* Triangle on a song whose PV is still locked gets only the game's sound for "no" (sound 3 of
+ * 08AB179C, the menus' sounds, with the sound in a1). With the song list in front and Triangle
+ * held, that sound is told as a message too, as "Game saved" is. */
+#define PLAY_MENU_SOUND 0x08AB179Cu
+#define SOUND_NO 3u
+#define PSP_TRIANGLE 0x1000u
+static const char *const PV_LOCKED[UI_COUNT] = {
+    [UI_ENGLISH] = "PV not unlocked yet: clear this song with GREAT or PERFECT",
+    [UI_JAPANESE] = "\xE3\x81\x93\xE3\x81\xAE\x50\x56\xE3\x81\xAF\xE6\x9C\xAA\xE8\xA7\xA3\xE7\xA6\x81\xEF\xBC\x9A"
+                    "\x47\x52\x45\x41\x54\xE4\xBB\xA5\xE4\xB8\x8A\xE3\x81\xA7\xE3\x82\xAF\xE3\x83\xAA\xE3\x82\xA2\xE3\x81\x99"
+                    "\xE3\x82\x8B\xE3\x81\xA8\xE8\xA7\xA3\xE7\xA6\x81",
+    [UI_GERMAN] = "PV noch gesperrt: Lied mit GREAT oder PERFECT schaffen",
+};
+
+static void on_menu_sound(void) {
+    if (psp_cpu.r[PSP_REG_A1] != SOUND_NO || !song_sort_list_in_front()) return;
+    if (!(psp_window_buttons() & PSP_TRIANGLE)) return;
+    psp_render_gl_show_message(PV_LOCKED[language_ui()]);
+}
+
 int song_sort_hook(uint32_t addr) {
+    if (addr == PLAY_MENU_SOUND) {
+        on_menu_sound();
+        return 1;
+    }
     if (addr == MODULE_KIND) {
         on_singer_module();
         return 1;
