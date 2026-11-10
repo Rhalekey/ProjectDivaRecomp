@@ -176,6 +176,9 @@ static void on_press(void) {
         if (left > latest) left = latest;
         psp_cpu.f[PRESS_LEFT_REG] = left;
     }
+    /* When the first notes were pressed, on the clock the renderer's DIVA_LOG_DRAWS uses, to tell
+     * the pictures of a press's effect from the rest. */
+    if (g_press_count < 3) fprintf(stderr, "timing: press %d at %.2f s\n", g_press_count + 1, (double)GetTickCount64() / 1000.0);
     if (g_press_count < PRESSES_KEPT) {
         g_queued_at[g_press_count] = (float)audio_out_queued_now();
         g_presses[g_press_count++] = -left * 1000.0f;
