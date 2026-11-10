@@ -2337,10 +2337,11 @@ HINT_ROWS = 11   # a hint's height on the sheet
 # hint at that place on the sheet is shown, from its first frame. In order: sorting with Select, the
 # module with L and R; both come with the song list's PV hint, which no other screen has.
 EXTRA_HINTS = {
-    'en': (('basic_sele_sort', 'Sort'), ('basic_lr_module', 'Module')),
-    'de': (('basic_sele_sort', 'Sortieren'), ('basic_lr_module', 'Modul')),
+    'en': (('basic_sele_sort', 'Sort'), ('basic_lr_module', 'Module'), ('basic_start_practice', 'Practice')),
+    'de': (('basic_sele_sort', 'Sortieren'), ('basic_lr_module', 'Modul'), ('basic_start_practice', 'Übung')),
 }
-EXTRA_WITH = {'basic_sele_sort': 'basic_tri_pvappr.png', 'basic_lr_module': 'basic_tri_pvappr.png'}
+EXTRA_WITH = {'basic_sele_sort': 'basic_tri_pvappr.png', 'basic_lr_module': 'basic_tri_pvappr.png',
+              'basic_start_practice': 'basic_tri_pvappr.png'}
 
 
 def sheet_of_hints(archive, labels, drawer, out, sign_set):

@@ -7,6 +7,7 @@
  * with its PV hint by themselves (EXTRA_WITH); other screens ask for theirs. */
 #define FOOTER_SORT   (1u << 0)   /* Select: Sort */
 #define FOOTER_MODULE (1u << 1)   /* L R: Module */
+#define FOOTER_PRACTICE (1u << 2) /* Start: Practice (see practice.c) */
 
 /* Generated code has reached a hooked function. Returns nonzero if it was this file's. */
 int song_sort_hook(uint32_t addr);
