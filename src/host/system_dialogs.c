@@ -8,9 +8,11 @@
 #include "screen_kit.h"
 
 #include <psprecomp/hle.h>
+#include <psprecomp/render.h>
 #include <psprecomp/window.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <windows.h>
@@ -433,7 +435,53 @@ static int keyboard(const uint16_t *description16, const uint16_t *initial, int 
     return entered;
 }
 
+/* ---- the system's messages ------------------------------------------------------------------ */
+/* The game asks for the system's message only for an error, by its number, as the Memory Stick
+ * being full. It is told over the game, as "Game saved" is, held until a button is pressed; the
+ * game goes on as after its OK. */
+static const wchar_t *const SAID_FULL[UI_COUNT] = {L"The Memory Stick is full.", L"\x30e1\x30e2\x30ea\x30fc\x30b9\x30c6\x30a3\x30c3\x30af\x306e\x7a7a\x304d\x304c\x3042\x308a\x307e\x305b\x3093\x3002",
+                                                   L"Der Memory Stick ist voll."};
+static const wchar_t *const SAID_BROKEN[UI_COUNT] = {L"The save data is damaged.", L"\x30bb\x30fc\x30d6\x30c7\x30fc\x30bf\x304c\x58ca\x308c\x3066\x3044\x307e\x3059\x3002",
+                                                     L"Der Spielstand ist besch\x00e4" L"digt."};
+static const wchar_t *const SAID_NO_DATA[UI_COUNT] = {L"There is no save data.", L"\x30bb\x30fc\x30d6\x30c7\x30fc\x30bf\x304c\x3042\x308a\x307e\x305b\x3093\x3002",
+                                                      L"Kein Spielstand vorhanden."};
+static const wchar_t *const SAID_ACCESS[UI_COUNT] = {L"The Memory Stick could not be read or written.",
+                                                     L"\x30e1\x30e2\x30ea\x30fc\x30b9\x30c6\x30a3\x30c3\x30af\x306b\x30a2\x30af\x30bb\x30b9\x3067\x304d\x307e\x305b\x3093\x3002",
+                                                     L"Der Memory Stick konnte nicht gelesen oder beschrieben werden."};
+static const wchar_t *const SAID_ERROR[UI_COUNT] = {L"An error occurred.", L"\x30a8\x30e9\x30fc\x304c\x767a\x751f\x3057\x307e\x3057\x305f\x3002",
+                                                    L"Ein Fehler ist aufgetreten."};
+static const wchar_t *const SAID_PRESS[UI_COUNT] = {L"Press a button.", L"\x30dc\x30bf\x30f3\x3092\x62bc\x3057\x3066\x304f\x3060\x3055\x3044\x3002",
+                                                    L"Taste dr\x00fc" L"cken."};
+
+static int message(uint32_t error, const char *text, uint32_t options) {
+    (void)options;
+    const int ui = language_ui();
+    wchar_t said[700];
+    if (text && text[0]) {
+        wchar_t t[600];
+        wide(text, t, 600);
+        swprintf(said, 700, L"%ls %ls", t, SAID_PRESS[ui]);
+    } else {
+        /* The save errors go by their last byte: 0x8011 03 then what was done and what went wrong. */
+        const int save = (error & 0xFFFFFF00u) == 0x80110300u, what = (int)(error & 0x0F);
+        const wchar_t *why = SAID_ERROR[ui];
+        if (save && what == 3) why = SAID_FULL[ui];
+        else if (save && what == 6) why = SAID_BROKEN[ui];
+        else if (save && (what == 7 || what == 9)) why = SAID_NO_DATA[ui];
+        else if (save) why = SAID_ACCESS[ui];
+        swprintf(said, 700, L"%ls (%08X) %ls", why, (unsigned)error, SAID_PRESS[ui]);
+    }
+    char utf8[2100];
+    WideCharToMultiByte(CP_UTF8, 0, said, -1, utf8, sizeof utf8, NULL, NULL);
+    psp_render_gl_show_held_message(utf8);
+    return PSP_MSG_YES;
+}
+
 void system_dialogs_start(void) {
     psp_savedata_set_chooser(choose_save);
     psp_utility_set_osk_handler(keyboard);
+    psp_utility_set_message_handler(message);
+    /* For a test: DIVA_TEST_MESSAGE=<error number in hex> tells it at the start. */
+    const char *test = getenv("DIVA_TEST_MESSAGE");
+    if (test) message((uint32_t)strtoul(test, NULL, 16), "", 0);
 }

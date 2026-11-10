@@ -9,6 +9,7 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 ### System screens
 - **Export song**: in Rhythm Game Edit's lists to load or delete from, Triangle (E on the keyboard) writes a zip of the chosen Edit's song to `Documents\Project DIVA Recomp\Export`: every Edit made with that song, and its MP3 if it is your own. A zip put in `Documents\Project DIVA Recomp\Import` is brought in when the list to load from opens: its Edits go into free slots, its MP3 into the Memory Stick's MUSIC, and the zip is moved to `Import\Imported`.
 - For it, in the recompiler: the host's list of saves can ask for the slots to be read again and the player asked again.
+- The system's message, which the game asks for only to report an error by its number (the Memory Stick full, save data damaged or missing, the stick not read or written), is told over the game as "Game saved" is, in the game's language with the error's number, and stays until a button is pressed. Before, it was answered unseen. In the recompiler, the message's kind, number, text and buttons are passed to the host.
 
 ## 2026-11-09
 
