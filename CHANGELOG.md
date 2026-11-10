@@ -7,7 +7,8 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 ## 2026-11-09
 
 ### System screens
-- Rhythm Game Edit's data can be saved, loaded and deleted by choosing a slot, as the PSP's own list of saves does: new data or which to save over, which to load, which to delete, with a question before saving over or deleting. Its data is named with an on-screen keyboard, with a controller or by typing.
+- Rhythm Game Edit can make Edit data with your own MP3s, as on the PSP: put them in `%LOCALAPPDATA%\ProjectDivaRecomp\data\ms\MUSIC` and they show under "Memory Stick", to preview, play and save with. The PSP's MP3 player is written for it, over FFmpeg's decoder.
+- Rhythm Game Edit's data can be saved, loaded and deleted by choosing a slot, as the PSP's own list of saves does: new data or which to save over, which to load, which to delete, with a question before saving over or deleting. Its data is named with an on-screen keyboard, with a controller or by typing. The list and the keyboard no longer hide behind the game's picture.
 
 ### Movies
 - The opening movie plays, with its sound: the PSP's movie player (sceMpeg) is written for it, over FFmpeg's H.264 and ATRAC3plus decoders, which the build downloads and the game loads while it runs. Without them, the movie is skipped as before.
