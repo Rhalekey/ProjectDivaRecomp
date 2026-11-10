@@ -12,6 +12,9 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 - For it, in the recompiler: the host's list of saves can ask for the slots to be read again and the player asked again.
 - The system's message, which the game asks for only to report an error by its number (the Memory Stick full, save data damaged or missing, the stick not read or written), is told over the game as "Game saved" is, in the game's language with the error's number, and stays until a button is pressed. Before, it was answered unseen. In the recompiler, the message's kind, number, text and buttons are passed to the host.
 
+### Interface
+- The song card's three small icons, the star, the clapperboard and the crown, are drawn as shapes in the game's blue with a white outline, no longer traced from their pixels.
+
 ### Language
 - German is shown by Austria's flag on the language screen.
 

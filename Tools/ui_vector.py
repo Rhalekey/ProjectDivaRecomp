@@ -90,6 +90,10 @@ RESULT_HEADER = (0, 0, 480, 69)       # the top of the results picture, with its
 RESULT_ICON = (9, 2, 16, 15)
 RESULT_WORDS = (36, 1, 110, 19)       # where its title's words are, kept as written
 RESULT_STAR_MIDDLE, RESULT_STAR_R = 7.0, 6.4
+# The song card's star in its 10 by 10: middle, the blue's reach, the white beyond it, how far in its
+# waist comes (the picture's star is a plump one).
+CARD_STAR_MIDDLE, CARD_STAR_R, CARD_STAR_EDGE, CARD_STAR_WAIST = 5.4, 3.7, 0.85, 0.5
+CARD_ICON_EDGE = 0.9   # the white round the card's other icons
 RESULT_WORD_EDGE = 0.28          # the dark edge round the window's words: how dark, how wide, how solid
 RESULT_WORD_EDGE_W = 0.45
 RESULT_WORD_STROKE = 2.3       # the letters' strokes, their dark edge inside
@@ -1878,9 +1882,66 @@ def sheet_of_card(archive, out):
         blend(c, drop_shadow(layer, CARD_SHADOW_ALPHA), box[0], box[1])
         blend(c, layer, box[0], box[1])
     white = lambda p: p[3] > 128 and lum(p) > 200
-    for name in ('info_free_star.png', 'info_free_kachi.png', 'info_free_oukan.png'):
-        traced_piece(c, pixels, rects[name], [(lambda p: p[3] > 128, white), (lambda p: p[3] > 128 and lum(p) <= 200, None)])
+    card_star(c, pixels, rects['info_free_star.png'])
+    card_icon(c, pixels, rects['info_free_kachi.png'], card_slate)
+    card_icon(c, pixels, rects['info_free_oukan.png'], card_crown)
     write_sheet(c, pixels, out)
+
+
+def card_star(sheet, pixels, box):
+    """The song card's star: five straight points in the game's blue, outlined in white, as the
+    picture has it but with no steps."""
+    x, y, w, h = box
+    inside = [pixels[y + j][x + i] for j in range(h) for i in range(w) if pixels[y + j][x + i][3] > 200 and lum(pixels[y + j][x + i]) <= 200]
+    blue = max(set(inside), key=inside.count) if inside else (1, 120, 167, 255)
+    def star(r_out, r_in):
+        return [(w / 2 + (r_out if k % 2 == 0 else r_in) * math.cos(math.radians(-90 + k * 36)),
+                 CARD_STAR_MIDDLE + (r_out if k % 2 == 0 else r_in) * math.sin(math.radians(-90 + k * 36))) for k in range(10)]
+    c = Canvas(w, h)
+    c.paint([star(CARD_STAR_R + CARD_STAR_EDGE * 1.7, (CARD_STAR_R + CARD_STAR_EDGE * 1.7) * CARD_STAR_WAIST)], (255, 255, 255))
+    c.paint([star(CARD_STAR_R, CARD_STAR_R * CARD_STAR_WAIST)], blue[:3])
+    wipe(sheet, box)
+    paste(sheet, c, x, y)
+
+
+def card_blue(pixels, box):
+    x, y, w, h = box
+    inside = [pixels[y + j][x + i] for j in range(h) for i in range(w) if pixels[y + j][x + i][3] > 200 and lum(pixels[y + j][x + i]) <= 200]
+    return max(set(inside), key=inside.count)[:3] if inside else (1, 120, 167)
+
+
+def card_icon(sheet, pixels, box, draw):
+    """One of the song card's small icons, drawn by `draw` on a canvas of its size in its blue."""
+    c = Canvas(box[2], box[3])
+    draw(c, card_blue(pixels, box))
+    wipe(sheet, box)
+    paste(sheet, c, box[0], box[1])
+
+
+def outlined_shapes(c, shapes, blue, edge=CARD_ICON_EDGE):
+    """Shapes in blue with a white outline round all of them, its corners mitred."""
+    c.paint(shapes + [thick(p, edge * 2, closed=True) for p in shapes], (255, 255, 255))
+    c.paint(shapes, blue)
+
+
+def card_slate(c, blue):
+    """A clapperboard: its body with the striped band at its top, and the stick lifted from its left."""
+    body = [(1, 4), (9, 4), (9, 9), (1, 9)]
+    stick = [(2.4, 2.7), (8.0, 1.0), (8.3, 2.0), (2.7, 3.4)]
+    outlined_shapes(c, [body, stick], blue)
+    # The band's stripes, white slants across the blue, and the line under them.
+    c.paint([[(1.6 + k * 2.3, 4), (2.7 + k * 2.3, 4), (2.0 + k * 2.3, 5.5), (0.9 + k * 2.3, 5.5)] for k in range(4)] +
+            [[(1, 5.5), (9, 5.5), (9, 6.0), (1, 6.0)]], (255, 255, 255), clip=(1, 4, 9, 6))
+
+
+def card_crown(c, blue):
+    """A crown: a point in the middle and one each side, two stones on its band."""
+    crown = [(5, 1.7), (6.0, 2.6), (6.4, 4.5), (8.7, 3.4), (8.6, 5.7), (7.4, 8.6), (2.6, 8.6), (1.4, 5.7), (1.3, 3.4), (3.6, 4.5),
+             (4.0, 2.6)]
+    outlined_shapes(c, [crown], blue)
+    for cx in (3.6, 6.4):
+        c.paint([[(cx + 0.65 * math.cos(math.radians(a)), 6.5 + 0.65 * math.sin(math.radians(a))) for a in range(0, 360, 30)]],
+                (255, 255, 255))
 
 
 def result_line(p):
