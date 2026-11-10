@@ -13,11 +13,19 @@
  * 16 ms after it really was. The buttons are read about once a millisecond, so the press is known
  * to that, and the note is judged as it stood then: what was left on it then is what is compared
  * with the limits. The note itself is not touched.
+ *
+ * Each song also learns its own correction: some charts sit a little off the music, and a player
+ * who is on time in one is late or early in another. After a song with enough presses, how late
+ * they were against the setting moves that song's correction towards it, all the way the first
+ * time and by a third after, so one bad try does not spoil it. It is added to the setting as the
+ * song starts. They are kept in SONGTIMING.INI beside this port's options. The measure shown in
+ * Options leaves the song's correction out, so that it still says how the setting stands.
  */
 
 #include "timing.h"
 
 #include "audio_out.h"
+#include "language.h"
 #include "options.h"
 #include "settings.h"
 
@@ -29,6 +37,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <direct.h>
+#include <windows.h>
 
 /* The function that sets the limits at the start of a song, and where it has just done so. */
 #define SETUP 0x08857818u
@@ -65,15 +75,88 @@ static int g_have_measure, g_late_ms;
 static uint64_t g_age_sum_us;   /* how long before their frames the presses came, for the log */
 static int g_age_count;
 
-static void on_setup_done(void) {
-    const uint32_t object = psp_cpu.r[PSP_REG_S0];
-    const float shift = g_settings.extras ? (float)g_options.note_timing / 1000.0f : 0.0f;
+/* ---- each song's own correction ---------------------------------------------------------------- */
+#define SONGS 64
+#define SONG_MOST_MS 80          /* a song's correction goes no further than this either way */
+#define SETUP_STILL_MS 15000u    /* a song that starts this soon after the limits were set is theirs */
+static float g_song_ms[SONGS];
+static int g_song_runs[SONGS], g_songs_read;
+static int g_song = -1;          /* the song playing, -1 if not known */
+static int g_applied_ms;         /* the song's correction as the limits were set */
+static int g_learned_from;       /* the first press not yet learned from */
+static uint32_t g_object;        /* the notes object the limits were set in, and when */
+static ULONGLONG g_setup_ms;
+
+static void song_timing_path(char *out, size_t cap, int make) {
+    const char *data = language_data_dir();
+    static const char *const PARTS[] = {"\\ms", "\\ms\\PSP", "\\ms\\PSP\\SAVEDATA", "\\ms\\PSP\\SAVEDATA\\ULJM05472RECOMP"};
+    for (int i = 0; make && i < 4; i++) {
+        snprintf(out, cap, "%s%s", data, PARTS[i]);
+        _mkdir(out);
+    }
+    snprintf(out, cap, "%s%s\\SONGTIMING.INI", data, PARTS[3]);
+}
+
+static void read_song_timing(void) {
+    g_songs_read = 1;
+    char path[1200], line[96];
+    song_timing_path(path, sizeof path, 0);
+    FILE *f = fopen(path, "r");
+    if (!f) return;
+    int song, runs;
+    float ms;
+    while (fgets(line, sizeof line, f)) {
+        if (sscanf(line, "song %d = %f %d", &song, &ms, &runs) == 3 && song >= 0 && song < SONGS && ms >= -SONG_MOST_MS && ms <= SONG_MOST_MS) {
+            g_song_ms[song] = ms;
+            g_song_runs[song] = runs > 0 ? runs : 1;
+        }
+    }
+    fclose(f);
+}
+
+static void write_song_timing(void) {
+    char path[1200];
+    song_timing_path(path, sizeof path, 1);
+    FILE *f = fopen(path, "w");
+    if (!f) return;
+    fprintf(f, "; Each song's own correction to Note timing, in ms, and how many plays it is from. Learned as you play.\n");
+    for (int i = 0; i < SONGS; i++)
+        if (g_song_runs[i]) fprintf(f, "song %d = %.1f %d\n", i, (double)g_song_ms[i], g_song_runs[i]);
+    fclose(f);
+}
+
+static int song_correction(void) {
+    if (!g_settings.extras || g_song < 0 || g_song >= SONGS) return 0;
+    if (!g_songs_read) read_song_timing();
+    return (int)lroundf(g_song_ms[g_song]);
+}
+
+static void write_limits(uint32_t object) {
+    g_applied_ms = song_correction();
+    const float shift = g_settings.extras ? (float)(g_options.note_timing + g_applied_ms) / 1000.0f : 0.0f;
     for (size_t i = 0; i < sizeof LIMITS / sizeof LIMITS[0]; i++) {
         const float value = LIMITS[i].seconds - shift;
         uint32_t bits;
         memcpy(&bits, &value, sizeof bits);
         psp_write32(object + LIMITS[i].field, bits);
     }
+}
+
+void timing_song_started(int song) {
+    g_song = song >= 0 && song < SONGS ? song : -1;
+    /* The limits may have been set just before the song was known: set again, with its correction. */
+    if (g_object && GetTickCount64() - g_setup_ms < SETUP_STILL_MS) {
+        write_limits(g_object);
+        if (g_applied_ms) fprintf(stderr, "timing: song %d has its own correction, %+d ms\n", g_song, g_applied_ms);
+    }
+}
+
+static void on_setup_done(void) {
+    g_object = psp_cpu.r[PSP_REG_S0];
+    g_setup_ms = GetTickCount64();
+    write_limits(g_object);
+    if (g_applied_ms) fprintf(stderr, "timing: song %d has its own correction, %+d ms\n", g_song, g_applied_ms);
+    g_learned_from = 0;
     g_press_count = g_presses_logged = 0;
     g_age_sum_us = 0;
     g_age_count = 0;
@@ -114,12 +197,33 @@ static float middle_in(const float *values, int first, int count) {
 
 static float middle_of(int first, int count) { return middle_in(g_presses, first, count); }
 
+/* The presses since the last time move the song's correction towards how late they were against
+ * the setting. */
+static void learn_song(void) {
+    const int n = g_press_count - g_learned_from;
+    if (!g_settings.extras || g_song < 0 || g_song >= SONGS || n < PRESSES_NEEDED) return;
+    if (!g_songs_read) read_song_timing();
+    const float late = middle_of(g_learned_from, n), aim = late - (float)g_options.note_timing;
+    const float before = g_song_ms[g_song], weight = g_song_runs[g_song] ? 1.0f / 3.0f : 1.0f;
+    float now = before + (aim - before) * weight;
+    if (now > SONG_MOST_MS) now = SONG_MOST_MS;
+    if (now < -SONG_MOST_MS) now = -SONG_MOST_MS;
+    g_song_ms[g_song] = now;
+    g_song_runs[g_song]++;
+    g_learned_from = g_press_count;
+    write_song_timing();
+    fprintf(stderr, "timing: song %d's own correction %+.1f -> %+.1f ms (presses %.1f ms late against the setting)\n", g_song, (double)before,
+            (double)now, (double)aim);
+}
+
 void timing_song_stopped(void) {
     if (g_press_count < PRESSES_NEEDED || g_press_count == g_presses_logged) return;
     g_presses_logged = g_press_count;
+    learn_song();
     const int half = g_press_count / 2;
     const float all = middle_of(0, g_press_count);
-    g_late_ms = (int)lroundf(all);
+    /* What Options shows leaves the song's own correction out. */
+    g_late_ms = (int)lroundf(all) - g_applied_ms;
     g_have_measure = 1;
     /* The two halves tell a player's habit from a song and notes that drift apart. */
     fprintf(stderr, "timing: %d presses, %.1f ms late, first half %.1f, second half %.1f, set to %+d, pressed %.1f ms before their frames\n",

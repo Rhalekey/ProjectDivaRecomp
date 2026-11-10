@@ -6,6 +6,9 @@
 /* Call from the hook for the functions named in timing.c. Returns nonzero if it was one of them. */
 int timing_hook(uint32_t addr);
 
+/* A song is starting, by its number: its own correction is added to the limits. */
+void timing_song_started(int song);
+
 /* A song has stopped or paused: works out what it measured, and logs it. */
 void timing_song_stopped(void);
 

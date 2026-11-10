@@ -7,9 +7,13 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 ## 2026-11-10
 
 ### System screens
+- Music on the Memory Stick need not be MP3: an M4A or AAC (as a phone records), Ogg, Opus, FLAC, WAV or WMA file in `MUSIC` shows in the list as an MP3 of its name and plays, as does one of those kinds that is named .mp3. FFmpeg's reader reads it whole, as an M4A keeps its index at its end, and it is played at 44100 Hz in stereo; the build keeps `avformat` with FFmpeg's other DLLs for it. Export song takes such a file as it is. In the recompiler, bytes that only look like an MP3 frame no longer pass for one: another frame must begin where it ends.
 - **Export song**: in Rhythm Game Edit's lists to load or delete from, Triangle (E on the keyboard) writes a zip of the chosen Edit's song to `Documents\Project DIVA Recomp\Export`: every Edit made with that song, and its MP3 if it is your own. A zip put in `Documents\Project DIVA Recomp\Import` is brought in when the list to load from opens: its Edits go into free slots, its MP3 into the Memory Stick's MUSIC, and the zip is moved to `Import\Imported`.
 - For it, in the recompiler: the host's list of saves can ask for the slots to be read again and the player asked again.
 - The system's message, which the game asks for only to report an error by its number (the Memory Stick full, save data damaged or missing, the stick not read or written), is told over the game as "Game saved" is, in the game's language with the error's number, and stays until a button is pressed. Before, it was answered unseen. In the recompiler, the message's kind, number, text and buttons are passed to the host.
+
+### Controls and notes
+- **Note timing by song**: each song learns its own correction, added to Note timing as it starts. After a song with at least 20 presses, how late they were against the setting moves that song's correction towards it, all the way the first time and a third of the way after, at most 80 ms either way. Kept in `SONGTIMING.INI` beside the port's options. The measure in Options leaves the song's correction out.
 
 ## 2026-11-09
 

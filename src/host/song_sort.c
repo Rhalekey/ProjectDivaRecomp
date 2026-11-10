@@ -14,6 +14,7 @@
  * Addresses are for ULJM05472 v1.01, which Tools\build.ps1 checks.
  */
 #include "song_sort.h"
+#include "timing.h"
 #include "guest.h"
 
 #include "language.h"
@@ -549,7 +550,9 @@ static void on_singer_module(void) {
     put_singer_module();
     /* Every song starts through here: the one chosen is at 20 in its setup, and the module it is
      * played in is the one asked about now; both kept as played. */
-    song_played((int)psp_read32(psp_cpu.r[PSP_REG_S0] + SETUP_SONG), (int)psp_cpu.r[PSP_REG_A0]);
+    const int song = (int)psp_read32(psp_cpu.r[PSP_REG_S0] + SETUP_SONG);
+    song_played(song, (int)psp_cpu.r[PSP_REG_A0]);
+    timing_song_started(song);
 }
 
 static void put_singer_module(void) {
