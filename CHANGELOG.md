@@ -20,6 +20,7 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 - The notes and targets as Xbox or Nintendo letters, or arrows, fill the same square as the PlayStation shapes, B a little narrower as letters are: the letters were narrower, so they looked smaller. Their targets are all of one size too: the game draws each of its shapes at a scale of its own, and that scale had been kept, so the one in place of the square was about a third larger than the one in place of the circle. The letters in the hints' buttons keep their shape.
 
 ### Menus
+- In Rhythm Game Edit, the footer's hints, which run along, no longer overlap where their words are wider than the game's: each moves right as far as needed, into the gaps the footer already has.
 - In Rhythm Game Edit, the number of bars has a space before its word (2 Bar, 2 Takt), and the rhythm screen's title in English is shorter: Rhythm Settings.
 - Hints for what this edition adds, in the footer: **L R: Module** and **SELECT: Sort** in the song list, **SELECT: Sort** on the modules' screen. They come and go with the game's own hints.
 - The footer's hints no longer overlap on screens whose hints change with the row chosen, as Options.
