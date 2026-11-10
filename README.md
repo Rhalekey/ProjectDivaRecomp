@@ -170,7 +170,7 @@ The MIT license below covers this project's code. `fonts\` is under its own lice
 
 The build downloads [SDL3](https://www.libsdl.org/), under the zlib license, from its official release and checks its hash. It reads controllers other than Xbox ones.
 
-The build also downloads [FFmpeg](https://ffmpeg.org/)'s decoders, under the LGPL 2.1 or later, in a build from [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds) made with only LGPL parts, and checks its hash. It keeps `avcodec`, `avutil` and `swresample` with FFmpeg's headers and licence in `%LOCALAPPDATA%\ProjectDivaRecomp`, and copies the three DLLs beside the game, which loads them while it runs to play the opening movie. They are not changed and can be replaced by any build of the same version. Without them the movie is skipped.
+The build also downloads [FFmpeg](https://ffmpeg.org/)'s decoders, under the LGPL 2.1 or later, in a build from [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds) made with only LGPL parts, and checks its hash. It keeps `avcodec`, `avutil`, `swresample` and `avformat` with FFmpeg's headers and licence in `%LOCALAPPDATA%\ProjectDivaRecomp`, and copies the four DLLs beside the game, which loads them while it runs to play the opening movie and the music on the Memory Stick. They are not changed and can be replaced by any build of the same version. Without them the movie is skipped and that music stays silent.
 
 ## Legal notice and trademarks
 

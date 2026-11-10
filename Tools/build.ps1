@@ -138,15 +138,15 @@ if ((Is-Stale $GenStamp $GenWanted) -or -not (Test-Path (Join-Path $Gen "diva_re
     $GenWanted | Set-Content $GenStamp
 }
 
-# ---- FFmpeg, for the movies: its LGPL decoders, loaded by the game at run time. Only the headers
-# it is compiled with, the three DLLs it loads and the licence are kept. The game runs without
-# it, so a failure here only costs the movies. The hash is the one the build's release publishes.
+# ---- FFmpeg, for the movies and the Memory Stick's music: its LGPL decoders and reader, loaded by
+# the game at run time. Only the headers it is compiled with, the DLLs it loads and the licence are
+# kept. The game runs without it, so a failure here only costs the movies and the music. The hash is the one the build's release publishes.
 $FfVersion = "n8.1.3-9-g29e619e767"
 $FfName = "ffmpeg-$FfVersion-win64-lgpl-shared-8.1"
 $FfHash = "3E47BDA1607740550141E37C0E49D1E5182B34699F15ADFD137EE266D346811A"
 $FfDir = Join-Path $env:LOCALAPPDATA "ProjectDivaRecomp\$FfName"
-$FfDlls = @("avcodec-62.dll", "avutil-60.dll", "swresample-6.dll")
-if (-not (Test-Path (Join-Path $FfDir "include\libavcodec\avcodec.h"))) {
+$FfDlls = @("avcodec-62.dll", "avutil-60.dll", "swresample-6.dll", "avformat-62.dll")
+if (-not (Test-Path (Join-Path $FfDir "include\libavcodec\avcodec.h")) -or -not (Test-Path (Join-Path $FfDir "bin\avformat-62.dll"))) {
     Step "downloading FFmpeg $FfVersion (for the movies)"
     $FfZip = Join-Path $Build "$FfName.zip"
     try {

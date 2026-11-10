@@ -63,16 +63,25 @@ static void song_of(const psp_save_slot *s, wchar_t *out, int cap) {
     out[n] = 0;
 }
 
-/* The player's MP3 a song names, by the start of its file name. */
+/* Whether a file is music the Memory Stick plays: an MP3, or another kind shown to the game as one. */
+static int is_music(const wchar_t *name) {
+    static const wchar_t *const KINDS[] = {L".mp3", L".m4a", L".aac", L".mp4", L".ogg", L".oga", L".opus", L".flac", L".wav", L".wma"};
+    const wchar_t *dot = wcsrchr(name, L'.');
+    for (size_t k = 0; dot && k < sizeof KINDS / sizeof KINDS[0]; k++)
+        if (!_wcsicmp(dot, KINDS[k])) return 1;
+    return 0;
+}
+
+/* The player's music a song names, by the start of its file name. */
 static int mp3_of(const wchar_t *song, wchar_t *path, size_t path_cap, wchar_t *name, size_t name_cap) {
     wchar_t pattern[1200];
-    data_path(L"ms\\MUSIC\\*.mp3", pattern, 1200);
+    data_path(L"ms\\MUSIC\\*", pattern, 1200);
     WIN32_FIND_DATAW d;
     HANDLE h = FindFirstFileW(pattern, &d);
     if (h == INVALID_HANDLE_VALUE || !song[0]) return 0;
     int found = 0;
     do {
-        if (_wcsnicmp(d.cFileName, song, wcslen(song)) == 0) {
+        if (!(d.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && is_music(d.cFileName) && _wcsnicmp(d.cFileName, song, wcslen(song)) == 0) {
             swprintf(name, name_cap, L"%ls", d.cFileName);
             wchar_t folder[1200];
             data_path(L"ms\\MUSIC", folder, 1200);
