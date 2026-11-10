@@ -11,6 +11,9 @@
 /* Generated code has reached a hooked function. Returns nonzero if it was this file's. */
 int song_sort_hook(uint32_t addr);
 
+/* Whether the Free Play song list is the window in front. */
+int song_sort_list_in_front(void);
+
 /* When a song was last played in a module (seconds since 1970), 0 if never: for module_sort.c. */
 long long song_sort_module_played(int module);
 

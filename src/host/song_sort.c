@@ -18,6 +18,7 @@
 
 #include "language.h"
 #include "options.h"
+#include "practice.h"
 #include "translation.h"
 
 #include <psprecomp/cpu.h>
@@ -63,7 +64,7 @@
 #define FIRST_MODULE_ITEM 122u
 #define ROOM_WEARS 0x08AACA24u        /* (room, module): worn, kept in the save, Miku dressed in it */
 
-enum { B_SELECT = 0x0001, B_L = 0x0100, B_R = 0x0200 };
+enum { B_SELECT = 0x0001, B_START = 0x0008, B_L = 0x0100, B_R = 0x0200 };
 enum { SORT_GAME, SORT_NAME, SORT_SCORE, SORT_BPM, SORT_RECENT, SORT_COUNT };
 /* Shown as the order changes, in English, Japanese and German (UI_ENGLISH, UI_JAPANESE, UI_GERMAN). */
 static const char *const SORT_NAME_SHOWN[SORT_COUNT][UI_COUNT] = {
@@ -495,7 +496,12 @@ static void next_module(int step) {
     }
 }
 
+/* The song list's update runs every frame while it is up: a little while without it, it is gone. */
+#define LIST_SEEN_MS 200u
+static ULONGLONG g_list_seen_ms;
+
 static void on_song_list(void) {
+    g_list_seen_ms = GetTickCount64();
     const uint32_t scene = psp_cpu.r[PSP_REG_A0];
     g_scene = scene;
     const uint32_t game = psp_read32(scene + SCENE_GAME);
@@ -507,7 +513,10 @@ static void on_song_list(void) {
     const uint32_t buttons = psp_window_buttons();
     const int pressed = (buttons & B_SELECT) && !(held & B_SELECT);
     const uint32_t shoulders = buttons & (B_L | B_R), fresh = shoulders & ~held;
+    const int start = (buttons & B_START) && !(held & B_START);
     held = buttons;
+    /* Start switches practice on or off. */
+    if (start && g_songs_in_front) practice_toggle();
     if (fresh && shoulders != (B_L | B_R) && g_songs_in_front) next_module(fresh & B_R ? 1 : -1);
     if (pressed) {
         g_sort = (g_sort + 1) % SORT_COUNT;
@@ -556,6 +565,9 @@ static void put_singer_module(void) {
     psp_write32(psp_cpu.r[PSP_REG_S0] + SETUP_MODULE, (uint32_t)chosen);
     fprintf(stderr, "song: module %d in place of %d\n", chosen, forced);
 }
+
+/* Start is practice's while the song list is in front, and the game's does not get it. */
+int song_sort_list_in_front(void) { return g_songs_in_front && GetTickCount64() - g_list_seen_ms < LIST_SEEN_MS; }
 
 int song_sort_hook(uint32_t addr) {
     if (addr == MODULE_KIND) {

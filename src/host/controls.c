@@ -21,6 +21,7 @@
 #include "module_sort.h"
 #include "options.h"
 #include "screen_kit.h"
+#include "song_sort.h"
 #include "timing.h"
 
 #include <psprecomp/cpu.h>
@@ -222,6 +223,8 @@ static uint32_t quick_restart(uint32_t buttons, int in_song) {
 
 static uint32_t swap_confirm(uint32_t buttons) {
     press_clears_held_message(buttons);
+    /* In the song list Start switches practice (see practice.c), and the game does not get it. */
+    if (song_sort_list_in_front()) buttons &= ~(uint32_t)B_START;
     module_sort_input(buttons);
     compare_with_space();
     compare_image_shapes();

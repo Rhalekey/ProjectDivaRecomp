@@ -2,7 +2,7 @@
 
 Static recompilation of *Hatsune Miku: Project DIVA* (PSP, ULJM05472 v1.01) to run natively on PC, built so that mods are easy to create.
 
-**Status:** playable but incomplete. Songs run from start to their results screen at 60 fps with sound, drawn by the GPU at up to 8 times the PSP's resolution, and progress is saved to `%LOCALAPPDATA%\ProjectDivaRecomp\data`. The menus can be played in English, German or Japanese. System dialogs and the save slot list are not shown, the opening movie is skipped because there is no video decoder yet, and ad hoc play does not work.
+**Status:** playable but incomplete. Songs run from start to their results screen at 60 fps with sound, drawn by the GPU at up to 8 times the PSP's resolution, and progress is saved to `%LOCALAPPDATA%\ProjectDivaRecomp\data`. The menus can be played in English, German or Japanese. The opening movie plays through FFmpeg, which the build downloads. System dialogs and the save slot list are not shown, and ad hoc play does not work.
 
 What has changed is in the [changelog](CHANGELOG.md). To install and play, see [INSTALL.md](INSTALL.md).
 
@@ -169,6 +169,8 @@ python Tools/psp_analyze.py <path to decrypted ELF> [--json output.json]
 The MIT license below covers this project's code. `fonts\` is under its own license, as `fonts\OFL.txt` says.
 
 The build downloads [SDL3](https://www.libsdl.org/), under the zlib license, from its official release and checks its hash. It reads controllers other than Xbox ones.
+
+The build also downloads [FFmpeg](https://ffmpeg.org/)'s decoders, under the LGPL 2.1 or later, in a build from [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds) made with only LGPL parts, and checks its hash. It keeps `avcodec`, `avutil` and `swresample` with FFmpeg's headers and licence in `%LOCALAPPDATA%\ProjectDivaRecomp`, and copies the three DLLs beside the game, which loads them while it runs to play the opening movie. They are not changed and can be replaced by any build of the same version. Without them the movie is skipped.
 
 ## Legal notice and trademarks
 

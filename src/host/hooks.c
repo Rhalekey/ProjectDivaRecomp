@@ -4,6 +4,7 @@
 
 #include "controls.h"
 #include "extras.h"
+#include "practice.h"
 #include "presence.h"
 #include "song_sort.h"
 #include "timing.h"
@@ -37,17 +38,18 @@ void hooks_start(void) {
     if (g_empty_player) psp_write32(g_empty_player, 0);
 }
 
-/* There is no video decoder yet. Started with a player that has nothing loaded, the
- * game's own check sends it straight back, as if there were no movie to show. */
+/* Movies play when FFmpeg is beside the game (see psprecomp's mpeg.c). Without it, the player is
+ * started with nothing loaded, and the game's own check sends it straight back, as if there were
+ * no movie to show. */
 static void on_movie_start(void) {
-    if (g_empty_player) psp_cpu.r[REG_A0] = g_empty_player;
+    if (!psp_mpeg_available() && g_empty_player) psp_cpu.r[REG_A0] = g_empty_player;
 }
 
-/* With DIVA_NO_DEATH set a song cannot be lost, to look at the picture and not play. */
+/* In practice a song cannot be lost; nor with DIVA_NO_DEATH set, to look at the picture and not play. */
 static void on_life_change(void) {
     static int no_death = -1;
     if (no_death < 0) no_death = getenv("DIVA_NO_DEATH") != NULL;
-    if (no_death) psp_write32(psp_cpu.r[REG_A0] + LIFE_FIELD, LIFE_FULL);
+    if (no_death || practice_on()) psp_write32(psp_cpu.r[REG_A0] + LIFE_FIELD, LIFE_FULL);
 }
 
 void psp_game_hook(uint32_t addr) {
@@ -56,6 +58,6 @@ void psp_game_hook(uint32_t addr) {
         presence_chosen(game ? psp_read32(game + GAME_SCORES) : 0, (int)psp_cpu.r[REG_A1], (int)psp_cpu.r[REG_A2]);
     } else if (addr == LIFE_CHANGE) on_life_change();
     else if (addr == MOVIE_START) on_movie_start();
-    else if (!controls_hook(addr) && !extras_hook(addr) && !timing_hook(addr) && !song_sort_hook(addr))
+    else if (!controls_hook(addr) && !extras_hook(addr) && !timing_hook(addr) && !song_sort_hook(addr) && !practice_hook(addr))
         translation_hook(addr);
 }

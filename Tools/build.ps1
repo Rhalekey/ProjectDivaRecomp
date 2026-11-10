@@ -121,11 +121,11 @@ if ($LASTEXITCODE -ne 0) { Fail "compile the recompiler" }
 Step "generating C from the game"
 New-Item -ItemType Directory -Force $Gen | Out-Null
 $Recomp = Join-Path $Out "third_party\psprecomp\tools\allegrexrecomp\allegrexrecomp.exe"
-# translation.c, letters.c, controls.c, hooks.c, extras.c, timing.c, song_sort.c and module_sort.c say what these are.
+# translation.c, letters.c, controls.c, hooks.c, extras.c, timing.c, song_sort.c, module_sort.c and practice.c say what these are.
 $Hooks = @(
     "0883D598", "0883EC34", "0883F104", "08851CD8", "08AF1C54", "08815FF4", "08ABF1B8", "0886B304", "08864C90", "08AD49B4",
     "08AB5908", "08AB5A4C", "08AB5448", "08AB5528", "08AB59A0", "08AB41C4", "08AB4C58", "08AB4D18", "08AB5EF0", "08AB5F38", "08AB4384",
-    "08857818", "08857E70", "08858200", "08858314", "08AC00B0", "08AC0514", "08862198"
+    "08857818", "08857E70", "08858200", "08858314", "08AC00B0", "08AC0514", "08862198", "0886B08C"
 )
 $GenStamp = Join-Path $Out "generated_from.txt"
 $GenWanted = "$ExpectedElf $((Get-FileHash $Recomp).Hash) $($Hooks -join ' ')"
@@ -138,9 +138,55 @@ if ((Is-Stale $GenStamp $GenWanted) -or -not (Test-Path (Join-Path $Gen "diva_re
     $GenWanted | Set-Content $GenStamp
 }
 
+# ---- FFmpeg, for the movies: its LGPL decoders, loaded by the game at run time. Only the headers
+# it is compiled with, the three DLLs it loads and the licence are kept. The game runs without
+# it, so a failure here only costs the movies. The hash is the one the build's release publishes.
+$FfVersion = "n8.1.3-9-g29e619e767"
+$FfName = "ffmpeg-$FfVersion-win64-lgpl-shared-8.1"
+$FfHash = "3E47BDA1607740550141E37C0E49D1E5182B34699F15ADFD137EE266D346811A"
+$FfDir = Join-Path $env:LOCALAPPDATA "ProjectDivaRecomp\$FfName"
+$FfDlls = @("avcodec-62.dll", "avutil-60.dll", "swresample-6.dll")
+if (-not (Test-Path (Join-Path $FfDir "include\libavcodec\avcodec.h"))) {
+    Step "downloading FFmpeg $FfVersion (for the movies)"
+    $FfZip = Join-Path $Build "$FfName.zip"
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $ProgressPreference = "SilentlyContinue"
+        Invoke-WebRequest -UseBasicParsing -OutFile $FfZip "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/$FfName.zip" -ErrorAction Stop
+        if ((Get-FileHash $FfZip -Algorithm SHA256).Hash -ne $FfHash) { throw "the downloaded file does not match its hash" }
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $zip = [IO.Compression.ZipFile]::OpenRead($FfZip)
+        try {
+            foreach ($entry in $zip.Entries) {
+                $inner = $entry.FullName.Substring($entry.FullName.IndexOf("/") + 1)
+                $keep = $inner -like "include/*" -or $inner -eq "LICENSE.txt" -or ($FfDlls | Where-Object { $inner -eq "bin/$_" })
+                if (-not $keep -or $entry.Name -eq "") { continue }
+                $target = Join-Path $FfDir ($inner -replace "/", "\")
+                New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
+                [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $target, $true)
+            }
+        } finally { $zip.Dispose() }
+    } catch {
+        "FFmpeg not installed: $_" *>> $Log
+        Write-Host "Warning: could not download FFmpeg ($_). The opening movie will be skipped."
+    }
+    Remove-Item $FfZip -ErrorAction SilentlyContinue
+}
+$FfInclude = Join-Path $FfDir "include"
+$FfArgs = @()
+if (Test-Path (Join-Path $FfInclude "libavcodec\avcodec.h")) {
+    $FfArgs = @("-DPSPRECOMP_FFMPEG_INCLUDE=$($FfInclude -replace '\\', '/')")
+    foreach ($dll in $FfDlls) {
+        $from = Join-Path $FfDir "bin\$dll"
+        if (Test-Path $from) { Copy-Item -Force $from $Out }
+    }
+} else {
+    $FfArgs = @("-DPSPRECOMP_FFMPEG_INCLUDE=")
+}
+
 Step "compiling the game (this can take a long time)"
 $sw = [Diagnostics.Stopwatch]::StartNew()
-cmake -S $Root -B $Out *>> $Log
+cmake -S $Root -B $Out @FfArgs *>> $Log
 cmake --build $Out --target diva -- -k 0 *>> $Log
 $built = $LASTEXITCODE
 "compile time: $([math]::Round($sw.Elapsed.TotalMinutes,1)) min" *>> $Log

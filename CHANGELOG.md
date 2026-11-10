@@ -6,7 +6,12 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 
 ## 2026-11-09
 
+### Movies
+- The opening movie plays, with its sound: the PSP's movie player (sceMpeg) is written for it, over FFmpeg's H.264 and ATRAC3plus decoders, which the build downloads and the game loads while it runs. Without them, the movie is skipped as before.
+- For it, in the recompiler: a thread is given a copy of what it is started with, on its own stack, as the console does (the movie's thread read its player from a stack that had been used again); the status of an event flag and of a thread can be asked for; and sceDmacMemcpy copies. A screen the game fills with a copy, as the movie's pictures, is shown from memory even if it was drawn on before, so every other picture is no longer the white of what was last drawn there, and it is smoothed as the rest is.
+
 ### Controls and notes
+- **Practice**: Start in the Free Play song list switches it on or off. In practice a song cannot be failed and no note scores, so nothing is kept from it. A message says which it is.
 - A press counts when it was made, not when the game next looked at the buttons: the game sees them once a frame, so a press could count up to 16 ms late. The buttons are read about once a millisecond, and the note is judged as it stood then. With this the measure for **Note timing** comes out a few milliseconds nearer zero, so it is worth measuring again.
 - After a hold-up in a song, as a restart or a controller plugged in, the sound no longer stays late to the notes for many seconds: what is left waiting is cut back at once. The measure at the end of a song also says how long the sound waited in each half.
 
@@ -175,7 +180,6 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 
 ## Known gaps
 
-- No video decoder, so movies do not play.
 - Ad hoc play does not work, and system dialogs and the save slot list are not shown.
 - The frame rate cannot be chosen: the game's speed follows its refresh rate, so it stays at 60. Other rates would need interpolation or changes to the game.
 - The original art outside the redrawn pieces is still at the game's own resolution.

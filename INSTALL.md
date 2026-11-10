@@ -69,7 +69,7 @@ Buttons go by position, not by what is printed on them. The bottom button is alw
 - **Options**, in the main menu: volume, background dim, note timing, language, song names and lyrics in romaji, the confirm button, and changing keys and buttons. Each button can have a second key, which helps with fast repeated notes.
 - **Graphics**, in the main menu: display mode, resolution, smoothing, image shape and the frame rate counter.
 
-The opening movie does not play in this version, and ad hoc play does not work. This is expected.
+Ad hoc play does not work. This is expected. The opening movie needs FFmpeg, which the build downloads; if it could not, the build says so and the movie is skipped.
 
 ## If something goes wrong
 
