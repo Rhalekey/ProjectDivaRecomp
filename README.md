@@ -148,6 +148,23 @@ mods\my mod\disc\PSP_GAME\USRDIR\x.ini    any other file on the disc
 
 If two mods replace one file, the later folder in alphabetical order wins. Use `Tools\afs.py` to find and extract files to start from. A replacement must be in the format the game expects, and very large ones may be more than the game has memory for. Never share files extracted from the game.
 
+The folders `mods\notes` and `mods\modules` are not replacements but skins, added as choices of their own.
+
+### Note skins
+
+Each folder in `mods\notes` is a note style, offered in Options > Notes after the game's own, under the folder's name:
+
+```
+mods\notes\my skin\circle.png      one note each, centred in a square
+mods\notes\my skin\cross.png
+mods\notes\my skin\square.png
+mods\notes\my skin\triangle.png
+mods\notes\my skin\targets.png     optional: the targets, circle top left, triangle top right,
+                                   square bottom left, cross bottom right, on a clear ground
+```
+
+A picture left out keeps the game's own. `mods\notes\_template` is written by the game with pictures at the size and place it expects, drawn from code, to start from; folders starting with `_` are not offered. Changes show after a restart.
+
 ## Tools
 
 | Script | Purpose |

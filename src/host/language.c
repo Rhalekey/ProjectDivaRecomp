@@ -5,6 +5,7 @@
 #include "language.h"
 
 #include "extras.h"
+#include "note_skins.h"
 #include "options.h"
 #include "settings.h"
 #include "translation.h"
@@ -52,7 +53,14 @@ void language_confirm_changed(void) { pick_vectors(); }
 
 void language_notes_changed(void) {
     static const char *const FOLDER[OPTIONS_NOTES_COUNT] = {NULL, "xbox", "nintendo", "keyboard"};
-    const char *folder = g_options.note_style > 0 && g_options.note_style < OPTIONS_NOTES_COUNT ? FOLDER[g_options.note_style] : NULL;
+    if (g_options.note_style >= OPTIONS_NOTES_COUNT) {
+        /* A note skin from the mods folder: if it has gone, the game's own notes. */
+        const char *skin = note_skins_folder(g_options.note_style - OPTIONS_NOTES_COUNT);
+        if (!skin) g_options.note_style = OPTIONS_NOTES_PLAYSTATION;
+        psp_render_gl_set_note_dir(skin);
+        return;
+    }
+    const char *folder = g_options.note_style > 0 ? FOLDER[g_options.note_style] : NULL;
     char notes[1200];
     if (folder) snprintf(notes, sizeof notes, "%s\\..\\textures_hd\\notes\\%s", g_data_dir, folder);
     psp_render_gl_set_note_dir(folder ? notes : NULL);

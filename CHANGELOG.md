@@ -13,6 +13,7 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 - The system's message, which the game asks for only to report an error by its number (the Memory Stick full, save data damaged or missing, the stick not read or written), is told over the game as "Game saved" is, in the game's language with the error's number, and stays until a button is pressed. Before, it was answered unseen. In the recompiler, the message's kind, number, text and buttons are passed to the host.
 
 ### Interface
+- **Note skins**: each folder of PNGs in `mods\notes` is one more choice in Options > Notes, after the game's own styles, under its name: the four notes and, if it has them, the targets. It is kept in `OPTIONS.INI` by name. The game writes a template to start from in `mods\notes\_template`, drawn from code by `Tools/hud_vector.py`. File replacement mods no longer read `mods\notes` or `mods\modules`.
 - The hit effects of the song screen, the rings of light, the gold flare, the bubbles with a note and a ring, the stars, sparks, crescent and lightning, are drawn from shapes and gradients at four times their size (`Tools/fx_vector.py`), in place of the game's small pictures.
 - In every style of notes, X is PlayStation's cross, as in Mega Mix, in the style's colour.
 - The results screen's words have their letters at one height: a round letter of the picture's, as the O of NORMAL, no longer comes out larger.

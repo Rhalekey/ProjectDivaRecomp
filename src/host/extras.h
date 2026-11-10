@@ -23,6 +23,11 @@ void extras_start(const char *data_dir);
 /* g_options.language has changed. */
 void extras_language_changed(void);
 
+/* The next note style, the game's own then the note skins, put to use. */
+void extras_next_note_style(void);
+/* A note skin's name as the menu shows it, while one is chosen. */
+const char *extras_note_style_name(void);
+
 /* Generated code has reached a hooked function. Returns nonzero if it was one of these. */
 int extras_hook(uint32_t addr);
 

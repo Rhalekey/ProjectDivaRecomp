@@ -14,7 +14,7 @@ import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lang_images import ARCHIVE, Archive, colour_hash, decode_png, layout_of  # noqa: E402
+from lang_images import ARCHIVE, Archive, colour_hash, decode_png, encode_png, layout_of  # noqa: E402
 
 SCALE = 4
 SUBSAMPLES = 4
@@ -757,6 +757,58 @@ def note_styles(out):
         print('notes: %s' % style)
 
 
+def write_png(c, path):
+    rows = [[tuple(c.data[(y * c.w + x) * 4:(y * c.w + x) * 4 + 4]) for x in range(c.w)] for y in range(c.h)]
+    with open(path, 'wb') as f:
+        f.write(encode_png(c.w, c.h, rows))
+
+
+# The game draws each target at a scale of its own (texels to the screen: circle 0.504, triangle
+# 0.599, square 0.645, plus 0.574), a skin's all at the triangle's: see note_target_drawn in
+# render_gl.c. So the template's shapes are sized for them to come out as large as the game's.
+TEMPLATE_TARGET_SCALE = {'circle': 0.504 / 0.599, 'triangle': 1.0, 'square': 0.645 / 0.599, 'cross': 0.574 / 0.599}
+
+
+def note_template(out):
+    """PNGs a note skin can start from, in mods\\notes\\_template: the game's shapes as drawn here,
+    top row first as anyone would draw them, at the size and place the game expects."""
+    folder = os.path.join(out, 'notes', 'template')
+    os.makedirs(folder, exist_ok=True)
+    for name, draw in (('circle', draw_circle), ('cross', draw_cross), ('square', draw_square), ('triangle', draw_triangle)):
+        c = Canvas(NOTE_SIDE, NOTE_SIDE)
+        draw(c)
+        write_png(c, os.path.join(folder, name + '.png'))
+    # Targets on a clear ground, each in its quarter of a sheet 256 units across.
+    c = Canvas(STYLE_TARGETS_SIDE, STYLE_TARGETS_SIDE)
+    plus = [(88, 64), (106, 64), (106, 87), (127, 87), (127, 104), (106, 104), (106, 127), (88, 127), (88, 104), (65, 104), (65, 87), (88, 87)]
+    plus_in = [(90.5, 66.5), (103.5, 66.5), (103.5, 89.5), (124.5, 89.5), (124.5, 101.5), (103.5, 101.5), (103.5, 124.5), (90.5, 124.5),
+               (90.5, 101.5), (67.5, 101.5), (67.5, 89.5), (90.5, 89.5)]
+    shapes = {  # rim, then fill, on the game's 128 sheet (upside down, as kept in memory), with the middle each is scaled around
+        'circle': ((32, 32), circle(32, 32, 29.5, 96), circle(32, 32, 27, 96)),
+        'triangle': ((95, 33.5), [(65, 7), (125, 7), (95, 60)], [(69.5, 9.5), (120.5, 9.5), (95, 55)]),
+        'square': ((32, 96), rect(8, 72, 48, 48), rect(10.5, 74.5, 43, 43)),
+        'cross': ((96, 95.5), plus, plus_in),
+    }
+    # The game turns its plus a quarter of a right angle to make Cross's target an X; a skin's
+    # quarter is drawn as it is, so the template's plus is turned here.
+    turn = {'cross': math.pi / 4}
+    for button, ((mx, my), rim, fill) in shapes.items():
+        col, row = TARGET_QUARTERS[button]
+        k = TEMPLATE_TARGET_SCALE[button]
+        cos, sin = math.cos(turn.get(button, 0)), math.sin(turn.get(button, 0))
+
+        def to(pts):
+            out = []
+            for x, y in pts:
+                dx, dy = (x - mx) * k * 2, (my - y) * k * 2
+                out.append(((col * 64 + 32) * 2 + dx * cos - dy * sin, (row * 64 + 32) * 2 + dx * sin + dy * cos))
+            return out
+        c.paint([to(rim)], TARGET_RIM)
+        c.paint([to(fill)], TARGET_FILL)
+    write_png(c, os.path.join(folder, 'targets.png'))
+    print('notes: template')
+
+
 # ---- music notes that drift across the room and menus
 MUSIC_BLUE = (0, 190, 250)
 
@@ -867,6 +919,7 @@ def main():
         note(os.path.join(out, name + '.rgba'), draw)
         print('note: %s' % name)
     note_styles(out)
+    note_template(out)
 
 
 if __name__ == '__main__':

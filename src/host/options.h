@@ -22,7 +22,8 @@ typedef struct {
     int note_timing;     /* in ms, how much later than the note's moment a press counts as on time */
     int blur;            /* blurred copies of pictures past their sides in a wider window */
     int button_style;    /* the signs shown for Cross and Circle: an OPTIONS_STYLE_ */
-    int note_style;      /* how the notes and targets look: an OPTIONS_NOTES_ */
+    int note_style;      /* how the notes and targets look: an OPTIONS_NOTES_, or past them a note skin */
+    char note_skin[48];  /* that note skin's name, kept by name as the skins found can change */
     int restart_key;     /* the key that plays a song again from its start, 0 for none */
     int restart_pad;     /* the controller buttons that do it, held together; 0 for L and R */
     int singer_module[2]; /* the module Kagamine Rin, then Len, sing their own songs in */

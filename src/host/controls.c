@@ -119,10 +119,10 @@ static void compare_image_shapes(void) {
     static int notes_was_down = 1;
     if (pressed_in_window(VK_F9, &notes_was_down)) {
         static const char *const NOTES[OPTIONS_NOTES_COUNT] = {"PLAYSTATION", "XBOX", "NINTENDO", "KEYBOARD"};
-        g_options.note_style = (g_options.note_style + 1) % OPTIONS_NOTES_COUNT;
-        language_notes_changed();
+        extras_next_note_style();
         char title[160];
-        snprintf(title, sizeof title, "Project DIVA Recomp - notes %s", NOTES[g_options.note_style]);
+        snprintf(title, sizeof title, "Project DIVA Recomp - notes %s",
+                 g_options.note_style < OPTIONS_NOTES_COUNT ? NOTES[g_options.note_style] : g_options.note_skin);
         SetWindowTextA((HWND)psp_window_handle(), title);
         fprintf(stderr, "controls: %s\n", title);
     }
@@ -540,7 +540,9 @@ void controls_ask_confirm(void) {
     const int ui = language_ui();
     static const int ASKS[3] = {1, 0, 2};
     int page = 0;
-    int chosen[3] = {g_options.confirm_cross == 1, g_options.button_style, g_options.note_style};
+    /* A note skin is not among this screen's styles: it starts from the game's own, and stays if left so. */
+    const int skin = g_options.note_style >= OPTIONS_NOTES_COUNT ? g_options.note_style : -1;
+    int chosen[3] = {g_options.confirm_cross == 1, g_options.button_style, skin >= 0 ? 0 : g_options.note_style};
     static const int COUNT[3] = {2, OPTIONS_STYLE_COUNT, OPTIONS_NOTES_COUNT};
     menu_input was = {1, 1, 1, 1, 1, 1};
     int redraw = 1;
@@ -579,7 +581,7 @@ void controls_ask_confirm(void) {
     g_pictures_style = -1;
     g_options.confirm_cross = chosen[0];
     g_options.button_style = chosen[1];
-    g_options.note_style = chosen[2];
+    g_options.note_style = skin >= 0 && chosen[2] == 0 ? skin : chosen[2];
     controls_apply();
     language_notes_changed();
 }

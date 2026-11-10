@@ -401,6 +401,8 @@ int mods_init(const char *dir) {
         /* NTFS lists names in order, so a later name overrides an earlier one. */
         do {
             if (found.cFileName[0] == '.' || !(found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) continue;
+            /* Skins are choices of their own, not replacements: see note_skins.c. */
+            if (_stricmp(found.cFileName, "notes") == 0 || _stricmp(found.cFileName, "modules") == 0) continue;
             char path[1100];
             snprintf(path, sizeof path, "%s\\%s", dir, found.cFileName);
             scan_dir(path, NULL, 1);

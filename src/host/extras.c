@@ -16,6 +16,7 @@
 #include "controls.h"
 #include "language.h"
 #include "letters.h"
+#include "note_skins.h"
 #include "options.h"
 #include "settings.h"
 #include "timing.h"
@@ -247,6 +248,23 @@ static void apply_scripts(void) {
     translation_set_romaji(!strcmp(g_options.song_names, "romaji"), !strcmp(g_options.lyrics, "romaji"));
 }
 
+void extras_next_note_style(void) {
+    g_options.note_style = (g_options.note_style + 1) % (OPTIONS_NOTES_COUNT + note_skins_count());
+    snprintf(g_options.note_skin, sizeof g_options.note_skin, "%s", note_skins_name(g_options.note_style - OPTIONS_NOTES_COUNT));
+    language_notes_changed();
+}
+
+/* A note skin's name as the menu's letters can show it: ASCII only, cut short to fit the row. */
+const char *extras_note_style_name(void) {
+    static char shown[16];
+    const char *name = note_skins_name(g_options.note_style - OPTIONS_NOTES_COUNT);
+    size_t n = 0;
+    for (; name[n] && n < sizeof shown - 1; n++) shown[n] = (unsigned char)name[n] >= 32 && (unsigned char)name[n] < 127 ? name[n] : '?';
+    shown[n] = 0;
+    if (name[n]) memcpy(shown + sizeof shown - 4, "...", 4);
+    return shown;
+}
+
 static const char *value_of(int row) {
     switch (row) {
     case ROW_DIM: {
@@ -273,6 +291,7 @@ static const char *value_of(int row) {
     case ROW_ICONS:
         return STYLE_NAME[g_options.button_style];
     case ROW_NOTES:
+        if (g_options.note_style >= OPTIONS_NOTES_COUNT) return extras_note_style_name();
         return g_options.note_style == OPTIONS_NOTES_KEYBOARD ? WORD_KEYBOARD[g_ui] : STYLE_NAME[g_options.note_style];
     default:
     case ROW_CONFIRM: {
@@ -425,8 +444,7 @@ static void change(int row) {
         write_label(ROW_CONFIRM);
         break;
     case ROW_NOTES:
-        g_options.note_style = (g_options.note_style + 1) % OPTIONS_NOTES_COUNT;
-        language_notes_changed();
+        extras_next_note_style();
         break;
     case ROW_SINGERS:
         g_options.free_singers = !g_options.free_singers;

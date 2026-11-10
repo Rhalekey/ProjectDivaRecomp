@@ -52,7 +52,7 @@ int options_load(const char *data_dir) {
     FILE *f = fopen(path, "r");
     if (!f) return 0;
     int chosen = 0;
-    char line[128], value[32];
+    char line[128], value[32], skin[48];
     int number, button;
     while (fgets(line, sizeof line, f)) {
         if (sscanf(line, "language = %31s", value) == 1) {
@@ -90,6 +90,8 @@ int options_load(const char *data_dir) {
             g_options.free_singers = number != 0;
         } else if (sscanf(line, "keep_vocal = %d", &number) == 1) {
             g_options.keep_vocal = number != 0;
+        } else if (sscanf(line, "note_skin = %47[^\r\n]", skin) == 1) {
+            snprintf(g_options.note_skin, sizeof g_options.note_skin, "%s", skin);
         } else if (sscanf(line, "note_style = %d", &number) == 1) {
             if (number >= 0 && number < OPTIONS_NOTES_COUNT) g_options.note_style = number;
         } else if (sscanf(line, "blur = %d", &number) == 1) {
@@ -135,8 +137,10 @@ void options_save(const char *data_dir) {
     fprintf(f, "restart_pad = %d\nrin_module = %d\nlen_module = %d\nfree_singers = %d\n", g_options.restart_pad, g_options.singer_module[0],
             g_options.singer_module[1], g_options.free_singers);
     fprintf(f, "keep_vocal = %d\n", g_options.keep_vocal);
-    fprintf(f, "blur = %d\nbutton_style = %d\nnote_style = %d\ndpad_notes = %d\nrestart_key = %d\n", g_options.blur, g_options.button_style, g_options.note_style,
+    fprintf(f, "blur = %d\nbutton_style = %d\nnote_style = %d\ndpad_notes = %d\nrestart_key = %d\n", g_options.blur, g_options.button_style,
+            g_options.note_style < OPTIONS_NOTES_COUNT ? g_options.note_style : 0,
             g_options.dpad_notes, g_options.restart_key);
+    if (g_options.note_style >= OPTIONS_NOTES_COUNT && g_options.note_skin[0]) fprintf(f, "note_skin = %s\n", g_options.note_skin);
     if (g_options.render_scale) fprintf(f, "render_scale = %d\n", g_options.render_scale);
     if (g_options.smoothing >= 0) fprintf(f, "smoothing = %d\n", g_options.smoothing);
     if (g_options.ask_language >= 0) fprintf(f, "ask_language = %d\n", g_options.ask_language);

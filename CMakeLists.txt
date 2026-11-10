@@ -18,7 +18,7 @@ set(DIVA_GEN_DIR "${CMAKE_BINARY_DIR}/generated" CACHE PATH "Generated C")
 file(GLOB DIVA_GEN CONFIGURE_DEPENDS "${DIVA_GEN_DIR}/*.c")
 
 if(DIVA_GEN)
-    add_executable(diva src/host/main.c src/host/audio_out.c src/host/mods.c src/host/settings.c src/host/watch.c src/host/lifesearch.c src/host/controls.c src/host/options.c src/host/language_screen.c src/host/screen_kit.c src/host/translation.c src/host/letters.c src/host/hooks.c src/host/extras.c src/host/language.c src/host/timing.c src/host/screenshot.c src/host/presence.c src/host/song_sort.c src/host/module_sort.c src/host/guest.c src/host/practice.c src/host/system_dialogs.c src/host/edit_share.c ${DIVA_GEN})
+    add_executable(diva src/host/main.c src/host/audio_out.c src/host/mods.c src/host/settings.c src/host/watch.c src/host/lifesearch.c src/host/controls.c src/host/options.c src/host/language_screen.c src/host/screen_kit.c src/host/translation.c src/host/letters.c src/host/hooks.c src/host/extras.c src/host/language.c src/host/timing.c src/host/screenshot.c src/host/presence.c src/host/song_sort.c src/host/module_sort.c src/host/guest.c src/host/practice.c src/host/system_dialogs.c src/host/edit_share.c src/host/note_skins.c ${DIVA_GEN})
     target_include_directories(diva PRIVATE "${DIVA_GEN_DIR}")
     target_link_libraries(diva PRIVATE psprecomp winmm gdi32 user32)
     set_source_files_properties(${DIVA_GEN} PROPERTIES
