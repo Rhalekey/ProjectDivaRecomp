@@ -15,9 +15,12 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 - The title screen's logo: its edges take the colour from inside each part, so they no longer step in a light fringe, and specks are left out.
 - The makers' logos at the start are shown as the game has them again: traced, they came out with too many flaws.
 - The menus' titles: the dark band under the plate with the menu's name runs on to its cut edge in one diagonal, and where lines run under it, the white diagonal that takes them up and its shadow are straight too. They were the last steps left in the titles.
+- The lists' rows and the glow of the one chosen: each row of their streaks is one even blend along its length, with no dithering and no blotches where the glow fades out.
+- Rhythm Game Edit's icons in clean lines, in their two blues: on the grid's buttons, lit or not (the arrows, the house, the note and the ©), and the camera's move, turn, preview, time and camera.
 - The notes and targets as Xbox or Nintendo letters, or arrows, fill the same square as the PlayStation shapes, B a little narrower as letters are: the letters were narrower, so they looked smaller. Their targets are all of one size too: the game draws each of its shapes at a scale of its own, and that scale had been kept, so the one in place of the square was about a third larger than the one in place of the circle. The letters in the hints' buttons keep their shape.
 
 ### Menus
+- In Rhythm Game Edit, the number of bars has a space before its word (2 Bar, 2 Takt), and the rhythm screen's title in English is shorter: Rhythm Settings.
 - Hints for what this edition adds, in the footer: **L R: Module** and **SELECT: Sort** in the song list, **SELECT: Sort** on the modules' screen. They come and go with the game's own hints.
 - The footer's hints no longer overlap on screens whose hints change with the row chosen, as Options.
 - The footer's band slides in to its place instead of jumping there once the game's slide has stopped. Where it goes is kept in `footer_places.txt` beside the save, so only a screen never seen before in that size of window can still jump, once.

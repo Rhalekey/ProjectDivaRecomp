@@ -310,7 +310,7 @@
 08B577A0 = D-pad: choose where the target icon appears.
 08B577DC = Analog or Left/Right: choose where the melody icon flies from.
 08B57830 = Confirm and return to Target Placement Settings.
-08B5786C = Rhythm Placement Settings
+08B5786C = Rhythm Settings
 08B5787C = Left/Right: change the rhythm pattern.
 08B578A8 = Change the tempo from this bar on. Triangle: hear the BPM.
 08B5791C = Change the time signature from this bar on.
@@ -375,7 +375,7 @@
 08B5A420 = %1dm %02ds %003d
 08B5A434 = Bar 1 BPM %3d
 08B5A448 = 1 beat %1.3fs
-08B5A454 = [    Bar]
+08B5A454 = [     Bar]
 08B5A470 = Choose whether to quit Edit.
 08B5A490 = ^Go to Home.
 08B5A4A4 = Song Style
@@ -972,7 +972,7 @@
 08B717D8 = ^Send Data
 08B717E8 = ^Receive Data
 08B717FC = ^To Title
-08B71A28 = [     Bar]
+08B71A28 = [      Bar]
 08B71A44 = ^246|Custom
 08B71A50 = Preset 1
 08B71A5C = Preset 2

@@ -375,7 +375,7 @@
 08B5A420 = %1d:%02d.%003d
 08B5A434 = Takt 1 BPM %3d
 08B5A448 = %1.3fs/Schl
-08B5A454 = [   Takt]
+08B5A454 = [    Takt]
 08B5A470 = Editor beenden?
 08B5A490 = ^Zum Menü.
 08B5A4A4 = Liedstil
@@ -972,7 +972,7 @@
 08B717D8 = ^Daten senden
 08B717E8 = ^Daten empfangen
 08B717FC = ^Zum Titel
-08B71A28 = [    Takt]
+08B71A28 = [     Takt]
 08B71A44 = ^246|Eigenes
 08B71A50 = Preset 1
 08B71A5C = Preset 2

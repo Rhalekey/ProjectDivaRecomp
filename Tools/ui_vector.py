@@ -72,6 +72,7 @@ BAR_ARROWS = ((113, 117, 'left'), (167, 171, 'right'))
 BAR_ARROW_TOP, BAR_ARROW_H = 12, 7   # from the glow's top; in the plain bar they start 5 from its top
 BAR_ARROW_MARGIN = 2   # around one, where the old halo is cleared
 BAR_ARROW_HALO = 1.2   # and how far the new one spreads
+STREAK_REACH = 2       # the lists' bars and glows are smoothed along their rows three times this far
 ICON_PINK_TOP, ICON_PINK_LOW = (236, 30, 155), (160, 0, 96)
 ICON_BLUE_TOP, ICON_BLUE_LOW = (60, 150, 212), (1, 98, 166)
 ICON_FOLDER_LIGHT = (200, 226, 245)
@@ -1084,12 +1085,66 @@ def arrow_in_bar(sheet, pixels, core, direction):
     paste(sheet, piece, left - m, top - m)
 
 
+def streaked(sheet, pixels, box, skip=()):
+    """A bar or glow of the lists, which runs along in streaks: each of its rows smoothed along its
+    length, so that the game's dithering and the steps where it fades out become one even blend,
+    and the rows joined smoothly up and down. Boxes in `skip` (left, top, right, bottom), as arrows
+    drawn into it afterwards, are left out of the blend."""
+    x, y, w, h = box
+    r = STREAK_REACH
+    rows = []
+    for j in range(h):
+        sums = []
+        for i in range(w):
+            p = pixels[y + j][x + i]
+            a = p[3]
+            gone = any(left - 1 <= x + i <= right and top <= y + j < bottom for left, top, right, bottom in skip)
+            k = 0 if gone else 1
+            sums.append([p[0] * a * k, p[1] * a * k, p[2] * a * k, a * k, k])
+        for _ in range(3):
+            run = []
+            for i in range(w):
+                lo, hi = max(0, i - r), min(w - 1, i + r)
+                run.append([sum(sums[n][c] for n in range(lo, hi + 1)) for c in range(5)])
+            sums = run
+        rows.append([(v[0] / v[3], v[1] / v[3], v[2] / v[3], v[3] / v[4]) if v[3] and v[4] else (0, 0, 0, 0) for v in sums])
+    for oy in range(h * SCALE):
+        gy = min(max((oy + 0.5) / SCALE - 0.5, 0), h - 1)
+        j0 = int(gy)
+        j1, ty = min(j0 + 1, h - 1), gy - j0
+        at = ((y * SCALE + oy) * sheet.w + x * SCALE) * 4
+        for ox in range(w * SCALE):
+            gx = min(max((ox + 0.5) / SCALE - 0.5, 0), w - 1)
+            i0 = int(gx)
+            i1, tx = min(i0 + 1, w - 1), gx - i0
+            out = [0.0] * 4
+            for (jj, wy) in ((j0, 1 - ty), (j1, ty)):
+                for (ii, wx) in ((i0, 1 - tx), (i1, tx)):
+                    q = rows[jj][ii]
+                    weight = wx * wy
+                    out[3] += q[3] * weight
+                    for c in range(3):
+                        out[c] += q[c] * q[3] * weight
+            alpha = out[3]
+            px = bytes((min(255, int(out[c] / alpha + 0.5)) for c in range(3))) if alpha > 0 else bytes(3)
+            sheet.data[at + ox * 4:at + ox * 4 + 4] = px + bytes([min(255, int(alpha + 0.5))])
+
+
 def sheet_of_arrows(archive, out):
     """The arrows and cursors of the lists, and the slider's handle."""
     picture = 'menu_basic04.png'
     w, h, pixels = decode_png(archive.read(archive.find(picture)))
     rects = layout_of(archive, picture)
     c = enlarged(archive, picture, pixels, w, h)
+    # The selected row's glows, before the arrows that go into some of them.
+    for name in ('basic_glow_arw_a.png', 'basic_glow_arw.png'):
+        x, y, bw, bh = rects[name]
+        streaked(c, pixels, rects[name], [(left, y + BAR_ARROW_TOP - 1, right, y + BAR_ARROW_TOP + BAR_ARROW_H + 1) for left, right, _ in BAR_ARROWS])
+    for name in ('basic_glow_menu_a.png', 'basic_glow_menu.png', 'basic_glow_fwin_a.png', 'basic_glow_fwin.png'):
+        streaked(c, pixels, rects[name])
+    for row in ('_a', ''):
+        left, right = rects['basic_glow_win_l%s.png' % row], rects['basic_glow_win_r%s.png' % row]
+        streaked(c, pixels, (left[0], left[1], right[0] + right[2] - left[0], left[3]))
     for name, direction in (('basic_yajirusi_upon.png', 'up'), ('basic_yajirusi_dnon.png', 'down'),
                             ('basic_yajirusi_upoff.png', 'up'), ('basic_yajirusi_dnoff.png', 'down'),
                             ('basic_cursor_l_on.png', 'left'), ('basic_cursor_r_on.png', 'right'),
@@ -2439,8 +2494,10 @@ def sheet_of_windows(archive, labels, drawer, out, sign_set):
     icon_ring(c, pixels, rects['basic_blade_ico.png'])
     slider_end(c, pixels, rects['basic_slider_up.png'], True)
     slider_end(c, pixels, rects['basic_slider_dn.png'], False)
-    # The same arrows in the bar of a row with a value, when it is not the one chosen.
+    # The rows' bars, and the same arrows in the bar of a row with a value, when it is not the one chosen.
     bx, by, _, _ = rects['basic_planeon.png']
+    streaked(c, pixels, rects['basic_planeoff.png'])
+    streaked(c, pixels, rects['basic_planeon.png'], [(left, by + 4, right, by + 6 + BAR_ARROW_H) for left, right, _ in BAR_ARROWS])
     for left, right, direction in BAR_ARROWS:
         arrow_in_bar(c, pixels, (left, by + 5, right, by + 5 + BAR_ARROW_H), direction)
     # Yes and No are placed to keep their row in the middle, and the others on their own buttons.
@@ -2459,6 +2516,160 @@ def sheet_of_windows(archive, labels, drawer, out, sign_set):
     for name, word in (('basic_flwin_resume.png', 'RESUME'), ('basic_flwin_retry.png', 'RETRY'), ('basic_flwin_return.png', 'RETURN')):
         wipe(c, rects[name])
         write_text(c, drawer, word, rects[name], WHITE, True, WORD_EDGE)
+    write_sheet(c, pixels, out)
+
+
+# ---- the editor's small icons: the camera's ways of moving, its time and its preview
+EDIT_ICON_EDGE = (11, 66, 166)
+EDIT_ICON_FILL = (148, 254, 244)
+
+
+def ellipse_points(cx, cy, rx, ry, from_deg, to_deg, steps=16):
+    return [(cx + rx * math.cos(math.radians(from_deg + (to_deg - from_deg) * k / steps)),
+             cy + ry * math.sin(math.radians(from_deg + (to_deg - from_deg) * k / steps))) for k in range(steps + 1)]
+
+
+def edged_icon(sheet, box, fills=(), lines=(), dark=(), dark_lines=(), clear=True):
+    """An icon in the editor's two colours: cyan shapes and strokes inside a dark blue edge one
+    pixel wide all round, and marks of the dark blue drawn over them."""
+    x, y, w, h = box
+    c = Canvas(w, h)
+    edge = [part for poly in fills for part in [poly] + polyline(poly + poly[:1], 2.0)]
+    edge += [part for points, width in lines for part in polyline(points, width + 2.0)]
+    c.paint(edge + list(dark), EDIT_ICON_EDGE)
+    inside = list(fills) + [part for points, width in lines for part in polyline(points, width)]
+    c.paint(inside, EDIT_ICON_FILL)
+    marks = list(dark) + [part for points, width in dark_lines for part in polyline(points, width)]
+    if marks:
+        c.paint(marks, EDIT_ICON_EDGE)
+    if clear:
+        wipe(sheet, box)
+    paste(sheet, c, x, y)
+
+
+def edit_icons(sheet, rects):
+    """Each traced from the game's twelve pixels as the shapes they stand for."""
+    edged_icon(sheet, rects['cameramd_icon_parallel.png'],
+               fills=[[(6, 1.0), (7.9, 3.1), (4.1, 3.1)], [(6, 11.0), (4.1, 8.9), (7.9, 8.9)],
+                      [(1.0, 6), (3.1, 7.9), (3.1, 4.1)], [(11.0, 6), (8.9, 4.1), (8.9, 7.9)]],
+               lines=[([(6, 2.8), (6, 9.2)], 1.8), ([(2.8, 6), (9.2, 6)], 1.8)])
+    edged_icon(sheet, rects['cameramd_icon_rotate.png'],
+               fills=[[(1.0, 2.6), (4.6, 2.6), (2.5, 5.2)], [(7.4, 2.6), (11.0, 2.6), (9.5, 5.2)]],
+               lines=[(ellipse_points(6, 4.8, 4.0, 3.4, 0, 180), 1.3)],
+               dark_lines=[([(6, 2.6), (6, 6.4)], 2.0)])
+    edged_icon(sheet, rects['cameramd_icon_preview.png'], fills=[[(1.4, 1.2), (10.8, 6), (1.4, 10.8)]])
+    edged_icon(sheet, rects['cameramd_icon_time.png'], fills=[circle(6, 6, 4.9, 32)],
+               dark_lines=[([(6, 6.6), (6, 1.8)], 1.6), ([(6, 6.6), (9.0, 6.6)], 1.2)])
+    camera = rects['cameramd_icon_camera.png']
+    body = rounded(1, 3, 10, 8, 1.2)
+    edged_icon(sheet, camera, fills=[body, rect(9, 1, 2, 1)],
+               dark=[circle(6, 7, 2.1, 20)],
+               dark_lines=[(ellipse_points(6, 7, 3.5, 3.1, 140, 220, 8), 1.3), (ellipse_points(6, 7, 3.5, 3.1, -40, 40, 8), 1.3)])
+
+
+def edit_dark(p):
+    """The dark blue of the editor's icons, which neither kind of button has elsewhere inside."""
+    return p[2] > 130 and p[0] < 70 and p[1] < 130
+
+
+def grid_icon_shapes(name):
+    """The grid's icons, in the game's pixels from the corner of each one's dark edge: cyan lines
+    one pixel wide (or shapes) that edged_icon puts inside an edge of the dark blue."""
+    head = 1.3
+    shapes = {
+        '1': dict(lines=[([(0.8, 8.5), (27.5, 8.5)], 1.0), ([(8.8, 0.8), (0.8, 8.5), (8.8, 16.2)], head)]),
+        '2': dict(lines=[([(5.5, 0.8), (5.5, 18.6)], 1.0), ([(1.2, 13.8), (5.5, 18.6), (9.8, 13.8)], head)]),
+        '3': dict(lines=[([(0.5, 5.5), (22.2, 5.5)], 1.0), ([(17.6, 1.0), (22.2, 5.5), (17.6, 10.0)], head)]),
+        '4': dict(lines=[([(7.5, 0.8), (7.5, 9.5), (1.6, 16.4)], 1.0), ([(1.6, 11.4), (1.6, 16.4), (6.6, 16.4)], head)]),
+        '5': dict(lines=[([(1.0, 1.0), (18.4, 18.4)], 1.0), ([(18.4, 12.6), (18.4, 18.4), (12.6, 18.4)], head)]),
+        '6': dict(lines=[([(1.0, 7.5), (13.4, 18.4)], 1.0), ([(13.4, 12.6), (13.4, 18.4), (8.6, 18.4)], head),
+                         ([(20.6, 13.4), (9.6, 1.6)], 1.0), ([(9.6, 6.4), (9.6, 1.6), (14.6, 1.6)], head)]),
+        '7': dict(lines=[([(0.6, 1.5), (8.5, 1.5), (21.4, 16.4)], 1.0), ([(21.4, 10.6), (21.4, 16.4), (16.6, 16.4)], head)]),
+        '8': dict(lines=[([(0.8, 4.5), (16.4, 4.5)], 1.0), ([(4.6, 1.0), (0.8, 4.5), (4.6, 8.0)], head),
+                         ([(6.6, 13.5), (22.2, 13.5)], 1.0), ([(18.4, 10.0), (22.2, 13.5), (18.4, 17.0)], head)]),
+        'count': dict(lines=[(ellipse_points(8.6, 9.5, 7.5, 8.0, 0, 360, 40), 1.3), (ellipse_points(8.6, 9.5, 3.6, 3.8, 40, 320, 20), 1.3)]),
+        'ie': dict(fills=[[(8.0, 0.8), (15.2, 9.2), (0.8, 9.2)], rect(3.2, 11.0, 9.6, 5.4)], dark=[rect(6.0, 11.0, 4.0, 3.6)]),
+        'oto': dict(lines=[([(5.5, 0.8), (5.5, 12.6)], 1.0), ([(5.6, 1.2), (7.6, 3.2), (9.4, 5.6), (9.4, 7.8), (8.4, 9.6)], 1.0)],
+                    fills=[ellipse(2.9, 14.0, 2.6, 1.9)]),
+    }
+    return shapes[name]
+
+
+def icon_box_off(pixels, box):
+    """Where an icon's dark edge is on a button that is not lit, and which of its pixels it covers."""
+    x, y, w, h = box
+    pts = [(i, j) for j in range(y + 2, y + h - 2) for i in range(x + 2, x + w - 2) if edit_dark(pixels[j][i])]
+    x0, y0 = min(i for i, _ in pts), min(j for _, j in pts)
+    x1, y1 = max(i for i, _ in pts) + 1, max(j for _, j in pts) + 1
+    return (x0, y0, x1 - x0, y1 - y0), {(i - x0, j - y0) for i, j in pts}
+
+
+def icon_box_lit(pixels, box, size, mask):
+    """The same icon on the lit button, found where its dark pixels match best."""
+    x, y, w, h = box
+    iw, ih = size
+    best = None
+    for oy in range(y + 3, y + h - ih - 2):
+        for ox in range(x + 3, x + w - iw - 2):
+            score = sum(1 for i, j in mask if edit_dark(pixels[oy + j][ox + i]))
+            if best is None or score > best[0]:
+                best = (score, ox, oy)
+    return best[1], best[2], iw, ih
+
+
+def under_icon(sheet, box):
+    """The button under an icon, run on from each side of it, row by row."""
+    x, y, w, h = box
+    m = 1
+    x0, x1 = (x - m) * SCALE, (x + w + m) * SCALE
+    for row in range((y - m) * SCALE, (y + h + m) * SCALE):
+        a = sheet.data[(row * sheet.w + x0 - 1) * 4:(row * sheet.w + x0) * 4]
+        b = sheet.data[(row * sheet.w + x1) * 4:(row * sheet.w + x1 + 1) * 4]
+        for col in range(x0, x1):
+            t = (col - x0 + 0.5) / (x1 - x0)
+            sheet.data[(row * sheet.w + col) * 4:(row * sheet.w + col + 1) * 4] = bytes(int(a[k] + (b[k] - a[k]) * t) for k in range(4))
+
+
+def grid_icons(sheet, pixels, rects):
+    """The icons on the editor grid's buttons, unlit and lit, drawn over the button run on under them."""
+    for name in ('1', '2', '3', '4', '5', '6', '7', '8', 'count', 'ie', 'oto'):
+        off, mask = icon_box_off(pixels, rects['editmd_btn_%s_act.png' % name])
+        lit = icon_box_lit(pixels, rects['editmd_btn_%s_a_act.png' % name], off[2:], mask)
+        for box in (off, lit):
+            under_icon(sheet, box)
+            shapes = grid_icon_shapes(name)
+            x, y = box[0], box[1]
+            c = Canvas(box[2] + 2, box[3] + 2)
+            moved = lambda pts: [(px + 1, py + 1) for px, py in pts]
+            edged_icon(c, (0, 0, c.w // SCALE, c.h // SCALE),
+                       fills=[moved(p) for p in shapes.get('fills', ())],
+                       lines=[(moved(pts), width) for pts, width in shapes.get('lines', ())],
+                       dark=[moved(p) for p in shapes.get('dark', ())], clear=False)
+            blend(sheet, c, x - 1, y - 1)
+
+
+def made_or_enlarged(archive, picture, pixels, out):
+    """The picture as the build has made it so far in this language, or the game's own enlarged."""
+    path = os.path.join(out, '%08X.rgba' % colour_hash(pixels))
+    if not os.path.exists(path):
+        w, h = len(pixels[0]), len(pixels)
+        return enlarged(archive, picture, pixels, w, h)
+    with open(path, 'rb') as f:
+        made_w, made_h = struct.unpack('<II', f.read(8))
+        data = f.read()
+    c = Canvas(made_w // SCALE, made_h // SCALE)
+    for row in range(made_h):
+        c.data[(made_h - 1 - row) * made_w * 4:(made_h - row) * made_w * 4] = data[row * made_w * 4:(row + 1) * made_w * 4]
+    return c
+
+
+def sheet_of_edit_buttons(archive, out):
+    picture = 'edit_button.png'
+    w, h, pixels = decode_png(archive.read(archive.find(picture)))
+    c = made_or_enlarged(archive, picture, pixels, out)
+    rects = layout_of(archive, picture)
+    edit_icons(c, rects)
+    grid_icons(c, pixels, rects)
     write_sheet(c, pixels, out)
 
 
@@ -2824,6 +3035,7 @@ def main():
     sheet_of_arrows(archive, out)
     sheet_of_icons(archive, family, out)
     sheet_of_card(archive, out)
+    sheet_of_edit_buttons(archive, out)
     for picture in ('result_win_nm.png', 'result_win_edit.pn'):
         sheet_of_result_window(archive, picture, out)
     write_card_swaps(archive, out)
