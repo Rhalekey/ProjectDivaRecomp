@@ -6,6 +6,9 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 
 ## 2026-11-09
 
+### System screens
+- Rhythm Game Edit's data can be saved, loaded and deleted by choosing a slot, as the PSP's own list of saves does: new data or which to save over, which to load, which to delete, with a question before saving over or deleting. Its data is named with an on-screen keyboard, with a controller or by typing.
+
 ### Movies
 - The opening movie plays, with its sound: the PSP's movie player (sceMpeg) is written for it, over FFmpeg's H.264 and ATRAC3plus decoders, which the build downloads and the game loads while it runs. Without them, the movie is skipped as before.
 - For it, in the recompiler: a thread is given a copy of what it is started with, on its own stack, as the console does (the movie's thread read its player from a stack that had been used again); the status of an event flag and of a thread can be asked for; and sceDmacMemcpy copies. A screen the game fills with a copy, as the movie's pictures, is shown from memory even if it was drawn on before, so every other picture is no longer the white of what was last drawn there, and it is smoothed as the rest is.

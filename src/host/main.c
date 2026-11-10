@@ -19,6 +19,7 @@
 #include "language.h"
 #include "letters.h"
 #include "controls.h"
+#include "system_dialogs.h"
 #include "language_screen.h"
 #include "mods.h"
 #include "screenshot.h"
@@ -301,6 +302,7 @@ int main(int argc, char **argv) {
         if (g_options.smoothing >= 0) g_settings.present_linear = g_options.smoothing;
         psp_window_set_mode(g_options.display_mode);
         controls_start(argv[2]);
+        system_dialogs_start();
     }
     language_start(g_data_dir);
     if (g_settings.translations) {

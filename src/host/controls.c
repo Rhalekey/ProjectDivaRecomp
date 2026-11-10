@@ -340,6 +340,15 @@ static menu_input read_menu(int split) {
     return in;
 }
 
+/* For the other screens shown over the game (system_dialogs.c): the same reading, the confirm button
+ * as the player chose it, and which they used last. */
+controls_input controls_screen_input(void) {
+    const menu_input in = read_menu(1);
+    return (controls_input){in.up, in.down, in.left, in.right, in.ok, in.back};
+}
+int controls_screen_from_pad(void) { return g_from_pad; }
+const char *controls_disc(void) { return g_disc; }
+
 /* ---- which button confirms ---------------------------------------------------------- */
 
 static const wchar_t *const ASK_QUESTION[UI_COUNT] = {L"Which button confirms?", L"\x6c7a\x5b9a\x30dc\x30bf\x30f3\x3092\x9078\x3093\x3067\x304f\x3060\x3055\x3044", L"Welche Taste best\x00e4tigt?"};
