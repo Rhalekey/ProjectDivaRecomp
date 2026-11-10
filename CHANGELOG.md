@@ -12,6 +12,9 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 - For it, in the recompiler: the host's list of saves can ask for the slots to be read again and the player asked again.
 - The system's message, which the game asks for only to report an error by its number (the Memory Stick full, save data damaged or missing, the stick not read or written), is told over the game as "Game saved" is, in the game's language with the error's number, and stays until a button is pressed. Before, it was answered unseen. In the recompiler, the message's kind, number, text and buttons are passed to the host.
 
+### Language
+- German is shown by Austria's flag on the language screen.
+
 ### Controls and notes
 - **Note timing by song**: each song learns its own correction, added to Note timing as it starts. After a song with at least 20 presses, how late they were against the setting moves that song's correction towards it, all the way the first time and a third of the way after, at most 80 ms either way. Kept in `SONGTIMING.INI` beside the port's options. The measure in Options leaves the song's correction out.
 

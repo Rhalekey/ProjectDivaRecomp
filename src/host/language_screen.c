@@ -57,11 +57,11 @@ static void flag_japan(double x, double y, double *r, double *g, double *b) {
     else set(r, g, b, 245, 245, 245);
 }
 
-static void flag_germany(double x, double y, double *r, double *g, double *b) {
+/* German is shown by Austria's flag, red, white and red. */
+static void flag_austria(double x, double y, double *r, double *g, double *b) {
     (void)x;
-    if (y < -1.0 / 3) set(r, g, b, 10, 10, 10);
-    else if (y < 1.0 / 3) set(r, g, b, 221, 0, 0);
-    else set(r, g, b, 255, 206, 0);
+    if (y < -1.0 / 3 || y >= 1.0 / 3) set(r, g, b, 200, 16, 46);
+    else set(r, g, b, 255, 255, 255);
 }
 
 static const struct {
@@ -78,7 +78,7 @@ static const struct {
     {"ja", L"日本語", flag_japan, L"言語を選択してください",
      {L"メニューと会話の言語を設定します。", L"楽曲の音声は日本語のままです。", L"", L"オプションで後から変更できます。"},
      L"決定", L"移動"},
-    {"de", L"Deutsch", flag_germany, L"Sprache wählen",
+    {"de", L"Deutsch", flag_austria, L"Sprache wählen",
      {L"Menüs und Dialoge nutzen diese", L"Sprache. Die Lieder bleiben", L"auf Japanisch.", L"Später unter Optionen änderbar."},
      L"Auswählen", L"Bewegen"},
 };
