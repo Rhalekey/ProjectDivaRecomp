@@ -72,6 +72,8 @@ BAR_ARROWS = ((113, 117, 'left'), (167, 171, 'right'))
 BAR_ARROW_TOP, BAR_ARROW_H = 12, 7   # from the glow's top; in the plain bar they start 5 from its top
 BAR_ARROW_MARGIN = 2   # around one, where the old halo is cleared
 BAR_ARROW_HALO = 1.2   # and how far the new one spreads
+SYMBOL_GLOW_REACH = 5.5   # the rhythm screen's shapes glow this far
+SYMBOL_GLOW_ALPHA = 200   # and this strongly at their edge
 STREAK_REACH = 2       # the lists' bars and glows are smoothed along their rows three times this far
 ICON_PINK_TOP, ICON_PINK_LOW = (236, 30, 155), (160, 0, 96)
 ICON_BLUE_TOP, ICON_BLUE_LOW = (60, 150, 212), (1, 98, 166)
@@ -2663,6 +2665,47 @@ def made_or_enlarged(archive, picture, pixels, out):
     return c
 
 
+# ---- the shapes on the rhythm screen's beat lines: white, a coloured middle, and a soft glow
+def glowing_symbol(sheet, box, white, middle_edge, middle, edge_colour, fill_colour, glow):
+    """A beat line's shape: its glow in the colour of its middle, spread from the white shape,
+    then the white, then its middle with a darker edge one pixel wide."""
+    x, y, w, h = box
+    c = Canvas(w, h)
+    mask = Canvas(w, h)
+    mask.paint(white, WHITE)
+    for i, cover in enumerate(blurred(mask, SYMBOL_GLOW_REACH)):
+        alpha = int(min(1.0, cover / 255 * 1.7) * SYMBOL_GLOW_ALPHA)
+        if alpha:
+            c.data[i * 4:i * 4 + 4] = bytes(glow[:3]) + bytes([alpha])
+    c.paint(white, WHITE)
+    c.paint(middle_edge, edge_colour)
+    c.paint(middle, fill_colour)
+    wipe(sheet, box)
+    paste(sheet, c, x, y)
+
+
+def rhythm_symbols(sheet, rects):
+    """Measured from the game's: each centred at (22, 20) of its piece."""
+    def bars(arm, width):
+        return [segment(22 - arm, 20 - arm, 22 + arm, 20 + arm, width), segment(22 + arm, 20 - arm, 22 - arm, 20 + arm, width)]
+    glowing_symbol(sheet, rects['edit_icon_sankaku.png'], [[(22, 4.2), (38.4, 34), (5.6, 34)]],
+                   [[(22, 15.4), (29.4, 29), (14.6, 29)]], [[(22, 17.4), (27.6, 28), (16.4, 28)]], (4, 161, 129), (1, 193, 152), (2, 205, 167))
+    glowing_symbol(sheet, rects['edit_icon_maru.png'], [circle(22, 20, 15, 72)],
+                   [circle(22, 20, 10, 64)], [circle(22, 20, 9, 64)], (195, 39, 118), (252, 40, 146), (253, 43, 151))
+    glowing_symbol(sheet, rects['deit_icon_batsu.png'], bars(13.5, 7.0), bars(7.6, 3.6), bars(7.0, 2.0), (55, 146, 204), (60, 162, 228),
+                   (68, 180, 247))
+    glowing_symbol(sheet, rects['edit_icon_shikaku.png'], [rect(8, 6, 28, 28)], [rect(14, 12, 16, 16)], [rect(15, 13, 14, 14)],
+                   (189, 75, 156), (255, 101, 214), (255, 114, 219))
+
+
+def sheet_of_rhythm(archive, out):
+    picture = 'edit_rhythm.png'
+    w, h, pixels = decode_png(archive.read(archive.find(picture)))
+    c = made_or_enlarged(archive, picture, pixels, out)
+    rhythm_symbols(c, layout_of(archive, picture))
+    write_sheet(c, pixels, out)
+
+
 def sheet_of_edit_buttons(archive, out):
     picture = 'edit_button.png'
     w, h, pixels = decode_png(archive.read(archive.find(picture)))
@@ -3036,6 +3079,7 @@ def main():
     sheet_of_icons(archive, family, out)
     sheet_of_card(archive, out)
     sheet_of_edit_buttons(archive, out)
+    sheet_of_rhythm(archive, out)
     for picture in ('result_win_nm.png', 'result_win_edit.pn'):
         sheet_of_result_window(archive, picture, out)
     write_card_swaps(archive, out)
