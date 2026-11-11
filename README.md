@@ -165,6 +165,18 @@ mods\notes\my skin\targets.png     optional: the targets, circle top left, trian
 
 A picture left out keeps the game's own. `mods\notes\_template` is written by the game with pictures at the size and place it expects, drawn from code, to start from; folders starting with `_` are not offered. Changes show after a restart.
 
+### Module skins
+
+Each folder in `mods\modules` with a `body.igb` is a look added to Module Convert's list, after the game's modules, under the folder's name:
+
+```
+mods\modules\my look\body.igb     the body, in the game's format (as skinNN.igb)
+mods\modules\my look\head.igb     optional: the head (as skinNN_head.igb); the base's own if left out
+mods\modules\my look\skin.ini     optional: base = N, the module it is worn over (0 if left out)
+```
+
+A skin is worn over one of the game's modules, its base, whose motions and everything else it keeps; only the models are its own. Up to 11 fit in the list. Converting models from common formats (FBX, PMX, glTF, VRM) is being worked on; until then the files must already be in the game's format, which `Tools\igb.py` reads and writes.
+
 ## Tools
 
 | Script | Purpose |

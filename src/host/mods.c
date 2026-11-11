@@ -202,6 +202,21 @@ static size_t afs_read_some(afs_virtual *a, uint64_t at, uint8_t *out, size_t n)
 
 static int on_open(const char *guest, const char *host, psp_io_virtual *out);
 static const char *g_watched_entry;
+
+/* Files added as entries past the end of DivaDataList.afs, and the first one's number once open. */
+#define MAX_EXTRA 64
+static mod_file g_extra[MAX_EXTRA];
+static int g_nextra, g_extra_first = -1;
+
+int mods_add_entry(const char *name, const char *path) {
+    if (g_nextra == MAX_EXTRA) return -1;
+    g_extra[g_nextra].name = dup_string(name);
+    g_extra[g_nextra].path = dup_string(path);
+    psp_io_set_open_hook(on_open);
+    return g_nextra++;
+}
+
+int mods_added_entry(int k) { return g_extra_first >= 0 && k >= 0 && k < g_nextra ? g_extra_first + k : -1; }
 static void (*g_watch_function)(void);
 
 void mods_on_first_read(const char *entry, void (*function)(void)) {
@@ -298,14 +313,32 @@ static int open_afs(const char *host, psp_io_virtual *out) {
     free(table);
     if (a->header_size < table_size || !names_at || a->names_size < a->count * AFS_NAME_RECORD) goto none;
 
-    a->header = (uint8_t *)malloc(a->header_size);
-    a->names = (uint8_t *)malloc(a->names_size);
+    /* Entries added after the game's own, in the archive that holds the models. */
+    const size_t host_len = strlen(host);
+    const uint32_t original = a->count;
+    const uint32_t extra = host_len >= 16 && _stricmp(host + host_len - 16, "DivaDataList.afs") == 0 ? (uint32_t)g_nextra : 0;
+    const uint32_t original_names = a->names_size;
+    const uint32_t original_header = a->header_size;
+    a->count += extra;
+    a->names_size += extra * AFS_NAME_RECORD;
+    /* Its table grows into the room before the first entry, or that room grows. */
+    if (8u + a->count * 8u + 8u > a->header_size) a->header_size = (uint32_t)sector_up(8u + a->count * 8u + 8u);
+
+    a->header = (uint8_t *)calloc(1, a->header_size);
+    a->names = (uint8_t *)calloc(1, a->names_size);
     a->entries = (afs_entry *)calloc(a->count, sizeof *a->entries);
     if (!a->header || !a->names || !a->entries) goto none;
     _fseeki64(f, 0, SEEK_SET);
-    if (fread(a->header, 1, a->header_size, f) != a->header_size) goto none;
+    if (fread(a->header, 1, original_header, f) != original_header) goto none;
     _fseeki64(f, names_at, SEEK_SET);
-    if (fread(a->names, 1, a->names_size, f) != a->names_size) goto none;
+    if (fread(a->names, 1, original_names, f) != original_names) goto none;
+    if (extra) {
+        write_u32(a->header + 4, a->count);
+        g_extra_first = (int)original;
+        for (uint32_t k = 0; k < extra; k++) {
+            snprintf((char *)a->names + (original + k) * AFS_NAME_RECORD, AFS_NAME_LEN, "%s", g_extra[k].name);
+        }
+    }
 
     /* Lay the entries out again in order, each from its original or its mod. */
     uint64_t at = a->header_size;
@@ -317,10 +350,10 @@ static int open_afs(const char *host, psp_io_virtual *out) {
 
         afs_entry *e = &a->entries[i];
         uint8_t *slot = a->header + 8 + i * 8;
-        e->source = read_u32(slot);
-        e->size = read_u32(slot + 4);
+        e->source = i < original ? read_u32(slot) : 0;
+        e->size = i < original ? read_u32(slot + 4) : 0;
         e->part = -1;
-        const char *path = find_file(g_entries, g_nentries, name);
+        const char *path = i < original ? find_file(g_entries, g_nentries, name) : g_extra[i - original].path;
         if (path) {
             e->part = get_part(a, path);
             if (e->part >= 0) {
@@ -342,7 +375,8 @@ static int open_afs(const char *host, psp_io_virtual *out) {
 
     a->names_offset = at;
     write_u32(a->header + 8 + a->count * 8, (uint32_t)at);
-    fprintf(stderr, "mods: %s: %d entries replaced, by %d files\n", host, replaced, a->nparts);
+    write_u32(a->header + 12 + a->count * 8, a->names_size);
+    fprintf(stderr, "mods: %s: %d entries replaced or added, by %d files\n", host, replaced, a->nparts);
     out->size = sector_up(at + a->names_size);
     out->ctx = a;
     out->read = afs_read;
@@ -387,7 +421,7 @@ static int on_open(const char *guest, const char *host, psp_io_virtual *out) {
         return 1;
     }
 
-    if (n > 4 && _stricmp(rel + n - 4, ".afs") == 0 && (g_nentries || g_watched_entry)) return open_afs(host, out);
+    if (n > 4 && _stricmp(rel + n - 4, ".afs") == 0 && (g_nentries || g_nextra || g_watched_entry)) return open_afs(host, out);
     return 0;
 }
 

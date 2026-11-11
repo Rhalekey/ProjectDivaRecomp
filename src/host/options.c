@@ -21,6 +21,8 @@ diva_options g_options = {
     1,
     OPTIONS_STYLE_PLAYSTATION,
     OPTIONS_NOTES_PLAYSTATION,
+    "",
+    "",
     0,
     0,
     {40, 41},
@@ -90,6 +92,8 @@ int options_load(const char *data_dir) {
             g_options.free_singers = number != 0;
         } else if (sscanf(line, "keep_vocal = %d", &number) == 1) {
             g_options.keep_vocal = number != 0;
+        } else if (sscanf(line, "module_skin = %47[^\r\n]", skin) == 1) {
+            snprintf(g_options.module_skin, sizeof g_options.module_skin, "%s", skin);
         } else if (sscanf(line, "note_skin = %47[^\r\n]", skin) == 1) {
             snprintf(g_options.note_skin, sizeof g_options.note_skin, "%s", skin);
         } else if (sscanf(line, "note_style = %d", &number) == 1) {
@@ -141,6 +145,7 @@ void options_save(const char *data_dir) {
             g_options.note_style < OPTIONS_NOTES_COUNT ? g_options.note_style : 0,
             g_options.dpad_notes, g_options.restart_key);
     if (g_options.note_style >= OPTIONS_NOTES_COUNT && g_options.note_skin[0]) fprintf(f, "note_skin = %s\n", g_options.note_skin);
+    if (g_options.module_skin[0]) fprintf(f, "module_skin = %s\n", g_options.module_skin);
     if (g_options.render_scale) fprintf(f, "render_scale = %d\n", g_options.render_scale);
     if (g_options.smoothing >= 0) fprintf(f, "smoothing = %d\n", g_options.smoothing);
     if (g_options.ask_language >= 0) fprintf(f, "ask_language = %d\n", g_options.ask_language);

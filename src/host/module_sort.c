@@ -13,6 +13,7 @@
  * Addresses are for ULJM05472 v1.01, which Tools\build.ps1 checks.
  */
 #include "module_sort.h"
+#include "module_skins.h"
 #include "guest.h"
 
 #include "language.h"
@@ -123,7 +124,7 @@ static void work_out_orders(void) {
 }
 
 /* The list's rows put in the order wanted, by their modules; rows that are no module (number -1)
- * stay where they are. False if the list is not, or no longer, the modules'. */
+ * and the module skins' rows (module_skins.c) stay where they are. False if the list is not, or no longer, the modules'. */
 static int sort_rows(uint32_t list, const int *wanted) {
     if (!guest_in_ram(list)) return 0;
     const int count = (int)psp_read32(list + LIST_COUNT);
@@ -133,10 +134,10 @@ static int sort_rows(uint32_t list, const int *wanted) {
     uint8_t seen[MODULES] = {0};
     for (int i = 0; i < count; i++) {
         const int module = (int)psp_read32(rows + (uint32_t)i * ROW_SIZE + ROW_VALUE);
-        if (module == -1) continue;
+        const uint32_t words = psp_read32(rows + (uint32_t)i * ROW_SIZE);
+        if (module == -1 || module_skins_row(words) >= 0) continue;
         if (module < 0 || module >= MODULES || seen[module]) return 0;
         seen[module] = 1;
-        const uint32_t words = psp_read32(rows + (uint32_t)i * ROW_SIZE);
         if (!guest_in_ram(words)) return 0;
         places[n] = i;
         modules[n++] = module;
@@ -205,7 +206,7 @@ static int is_module_list(uint32_t list) {
     int n = 0;
     for (int i = 0; i < count; i++) {
         const int module = (int)psp_read32(rows + (uint32_t)i * ROW_SIZE + ROW_VALUE);
-        if (module == -1) continue;
+        if (module == -1 || module_skins_row(psp_read32(rows + (uint32_t)i * ROW_SIZE)) >= 0) continue;
         if (module < 0 || module >= MODULES || seen[module]) return 0;
         seen[module] = 1;
         if (psp_read32(rows + (uint32_t)i * ROW_SIZE) != psp_read32(MODULE_NAMES + (uint32_t)module * 4)) return 0;
@@ -237,6 +238,7 @@ void module_sort_input(uint32_t buttons) {
      * the game's thread, as it reads the buttons, so its functions can be called), for what was
      * obtained or played since, and it is put in the order chosen. */
     const uint32_t list = find_module_list();
+    module_skins_screen(list);
     if (list != g_list) {
         g_list = list;
         if (list) {

@@ -269,7 +269,7 @@ class IGB:
             start = self.align_up(len(memory), self.memory_alignment(e))
             memory += b'\0' * (start - len(memory)) + block
             mcount += 1
-        mem_size = max(self.mem_size, len(memory)) if len(memory) <= self.mem_size else len(memory)
+        mem_size = len(memory)
         out += memory + self.tail
 
         struct.pack_into('<12I', out, 0, len(entries), len(self.entries), len(mo), len(self.meta_objects), len(objects), count,
@@ -302,6 +302,90 @@ class IGB:
             else:
                 e = self.entries[index]
                 print('%4d mem %-26s %d bytes, align %d' % (slot, self.memory_type(e), len(item), self.memory_alignment(e)))
+
+
+    # ---- changing
+    def own_entry(self, slot):
+        """The slot's directory entry, made its own first: entries that are alike are shared by
+        many slots, and a change to a shared one would change them all."""
+        index = self.indexes[slot]
+        if sum(1 for i in self.indexes if i == index) > 1:
+            e = self.entries[index]
+            self.entries.append(Entry(e.meta, list(e.values)))
+            self.indexes[slot] = len(self.entries) - 1
+        return self.entries[self.indexes[slot]]
+
+    def set_memory(self, slot, data):
+        """A block of memory given new contents, of any size."""
+        self.own_entry(slot).values[1] = struct.pack('<I', len(data))
+        self.items[slot] = bytes(data)
+
+    def add_memory(self, like_slot, data):
+        """A new block, of the kind of another; returns its slot."""
+        e = self.entries[self.indexes[like_slot]]
+        self.entries.append(Entry(e.meta, list(e.values)))
+        self.entries[-1].values[1] = struct.pack('<I', len(data))
+        self.indexes.append(len(self.entries) - 1)
+        self.items.append(bytes(data))
+        return len(self.items) - 1
+
+    def add_object(self, like_slot, values):
+        """A new object, of the class of another; returns its slot."""
+        e = self.entries[self.indexes[like_slot]]
+        self.entries.append(Entry(e.meta, list(e.values)))
+        self.indexes.append(len(self.entries) - 1)
+        self.items.append(Object(self.items[like_slot].meta, list(values)))
+        return len(self.items) - 1
+
+    # ---- references
+    REF_FIELDS = ('igObjectRefMetaField', 'igMemoryRefMetaField')
+
+    def refs_of(self, slot):
+        """The directory slots this slot refers to: from an object's reference fields, or the
+        words of a block of references."""
+        item = self.items[slot]
+        out = []
+        if isinstance(item, Object):
+            for (f, _s, _z), v in zip(self.meta_objects[item.meta].fields, item.values):
+                if self.meta_fields[f][0] in self.REF_FIELDS and len(v) == 4 and i32(v, 0) >= 0:
+                    out.append(i32(v, 0))
+        elif self.memory_type(self.entries[self.indexes[slot]]) in self.REF_FIELDS:
+            out += [r for r in struct.unpack('<%di' % (len(item) // 4), item[:len(item) // 4 * 4]) if r >= 0]
+        return out
+
+    def collect(self):
+        """Leaves out every object and block nothing reaches from the info list; returns how many."""
+        if self.info is None:
+            return 0
+        seen, todo = set(), [self.info]
+        while todo:
+            slot = todo.pop()
+            if slot in seen or not 0 <= slot < len(self.items):
+                continue
+            seen.add(slot)
+            todo += self.refs_of(slot)
+        keep = [s for s in range(len(self.items)) if s in seen]
+        new = {old: i for i, old in enumerate(keep)}
+        remap = lambda r: new.get(r, -1) if r >= 0 else r
+        for slot in keep:
+            item = self.items[slot]
+            if isinstance(item, Object):
+                for k, ((f, _s, _z), v) in enumerate(zip(self.meta_objects[item.meta].fields, item.values)):
+                    if self.meta_fields[f][0] in self.REF_FIELDS and len(v) == 4:
+                        item.values[k] = struct.pack('<i', remap(i32(v, 0)))
+            elif self.memory_type(self.entries[self.indexes[slot]]) in self.REF_FIELDS:
+                n = len(item) // 4
+                words = [remap(r) for r in struct.unpack('<%di' % n, item[:n * 4])]
+                self.items[slot] = struct.pack('<%di' % n, *words) + item[n * 4:]
+        # Entries still used, in their order.
+        used = sorted({self.indexes[s] for s in keep})
+        entry_at = {old: i for i, old in enumerate(used)}
+        dropped = len(self.items) - len(keep)
+        self.entries = [self.entries[i] for i in used]
+        self.indexes = [entry_at[self.indexes[s]] for s in keep]
+        self.items = [self.items[s] for s in keep]
+        self.info = new[self.info]
+        return dropped
 
 
 def main():

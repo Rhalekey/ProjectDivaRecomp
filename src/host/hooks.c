@@ -1,6 +1,7 @@
 /* Where generated code calls the host. Tools\build.ps1 names the functions that do. */
 
 #include "hooks.h"
+#include "module_skins.h"
 
 #include "controls.h"
 #include "extras.h"
@@ -58,6 +59,6 @@ void psp_game_hook(uint32_t addr) {
         presence_chosen(game ? psp_read32(game + GAME_SCORES) : 0, (int)psp_cpu.r[REG_A1], (int)psp_cpu.r[REG_A2]);
     } else if (addr == LIFE_CHANGE) on_life_change();
     else if (addr == MOVIE_START) on_movie_start();
-    else if (!controls_hook(addr) && !extras_hook(addr) && !timing_hook(addr) && !song_sort_hook(addr) && !practice_hook(addr))
+    else if (!controls_hook(addr) && !extras_hook(addr) && !timing_hook(addr) && !song_sort_hook(addr) && !practice_hook(addr) && !module_skins_hook(addr))
         translation_hook(addr);
 }

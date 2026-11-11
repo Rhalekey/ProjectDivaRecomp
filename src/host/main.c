@@ -22,6 +22,7 @@
 #include "system_dialogs.h"
 #include "language_screen.h"
 #include "mods.h"
+#include "module_skins.h"
 #include "note_skins.h"
 #include "screenshot.h"
 #include "presence.h"
@@ -332,6 +333,7 @@ int main(int argc, char **argv) {
         char default_mods[1100];
         snprintf(default_mods, sizeof default_mods, "%s\\..\\mods", g_data_dir);
         g_mod_files = mods_init(mods_dir ? mods_dir : default_mods);
+        module_skins_scan(mods_dir ? mods_dir : default_mods);
         /* Note skins are more choices in Options, so they come with the extras. */
         if (g_settings.extras && note_skins_scan(mods_dir ? mods_dir : default_mods, g_data_dir) && g_options.note_skin[0]) {
             const int skin = note_skins_find(g_options.note_skin);
