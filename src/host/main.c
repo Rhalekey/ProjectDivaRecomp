@@ -333,7 +333,7 @@ int main(int argc, char **argv) {
         char default_mods[1100];
         snprintf(default_mods, sizeof default_mods, "%s\\..\\mods", g_data_dir);
         g_mod_files = mods_init(mods_dir ? mods_dir : default_mods);
-        module_skins_scan(mods_dir ? mods_dir : default_mods);
+        module_skins_scan(mods_dir ? mods_dir : default_mods, argv[2], g_data_dir);
         /* Note skins are more choices in Options, so they come with the extras. */
         if (g_settings.extras && note_skins_scan(mods_dir ? mods_dir : default_mods, g_data_dir) && g_options.note_skin[0]) {
             const int skin = note_skins_find(g_options.note_skin);

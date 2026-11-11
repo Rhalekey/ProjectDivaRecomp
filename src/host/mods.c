@@ -159,6 +159,42 @@ static size_t read_part(afs_part *p, uint64_t offset, void *dst, size_t n) {
     return p->f ? file_read(p->f, offset, dst, n) : 0;
 }
 
+/* ---- entries added past the end of DivaDataList.afs ------------------------------------------
+ *
+ * Each has room of a size fixed as the archive opens, as the game keeps every entry's size from
+ * then on, and the file it is read from can change while the game runs: a few of them serve any
+ * number of files. Past the end of its file an entry reads as noughts. */
+
+#define MAX_EXTRA 16
+
+typedef struct {
+    char name[40];
+    uint32_t room;
+    char path[1100];
+    FILE *f;
+    char open_path[1100];
+} added_entry;
+
+static added_entry g_extra[MAX_EXTRA];
+static int g_nextra, g_extra_first = -1;
+static CRITICAL_SECTION g_extra_lock;
+static int g_extra_lock_ready;
+
+static size_t read_added(int k, uint64_t offset, void *dst, size_t n) {
+    if (k < 0 || k >= g_nextra) return 0;
+    added_entry *x = &g_extra[k];
+    EnterCriticalSection(&g_extra_lock);
+    if (strcmp(x->open_path, x->path)) {
+        if (x->f) fclose(x->f);
+        x->f = x->path[0] ? fopen(x->path, "rb") : NULL;
+        snprintf(x->open_path, sizeof x->open_path, "%s", x->path);
+    }
+    size_t got = x->f ? file_read(x->f, offset, dst, n) : 0;
+    LeaveCriticalSection(&g_extra_lock);
+    if (got < n) memset((uint8_t *)dst + got, 0, n - got);
+    return n;
+}
+
 /* Fill `n` bytes starting at `at`, within one stretch of the archive. Returns how
  * many it could: parts of it are a single entry, the padding after one, a table. */
 static size_t afs_read_some(afs_virtual *a, uint64_t at, uint8_t *out, size_t n) {
@@ -197,23 +233,29 @@ static size_t afs_read_some(afs_virtual *a, uint64_t at, uint8_t *out, size_t n)
     }
     const size_t want = n < e->size - within ? n : (size_t)(e->size - within);
     if (e->part >= 0) return read_part(&a->parts[e->part], within, out, want);
+    if (e->part <= -2) return read_added(-2 - e->part, within, out, want);
     return file_read(a->original, e->source + within, out, want);
 }
-
 static int on_open(const char *guest, const char *host, psp_io_virtual *out);
 static const char *g_watched_entry;
 
-/* Files added as entries past the end of DivaDataList.afs, and the first one's number once open. */
-#define MAX_EXTRA 64
-static mod_file g_extra[MAX_EXTRA];
-static int g_nextra, g_extra_first = -1;
-
-int mods_add_entry(const char *name, const char *path) {
+int mods_add_entry(const char *name, uint32_t room) {
     if (g_nextra == MAX_EXTRA) return -1;
-    g_extra[g_nextra].name = dup_string(name);
-    g_extra[g_nextra].path = dup_string(path);
+    if (!g_extra_lock_ready) {
+        InitializeCriticalSection(&g_extra_lock);
+        g_extra_lock_ready = 1;
+    }
+    snprintf(g_extra[g_nextra].name, sizeof g_extra[0].name, "%s", name);
+    g_extra[g_nextra].room = room;
     psp_io_set_open_hook(on_open);
     return g_nextra++;
+}
+
+void mods_set_entry_file(int k, const char *path) {
+    if (k < 0 || k >= g_nextra) return;
+    EnterCriticalSection(&g_extra_lock);
+    snprintf(g_extra[k].path, sizeof g_extra[k].path, "%s", path ? path : "");
+    LeaveCriticalSection(&g_extra_lock);
 }
 
 int mods_added_entry(int k) { return g_extra_first >= 0 && k >= 0 && k < g_nextra ? g_extra_first + k : -1; }
@@ -353,7 +395,12 @@ static int open_afs(const char *host, psp_io_virtual *out) {
         e->source = i < original ? read_u32(slot) : 0;
         e->size = i < original ? read_u32(slot + 4) : 0;
         e->part = -1;
-        const char *path = i < original ? find_file(g_entries, g_nentries, name) : g_extra[i - original].path;
+        if (i >= original) {
+            e->part = -2 - (int)(i - original);
+            e->size = g_extra[i - original].room;
+            replaced++;
+        }
+        const char *path = i < original ? find_file(g_entries, g_nentries, name) : NULL;
         if (path) {
             e->part = get_part(a, path);
             if (e->part >= 0) {
