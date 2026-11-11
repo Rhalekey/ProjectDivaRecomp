@@ -96,6 +96,7 @@ static const char *const G_KEY[G_COUNT] = {[G_DISPLAY] = "display", [G_SHAPE] = 
                                            [G_SMOOTHING] = "smoothing", [G_BLUR] = "blur", [G_FPS] = "fps"};
 
 static const char *word(const char *key) { return ui_game_text(key); }
+static int stepped(int value, int count, int step);
 
 /* "<list>.<row>.<part>" of a row. */
 static const char *row_word(const char *list, const char *row, const char *part) {
@@ -130,6 +131,25 @@ static void write_string(uint32_t to, const char *s) {
     while (*s++);
 }
 
+/* A line into its room of LINE_ROOM bytes, cut short if a translation is longer, never inside a
+ * Shift-JIS letter of two bytes. */
+static void write_line(uint32_t to, const char *s) {
+    if (!to) return;
+    uint32_t n = 0;
+    while (s[n] && n + 1 < LINE_ROOM) {
+        const unsigned char c = (unsigned char)s[n];
+        const int pair = (c >= 0x81 && c <= 0x9F) || (c >= 0xE0 && c <= 0xFC);
+        if (pair && (n + 2 >= LINE_ROOM || !s[n + 1])) break;
+        psp_write8(to + n, c);
+        if (pair) {
+            psp_write8(to + n + 1, (uint8_t)s[n + 1]);
+            n++;
+        }
+        n++;
+    }
+    psp_write8(to + n, 0);
+}
+
 static uint32_t new_string(const char *s) {
     const uint32_t at = psp_sysmem_alloc((uint32_t)strlen(s) + 1, 1);
     if (at) write_string(at, s);
@@ -148,8 +168,10 @@ static void apply_scripts(void) {
     translation_set_romaji(!strcmp(g_options.song_names, "romaji"), !strcmp(g_options.lyrics, "romaji"));
 }
 
-void extras_next_note_style(void) {
-    g_options.note_style = (g_options.note_style + 1) % (OPTIONS_NOTES_COUNT + note_skins_count());
+void extras_next_note_style(void) { extras_step_note_style(1); }
+
+void extras_step_note_style(int step) {
+    g_options.note_style = stepped(g_options.note_style, OPTIONS_NOTES_COUNT + note_skins_count(), step);
     snprintf(g_options.note_skin, sizeof g_options.note_skin, "%s", note_skins_name(g_options.note_style - OPTIONS_NOTES_COUNT));
     language_notes_changed();
 }
@@ -235,7 +257,7 @@ static void write_timing_lines(void) {
     if (!off) snprintf(text, sizeof text, "%s%s", word("extras.timing.last"), word("extras.timing.on_time"));
     else snprintf(text, sizeof text, "%s%d%s", word("extras.timing.last"), off > 0 ? off : -off,
                   word(off > 0 ? "extras.timing.late" : "extras.timing.early"));
-    write_string(g_lines[ROW_TIMING][1], text);
+    write_line(g_lines[ROW_TIMING][1], text);
 }
 
 static void write_label(int row) {
@@ -314,7 +336,14 @@ static void play_sound(void) {
     guest_call(PLAY_MENU_SOUND, sounds, 0, 0, 0);
 }
 
-static void change(int row) {
+/* One step along a list of `count`, and round again. */
+static int stepped(int value, int count, int step) {
+    return ((value + step) % count + count) % count;
+}
+
+/* A row's value one step on: Right forward, Left back, as the player sees them listed. Rows of two
+ * values only turn over. */
+static void change(int row, int step) {
     switch (row) {
     case ROW_SONGS:
         if (!translation_has_song_romaji()) return;
@@ -327,8 +356,8 @@ static void change(int row) {
         apply_scripts();
         break;
     case ROW_LANGUAGE:
-        /* English, Japanese, German, and round again. */
-        language_apply(!strcmp(g_options.language, "en") ? "ja" : !strcmp(g_options.language, "ja") ? "de" : "en");
+        /* The next or the one before in lang\languages.txt, and round again. */
+        language_apply(ui_text_code(stepped(ui_text_find(g_options.language), ui_text_languages(), step)));
         break;
     case ROW_ASK:
         g_settings.language_prompt = !g_settings.language_prompt;
@@ -339,12 +368,12 @@ static void change(int row) {
         controls_apply();
         break;
     case ROW_ICONS:
-        g_options.button_style = (g_options.button_style + 1) % OPTIONS_STYLE_COUNT;
+        g_options.button_style = stepped(g_options.button_style, OPTIONS_STYLE_COUNT, step);
         controls_style_changed();
         write_label(ROW_CONFIRM);
         break;
     case ROW_NOTES:
-        extras_next_note_style();
+        extras_step_note_style(step);
         break;
     case ROW_SINGERS:
         g_options.free_singers = !g_options.free_singers;
@@ -359,9 +388,11 @@ static void change(int row) {
         break;
     case ROW_DPAD: {
         /* Stick, d-pad, both, off, and round again. */
-        static const int NEXT[4] = {[OPTIONS_HIT_STICK] = OPTIONS_HIT_DPAD, [OPTIONS_HIT_DPAD] = OPTIONS_HIT_BOTH,
-                                    [OPTIONS_HIT_BOTH] = OPTIONS_HIT_OFF, [OPTIONS_HIT_OFF] = OPTIONS_HIT_STICK};
-        g_options.dpad_notes = NEXT[g_options.dpad_notes & 3];
+        static const int ORDER[4] = {OPTIONS_HIT_STICK, OPTIONS_HIT_DPAD, OPTIONS_HIT_BOTH, OPTIONS_HIT_OFF};
+        int at = 0;
+        for (int i = 0; i < 4; i++)
+            if (ORDER[i] == g_options.dpad_notes) at = i;
+        g_options.dpad_notes = ORDER[stepped(at, 4, step)];
         break;
     }
     default:
@@ -370,11 +401,6 @@ static void change(int row) {
     write_label(row);
     options_save(g_data_dir);
     play_sound();
-}
-
-/* One step along a list of `count`, and round again. */
-static int stepped(int value, int count, int step) {
-    return (value + step + count) % count;
 }
 
 static void change_graphics(int row, int step) {
@@ -470,14 +496,14 @@ static void on_window_update(void) {
     /* Buttons is a button: the player's confirm button opens its screen. The buttons read here
      * are before the swap that makes it the game's Circle, so it is Cross if Cross was chosen. */
     if (!g_graphics && row == ROW_BUTTONS) {
-        if (pressed & (g_options.confirm_cross == 1 ? B_CROSS_KEY : B_CIRCLE_KEY)) change((int)row);
+        if (pressed & (g_options.confirm_cross == 1 ? B_CROSS_KEY : B_CIRCLE_KEY)) change((int)row, 1);
         return;
     }
     if (!(pressed & (B_LEFT | B_RIGHT))) return;
     if (g_graphics) {
         if (row < G_COUNT) change_graphics((int)row, pressed & B_LEFT ? -1 : 1);
     } else if (row >= ROW_FIRST && row < ROW_COUNT) {
-        change((int)row);
+        change((int)row, pressed & B_LEFT ? -1 : 1);
     }
 }
 
@@ -614,16 +640,16 @@ static void on_window_volume(void) {
  * second line of the timing row is the last song's, once one has been measured. */
 static void write_all_lines(void) {
     for (int row = ROW_FIRST; row < ROW_COUNT; row++) {
-        write_string(g_lines[row][0], row_word("extras", ROW_KEY[row], "line1"));
-        write_string(g_lines[row][1], row_word("extras", ROW_KEY[row], "line2"));
+        write_line(g_lines[row][0], row_word("extras", ROW_KEY[row], "line1"));
+        write_line(g_lines[row][1], row_word("extras", ROW_KEY[row], "line2"));
     }
     for (int row = 0; row < G_COUNT; row++) {
-        write_string(g_graphics_lines[row][0], row_word("graphics", G_KEY[row], "line1"));
-        write_string(g_graphics_lines[row][1], row_word("graphics", G_KEY[row], "line2"));
+        write_line(g_graphics_lines[row][0], row_word("graphics", G_KEY[row], "line1"));
+        write_line(g_graphics_lines[row][1], row_word("graphics", G_KEY[row], "line2"));
     }
-    write_string(g_menu_label, word("graphics.menu.name"));
-    write_string(g_menu_lines[0], word("graphics.menu.line1"));
-    write_string(g_menu_lines[1], word("graphics.menu.line2"));
+    write_line(g_menu_label, word("graphics.menu.name"));
+    write_line(g_menu_lines[0], word("graphics.menu.line1"));
+    write_line(g_menu_lines[1], word("graphics.menu.line2"));
 }
 
 void extras_language_changed(void) {

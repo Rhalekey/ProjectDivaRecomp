@@ -1,11 +1,14 @@
 #ifndef DIVA_OPTIONS_H
 #define DIVA_OPTIONS_H
 
+#include <stddef.h>
+#include <stdio.h>
+
 #include <psprecomp/window.h>
 
 /* What the player chose in the game, kept with the saves. */
 typedef struct {
-    char language[8];    /* "ja", "en" or "de" */
+    char language[8];    /* a code of lang\languages.txt */
     char song_names[12]; /* "japanese" or "romaji" */
     char lyrics[12];     /* "japanese" or "romaji" */
     int ask_language;    /* over the edition's language_prompt; -1 leaves it to the edition */
@@ -58,5 +61,11 @@ extern diva_options g_options;
 /* Returns nonzero if a language had been chosen before. */
 int options_load(const char *data_dir);
 void options_save(const char *data_dir);
+
+/* A file written whole or not at all: replace_file_begin opens <path>.new to write, and
+ * replace_file_end closes it and puts it in the place of <path>, or leaves the old one if anything
+ * failed. `temp` keeps the name in between. */
+FILE *replace_file_begin(const char *path, char *temp, size_t cap);
+int replace_file_end(FILE *f, const char *temp, const char *path);
 
 #endif

@@ -241,6 +241,24 @@ const char *ui_game_text_in(int language, const char *key) {
 
 wchar_t ui_text_letter_of(unsigned char byte) { return g_letter[byte]; }
 
+void ui_text_from_game(const char *game, int letters, wchar_t *out, size_t cap) {
+    size_t n = 0;
+    if (!cap) return;
+    for (const unsigned char *c = (const unsigned char *)game; *c && n + 1 < cap;) {
+        if (letters && g_letter[*c]) {
+            out[n++] = g_letter[*c++];
+            continue;
+        }
+        /* Shift-JIS: a lead byte and the one after it, or one byte. */
+        const int pair = ((*c >= 0x81 && *c <= 0x9F) || (*c >= 0xE0 && *c <= 0xFC)) && c[1];
+        wchar_t got[2];
+        const int made = MultiByteToWideChar(932, 0, (const char *)c, pair ? 2 : 1, got, 2);
+        for (int k = 0; k < made && n + 1 < cap; k++) out[n++] = got[k];
+        c += pair ? 2 : 1;
+    }
+    out[n] = 0;
+}
+
 const char *ui_text(const char *key) { return ui_text_in(g_current, key); }
 const wchar_t *ui_wtext(const char *key) { return ui_wtext_in(g_current, key); }
 const char *ui_game_text(const char *key) { return ui_game_text_in(g_current, key); }

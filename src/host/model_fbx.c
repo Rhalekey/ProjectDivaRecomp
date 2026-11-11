@@ -236,11 +236,12 @@ static int64_t read_node(const reader *r, size_t p, node *n, int depth) {
     const int nlen = r->b[p + 3 * w];
     p += 3u * w + 1;
     if (end == 0) return 0;
-    if (end > r->size || end <= p || nprops > 100000) return -1;
+    if (end > r->size || end <= p || nprops > 100000 || p + (size_t)nlen > end) return -1;
     memset(n, 0, sizeof *n);
     memcpy(n->name, r->b + p, nlen < 47 ? nlen : 47);
     p += nlen;
     n->props = (prop *)calloc(nprops ? nprops : 1, sizeof(prop));
+    if (!n->props) return -1;
     n->nprops = (int)nprops;
     for (uint64_t i = 0; i < nprops; i++) {
         if (p >= end) return -1;
@@ -370,6 +371,12 @@ static void string_of(const node *n, const char *name, char *out, size_t size) {
     if (c && c->nprops) prop_str(&c->props[0], out, size);
 }
 
+/* A number from the file as an index below `limit`, or -1: a double past int's range is not
+ * converted, which C leaves undefined. */
+static int index_in(double v, size_t limit) {
+    return v >= 0 && v < (double)limit && v < 2147483647.0 ? (int)v : -1;
+}
+
 /* ---- transforms: 4x4, column vectors, columns in order (as FBX writes them) ---------------- */
 
 typedef struct { double m[16]; } mat4;
@@ -435,15 +442,30 @@ typedef struct {
 } link;
 
 typedef struct {
+    int64_t id;
+    const node *object;
+} by_id;
+
+typedef struct {
     const node *objects;
     link *links;
     int nlinks;
+    by_id *ids;     /* every object, by id */
+    int nids;
 } scene;
 
+static int compare_ids(const void *a, const void *b) {
+    const int64_t x = ((const by_id *)a)->id, y = ((const by_id *)b)->id;
+    return x < y ? -1 : x > y;
+}
+
 static const node *object(const scene *s, int64_t id) {
-    for (int i = 0; i < s->objects->nchildren; i++) {
-        const node *o = &s->objects->children[i];
-        if (o->nprops && prop_int(&o->props[0]) == id) return o;
+    int lo = 0, hi = s->nids - 1;
+    while (lo <= hi) {
+        const int mid = (lo + hi) / 2;
+        if (s->ids[mid].id == id) return s->ids[mid].object;
+        if (s->ids[mid].id < id) lo = mid + 1;
+        else hi = mid - 1;
     }
     return NULL;
 }
@@ -496,8 +518,8 @@ static int layer_index(const node *layer, const double *index, size_t nindex, si
     string_of(layer, "ReferenceInformationType", reference, sizeof reference);
     size_t i = !strcmp(mapping, "ByPolygonVertex") ? k : (size_t)v;
     if (!strcmp(mapping, "AllSame")) i = 0;
-    if (!strcmp(reference, "IndexToDirect") || !strcmp(reference, "Index")) return index && i < nindex ? (int)index[i] : -1;
-    return (int)i;
+    if (!strcmp(reference, "IndexToDirect") || !strcmp(reference, "Index")) return index && i < nindex ? index_in(index[i], 1u << 30) : -1;
+    return i < (1u << 30) ? (int)i : -1;
 }
 
 int model_load_fbx(const char *path, model *m, char *err, size_t errlen) {
@@ -522,7 +544,9 @@ int model_load_fbx(const char *path, model *m, char *err, size_t errlen) {
     for (;;) {
         if (root.nchildren == cap) {
             cap = cap ? cap * 2 : 16;
-            root.children = (node *)realloc(root.children, (size_t)cap * sizeof(node));
+            node *grown = (node *)realloc(root.children, (size_t)cap * sizeof(node));
+            if (!grown) break;
+            root.children = grown;
         }
         const int64_t next = read_node(&r, p, &root.children[root.nchildren], 0);
         if (next <= 0) break;
@@ -535,7 +559,21 @@ int model_load_fbx(const char *path, model *m, char *err, size_t errlen) {
         snprintf(err, errlen, "no objects in it");
         goto done;
     }
-    scene s = {objects, (link *)calloc((size_t)connections->nchildren + 1, sizeof(link)), 0};
+    scene s = {objects, (link *)calloc((size_t)connections->nchildren + 1, sizeof(link)), 0,
+               (by_id *)calloc((size_t)objects->nchildren + 1, sizeof(by_id)), 0};
+    if (!s.links || !s.ids) {
+        free(s.links);
+        free(s.ids);
+        snprintf(err, errlen, "out of memory");
+        goto done;
+    }
+    for (int i = 0; i < objects->nchildren; i++) {
+        const node *o = &objects->children[i];
+        if (!o->nprops) continue;
+        s.ids[s.nids].id = prop_int(&o->props[0]);
+        s.ids[s.nids++].object = o;
+    }
+    qsort(s.ids, (size_t)s.nids, sizeof *s.ids, compare_ids);
     for (int i = 0; i < connections->nchildren; i++) {
         const node *c = &connections->children[i];
         if (strcmp(c->name, "C") || c->nprops < 3) continue;
@@ -659,8 +697,8 @@ int model_load_fbx(const char *path, model *m, char *err, size_t errlen) {
             free(bind);
             double *idx = array_of(cluster, "Indexes", &nidx), *wts = array_of(cluster, "Weights", &nw);
             for (size_t k = 0; idx && wts && k < nidx && k < nw; k++) {
-                const int v = (int)idx[k];
-                if (v < 0 || (size_t)v >= npoints) continue;
+                const int v = index_in(idx[k], npoints);
+                if (v < 0) continue;
                 /* An empty place, or else the lightest, if this weight is heavier. */
                 int slot = -1;
                 for (int q = 0; q < MODEL_WEIGHTS && slot < 0; q++)
@@ -696,7 +734,8 @@ int model_load_fbx(const char *path, model *m, char *err, size_t errlen) {
                 }
                 for (int c = 0; c < 3; c++) {
                     const size_t ki = pick[c];
-                    const int v = poly[ki] >= 0 ? (int)poly[ki] : ~(int)poly[ki];
+                    /* The last corner of a polygon is written as ~index. */
+                    const int v = index_in(poly[ki] >= 0 ? poly[ki] : -poly[ki] - 1, npoints);
                     model_corner *out = &m->corners[m->ncorners + c];
                     memset(out, 0, sizeof *out);
                     if (v >= 0 && (size_t)v < npoints) {
@@ -726,7 +765,7 @@ int model_load_fbx(const char *path, model *m, char *err, size_t errlen) {
                     }
                 }
                 int mi = 0;
-                if (mats && nmat) mi = !strcmp(material_mapping, "ByPolygon") ? (polygon < nmat ? (int)mats[polygon] : 0) : (int)mats[0];
+                if (mats && nmat) mi = index_in(!strcmp(material_mapping, "ByPolygon") ? (polygon < nmat ? mats[polygon] : 0) : mats[0], 1u << 20);
                 if (mi < 0 || first_material + mi >= m->nmaterials) mi = 0;
                 m->material[m->ncorners / 3] = first_material + mi;
                 m->ncorners += 3;
@@ -739,6 +778,7 @@ int model_load_fbx(const char *path, model *m, char *err, size_t errlen) {
     }
     free(bone_node);
     free(s.links);
+    free(s.ids);
     if (!m->ncorners) {
         snprintf(err, errlen, "no triangles in it");
         goto done;

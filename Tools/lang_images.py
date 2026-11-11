@@ -26,6 +26,7 @@ where the style is one of
              game places for longer words, and that would lean to the left otherwise
     title    large words on the title plate
 """
+import itertools
 import os
 import re
 import struct
@@ -107,7 +108,8 @@ def decode_png(data):
         kind = raw[at]
         row = bytearray(raw[at + 1:at + 1 + stride])
         at += 1 + stride
-        for x in range(stride):
+        # A row with no filter is as it is: nothing to undo.
+        for x in (range(stride) if kind else ()):
             a = row[x - step] if x >= step else 0
             b = prev[x]
             c = prev[x - step] if x >= step else 0
@@ -141,7 +143,7 @@ def decode_png(data):
 
 
 def encode_png(w, h, pixels):
-    raw = b''.join(b'\0' + bytes(v for p in row for v in p) for row in pixels)
+    raw = b''.join(b'\0' + bytes(itertools.chain.from_iterable(row)) for row in pixels)
 
     def chunk(kind, body):
         return struct.pack('>I', len(body)) + kind + body + struct.pack('>I', zlib.crc32(kind + body))
@@ -466,7 +468,7 @@ def write_large(pixels, original_hash, labels, font_family, cell_heights, out, p
     with open(os.path.join(out, name), 'wb') as f:
         f.write(struct.pack('<II', len(canvas[0]), len(canvas)))
         for row in reversed(canvas):
-            f.write(bytes(v for p in row for v in p))
+            f.write(bytes(itertools.chain.from_iterable(row)))
     return name
 
 

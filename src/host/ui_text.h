@@ -42,5 +42,8 @@ const char *ui_game_text_in(int language, const char *key);
 void ui_text_to_game(const char *utf8, char *out, size_t size);
 /* The letter a byte of the game's font stands for in letters.txt, or 0 if it is not one of them. */
 wchar_t ui_text_letter_of(unsigned char byte);
+/* Text as the game's font reads it, back to wide text: Shift-JIS, and letters.txt's letters where
+ * the translations put them when `letters` is set (the game's own text has none). */
+void ui_text_from_game(const char *game, int letters, wchar_t *out, size_t cap);
 
 #endif

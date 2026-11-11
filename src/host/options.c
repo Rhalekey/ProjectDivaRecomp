@@ -9,6 +9,7 @@
 #include <direct.h>
 #include <stdio.h>
 #include <string.h>
+#include <windows.h>
 
 diva_options g_options = {
     "ja", "japanese", "japanese", -1, 1, -1,
@@ -129,7 +130,9 @@ void options_save(const char *data_dir) {
     folder(data_dir, path, sizeof path);
     _mkdir(path);
     strcat(path, "\\OPTIONS.INI");
-    FILE *f = fopen(path, "w");
+    /* Written beside it, then put in its place: a game closed halfway through leaves the old one. */
+    char writing[1220];
+    FILE *f = replace_file_begin(path, writing, sizeof writing);
     if (!f) {
         fprintf(stderr, "options: cannot write %s\n", path);
         return;
@@ -155,5 +158,19 @@ void options_save(const char *data_dir) {
         if (g_options.keys2[i] >= 0) fprintf(f, "key2 %d = %d\n", i, g_options.keys2[i]);
         if (g_options.pads[i] >= 0) fprintf(f, "pad %d = %d\n", i, g_options.pads[i]);
     }
-    fclose(f);
+    if (!replace_file_end(f, writing, path)) fprintf(stderr, "options: cannot write %s\n", path);
+}
+
+FILE *replace_file_begin(const char *path, char *temp, size_t cap) {
+    snprintf(temp, cap, "%s.new", path);
+    return fopen(temp, "w");
+}
+
+int replace_file_end(FILE *f, const char *temp, const char *path) {
+    const int written = !ferror(f);
+    if (fclose(f) != 0 || !written || !MoveFileExA(temp, path, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        remove(temp);
+        return 0;
+    }
+    return 1;
 }

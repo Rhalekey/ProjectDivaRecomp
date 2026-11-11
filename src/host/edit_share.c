@@ -287,6 +287,34 @@ static int write_file(const wchar_t *path, const uint8_t *data, uint32_t size) {
     return fclose(f) == 0 && ok;
 }
 
+/* A file of a zip, read from its local header at `at`, checked to lie wholly inside the zip: a zip
+ * from anywhere may be cut short or made up. Gives the offset of the next header, or 0 at the end. */
+typedef struct {
+    char name[300];
+    uint32_t method, size;
+    const uint8_t *data;
+} zip_entry;
+
+static uint32_t zip_next(const uint8_t *zip, uint32_t size, uint32_t at, zip_entry *e) {
+    if (at > size || size - at < 30) return 0;
+    const uint8_t *h = zip + at;
+    if (h[0] != 'P' || h[1] != 'K' || h[2] != 3 || h[3] != 4) return 0;
+    e->method = h[8] | h[9] << 8;
+    e->size = h[18] | h[19] << 8 | h[20] << 16 | (uint32_t)h[21] << 24;
+    const uint32_t nlen = h[26] | h[27] << 8, xlen = h[28] | h[29] << 8, left = size - at - 30;
+    if (nlen + xlen > left || e->size > left - nlen - xlen) return 0;
+    const uint32_t shown = nlen < sizeof e->name - 1 ? nlen : (uint32_t)sizeof e->name - 1;
+    memcpy(e->name, h + 30, shown);
+    e->name[shown] = 0;
+    e->data = h + 30 + nlen + xlen;
+    return at + 30 + nlen + xlen + e->size;
+}
+
+/* A name that stays inside its folder: no way up, no drive, no deeper folder. */
+static int safe_file_name(const char *file) {
+    return file[0] && !strstr(file, "..") && !strpbrk(file, "\\/:");
+}
+
 /* One zip: its Edits into free slots, its MP3 into MUSIC. Gives back the Edits brought in, or -1
  * if there was no room, when it is left where it is. */
 static int import_zip(const wchar_t *path, const psp_save_slot *slots, int count, int *taken) {
@@ -295,17 +323,14 @@ static int import_zip(const wchar_t *path, const psp_save_slot *slots, int count
     if (!zip) return 0;
     /* How many Edits it holds, by the folders its names are in, and whether there is room. */
     int most = 0;
-    for (uint32_t at = 0; at + 30 <= size;) {
-        const uint8_t *h = zip + at;
-        if (h[0] != 'P' || h[1] != 'K' || h[2] != 3 || h[3] != 4) break;
-        const uint32_t csize = h[18] | h[19] << 8 | h[20] << 16 | (uint32_t)h[21] << 24, nlen = h[26] | h[27] << 8, xlen = h[28] | h[29] << 8;
+    zip_entry e;
+    for (uint32_t at = 0; (at = zip_next(zip, size, at, &e)) != 0;) {
         int k = 0;
-        if (nlen > 4 && sscanf((const char *)h + 30, "edit%d/", &k) == 1 && k > most) most = k;
-        at += 30 + nlen + xlen + csize;
+        if (sscanf(e.name, "edit%d/", &k) == 1 && k > most) most = k;
     }
     int free_slots = 0;
     for (int i = 0; i < count; i++) free_slots += !slots[i].used && !taken[i] && !strncmp(slots[i].name, "EDIT", 4);
-    if (most > free_slots) {
+    if (most > free_slots || most > MOST_EDITS) {
         free(zip);
         return -1;
     }
@@ -321,18 +346,13 @@ static int import_zip(const wchar_t *path, const psp_save_slot *slots, int count
         }
     }
     int edits = 0;
-    for (uint32_t at = 0; at + 30 <= size;) {
-        const uint8_t *h = zip + at;
-        if (h[0] != 'P' || h[1] != 'K' || h[2] != 3 || h[3] != 4) break;
-        const uint32_t method = h[8] | h[9] << 8, csize = h[18] | h[19] << 8 | h[20] << 16 | (uint32_t)h[21] << 24;
-        const uint32_t nlen = h[26] | h[27] << 8, xlen = h[28] | h[29] << 8;
-        char name[300];
-        snprintf(name, sizeof name, "%.*s", (int)(nlen < 299 ? nlen : 299), (const char *)h + 30);
-        const uint8_t *data = h + 30 + nlen + xlen;
-        at += 30 + nlen + xlen + csize;
-        if (method != 0 || data + csize > zip + size) continue;   /* only stored files, as exported */
+    for (uint32_t at = 0; (at = zip_next(zip, size, at, &e)) != 0;) {
+        const char *name = e.name;
+        const uint8_t *data = e.data;
+        const uint32_t csize = e.size;
+        if (e.method != 0) continue;   /* only stored files, as exported */
         const char *file = strchr(name, '/');
-        if (!file || !file[1] || strstr(name, "..")) continue;
+        if (!file || !safe_file_name(file + 1)) continue;
         wchar_t wfile[300], target[1400];
         MultiByteToWideChar(CP_UTF8, 0, file + 1, -1, wfile, 300);
         int k = 0;

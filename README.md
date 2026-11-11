@@ -53,7 +53,7 @@ Everything below is in the recommended edition, the default. The [changelog](CHA
 - Ad Hoc's Send Data and Receive Data work between computers on the same local network, or between two copies of the game on one computer, with no PSP wireless. The first time, allow `diva.exe` on private networks when Windows asks. As on the PSP, an Edit made with a song from the Memory Stick needs that song on the computer that receives it too.
 
 **Languages and mods**
-- English and German, besides the game's Japanese, with song names and lyrics in romaji if wanted.
+- English, German, French, Spanish and Italian, besides the game's Japanese, with song names and lyrics in romaji if wanted.
 - Mods as folders of files that replace the game's, with nothing on disk changed.
 
 ## Suggestions welcome
@@ -117,9 +117,9 @@ The raw edition is as close to the original as this project can make it, not a p
 
 ## Languages
 
-The game can be played in Japanese, English and German. It asks which language to play in each time it starts, between its intros and its title. Put `language_prompt = 0` in `settings.ini` to be asked only when no choice has been saved. Choices are kept beside the saves, in `ms\PSP\SAVEDATA\ULJM05472RECOMP\OPTIONS.INI`, not inside the game's save, whose format stays as a PSP would read it.
+The game can be played in Japanese, English, German, French, Spanish and Italian. It asks which language to play in each time it starts, between its intros and its title. Put `language_prompt = 0` in `settings.ini` to be asked only when no choice has been saved. Choices are kept beside the saves, in `ms\PSP\SAVEDATA\ULJM05472RECOMP\OPTIONS.INI`, not inside the game's save, whose format stays as a PSP would read it.
 
-The German translation was written without a native speaker and has not been reviewed by one yet, so expect some awkward or wrong wording. Corrections are welcome in `lang/de.txt` and `lang/de_images.txt`.
+The German, French, Spanish and Italian translations were written without native speakers and have not been reviewed by any yet, so expect some awkward or wrong wording. Corrections are welcome in `lang/<code>.txt`, `lang/<code>_images.txt` and `lang/<code>_ui.txt`.
 
 The recommended edition adds rows to the game's own Options window: language, song names and lyrics in romaji (each on its own), whether to ask the language at each start, the confirm button, the button icons (PlayStation, or A and B as on Xbox or Nintendo controllers, where A and B are swapped), and the keyboard and controller buttons, with a second key if wanted. It also adds a background dim for songs, from off to 100%, and [Note timing](#before-you-play-set-note-timing), from -100 to +300 ms. The song names come from `lang\romaji_titles.txt`. The lyrics are never in this repository: `Tools\romaji.py` makes them during the build from your copy of the game, using a dictionary, so a line can come out misread. The language changes at once. These are kept in the same file, and the row that asks wins over `language_prompt`. Put `extras = 0` in `settings.ini` to leave the window as the game has it.
 

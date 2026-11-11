@@ -61,6 +61,17 @@ static void text(pmx *p, char *out, size_t size) {
     }
 }
 
+/* A count read from the file, checked against what is left of it: each of the things counted takes
+ * at least `least` bytes, so a made-up count cannot ask for more memory than the file could fill. */
+static int32_t count_of(pmx *p, size_t least) {
+    const int32_t n = i32(p);
+    if (n < 0 || (size_t)n > (p->size - p->at) / (least ? least : 1)) {
+        p->bad = 1;
+        return 0;
+    }
+    return n;
+}
+
 static void skip_text(pmx *p) {
     const int32_t n = i32(p);
     if (n < 0) p->bad = 1;
@@ -93,10 +104,15 @@ int model_load_pmx(const char *path, model *m, char *err, size_t errlen) {
     p.texture_index = g[3];
     p.material_index = g[4];
     p.bone_index = g[5];
+    /* Index sizes are 1, 2 or 4 bytes, and up to four more UVs: anything else is not PMX. */
+    const int sizes[4] = {p.vertex_index, p.texture_index, p.material_index, p.bone_index};
+    for (int i = 0; i < 4; i++)
+        if (sizes[i] != 1 && sizes[i] != 2 && sizes[i] != 4) { snprintf(err, errlen, "its header is not as expected"); goto done; }
+    if (p.extra_uv < 0 || p.extra_uv > 4) { snprintf(err, errlen, "its header is not as expected"); goto done; }
     for (int i = 0; i < 4; i++) skip_text(&p);  /* names and comments */
 
     /* Vertices. */
-    const int32_t nv = i32(&p);
+    const int32_t nv = count_of(&p, 9 * 4);
     if (nv <= 0 || nv > 10000000) { snprintf(err, errlen, "no vertices in it"); goto done; }
     pos = malloc((size_t)nv * 12); nrm = malloc((size_t)nv * 12); uv = malloc((size_t)nv * 8);
     wt = malloc((size_t)nv * 16); bone = malloc((size_t)nv * 16);
@@ -130,21 +146,28 @@ int model_load_pmx(const char *path, model *m, char *err, size_t errlen) {
     }
 
     /* Triangles: corners, three to one. */
-    const int32_t nf = i32(&p);
+    const int32_t nf = count_of(&p, (size_t)p.vertex_index);
     if (nf <= 0 || nf % 3 || p.bad) { snprintf(err, errlen, "no triangles in it"); goto done; }
     faces = malloc((size_t)nf * sizeof(int));
+    if (!faces) { snprintf(err, errlen, "out of memory"); goto done; }
     for (int32_t i = 0; i < nf && !p.bad; i++) faces[i] = index_of(&p, p.vertex_index, 1);
 
     /* Textures' paths. */
-    const int32_t nt = i32(&p);
+    const int32_t nt = count_of(&p, 4);
     char (*textures)[520] = calloc((size_t)(nt > 0 ? nt : 1), sizeof *textures);
+    if (!textures) { snprintf(err, errlen, "out of memory"); goto done; }
     for (int32_t i = 0; i < nt && !p.bad; i++) text(&p, textures[i], sizeof textures[0]);
 
     /* Materials: each its texture and how many corners follow. */
-    const int32_t nm = i32(&p);
+    const int32_t nm = count_of(&p, 8 + 16 + 12 + 4 + 12 + 1 + 16 + 4 + 2 + 4);
     int *mat_corners = calloc((size_t)(nm > 0 ? nm : 1), sizeof(int));
     uint8_t *hidden = calloc((size_t)(nm > 0 ? nm : 1), 1);
     m->picture = calloc((size_t)(nm > 0 ? nm : 1), sizeof *m->picture);
+    if (!mat_corners || !hidden || !m->picture) {
+        free(textures); free(mat_corners); free(hidden);
+        snprintf(err, errlen, "out of memory");
+        goto done;
+    }
     m->nmaterials = nm > 0 ? nm : 0;
     for (int32_t i = 0; i < nm && !p.bad; i++) {
         skip_text(&p);
@@ -166,8 +189,9 @@ int model_load_pmx(const char *path, model *m, char *err, size_t errlen) {
     free(textures);
 
     /* Bones. */
-    const int32_t nb = i32(&p);
+    const int32_t nb = count_of(&p, 4 + 4 + 12 + 1 + 4 + 2 + 1);
     m->bones = calloc((size_t)(nb > 0 ? nb : 1), sizeof(model_bone));
+    if (!m->bones) { free(mat_corners); free(hidden); snprintf(err, errlen, "out of memory"); goto done; }
     for (int32_t i = 0; i < nb && !p.bad; i++) {
         model_bone *bn = &m->bones[i];
         text(&p, bn->name, sizeof bn->name);
@@ -197,12 +221,13 @@ int model_load_pmx(const char *path, model *m, char *err, size_t errlen) {
         m->nbones = i + 1;
     }
     for (int i = 0; i < m->nbones; i++)
-        if (m->bones[i].parent >= m->nbones || m->bones[i].parent == i) m->bones[i].parent = -1;
+        if (m->bones[i].parent < 0 || m->bones[i].parent >= m->nbones || m->bones[i].parent == i) m->bones[i].parent = -1;
     if (p.bad) { free(mat_corners); free(hidden); snprintf(err, errlen, "it ends before its bones do"); goto done; }
 
     /* Corners, whole; each triangle the other way round; those of hidden materials left out. */
     m->corners = calloc((size_t)nf, sizeof(model_corner));
     m->material = calloc((size_t)(nf / 3), sizeof(int));
+    if (!m->corners || !m->material) { free(mat_corners); free(hidden); snprintf(err, errlen, "out of memory"); goto done; }
     int mat = 0, left = nm > 0 ? mat_corners[0] : nf, kept = 0;
     for (int32_t t = 0; t < nf / 3; t++) {
         while (left <= 0 && mat + 1 < nm) left = mat_corners[++mat];

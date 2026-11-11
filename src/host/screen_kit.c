@@ -690,6 +690,11 @@ static void show(HWND window) {
 
 static HWND g_window, g_parent;
 static HBITMAP g_bitmap;
+
+int kit_has_focus(void) {
+    const HWND f = GetForegroundWindow();
+    return f && (f == g_window || f == g_parent || (g_window && GetAncestor(g_window, GA_ROOT) == f));
+}
 static HGDIOBJ g_old_bitmap;
 static RECT g_last_client;
 

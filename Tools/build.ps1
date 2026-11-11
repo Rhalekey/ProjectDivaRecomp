@@ -71,6 +71,7 @@ function Hide-UserFolder {
     }
 }
 function Fail($name) {
+    Get-Job | Remove-Job -Force -ErrorAction SilentlyContinue
     "FAILED: $name" *>> $Log
     Write-Host "FAILED: $name (see $Log)"
     "FIM" *>> $Log
@@ -96,6 +97,74 @@ $Tools = @(
     "-DCMAKE_AR=$(Join-Path $Tc 'Scripts\zar.cmd')",
     "-DCMAKE_RANLIB=$(Join-Path $Tc 'Scripts\zranlib.cmd')"
 )
+
+# ---- what is downloaded: started now, each in a job of its own, so that it comes in while the
+# recompiler and the game compile, and waited for only where it is used. Each job leaves its folder
+# whole or not at all; a failure is reported where it is waited for.
+$FfVersion = "n8.1.3-9-g29e619e767"
+$FfName = "ffmpeg-$FfVersion-win64-lgpl-shared-8.1"
+$FfHash = "3E47BDA1607740550141E37C0E49D1E5182B34699F15ADFD137EE266D346811A"
+$FfDir = Join-Path $env:LOCALAPPDATA "ProjectDivaRecomp\$FfName"
+$FfDlls = @("avcodec-62.dll", "avutil-60.dll", "swresample-6.dll", "avformat-62.dll")
+$SdlVersion = "3.4.18"
+$SdlHash = "75C2C0FC74E7D1206AAEDC22893A35887332F4F85F5C8B74FDDC10D177985F2C"
+$SdlDir = Join-Path $env:LOCALAPPDATA "ProjectDivaRecomp\SDL3-$SdlVersion"
+$SdlDll = Join-Path $SdlDir "SDL3.dll"
+$FfJob = $null
+if (-not (Test-Path (Join-Path $FfDir "include\libavcodec\avcodec.h")) -or -not (Test-Path (Join-Path $FfDir "bin\avformat-62.dll"))) {
+    Step "downloading FFmpeg $FfVersion (for the movies), meanwhile"
+    $FfJob = Start-Job -ArgumentList $FfName, $FfHash, $FfDir, $FfDlls, (Join-Path $Build "$FfName.zip") -ScriptBlock {
+        param($FfName, $FfHash, $FfDir, $FfDlls, $FfZip)
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $ProgressPreference = "SilentlyContinue"
+        try {
+            Invoke-WebRequest -UseBasicParsing -OutFile $FfZip "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/$FfName.zip" -ErrorAction Stop
+            if ((Get-FileHash $FfZip -Algorithm SHA256).Hash -ne $FfHash) { throw "the downloaded file does not match its hash" }
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            $zip = [IO.Compression.ZipFile]::OpenRead($FfZip)
+            try {
+                foreach ($entry in $zip.Entries) {
+                    $inner = $entry.FullName.Substring($entry.FullName.IndexOf("/") + 1)
+                    $keep = $inner -like "include/*" -or $inner -eq "LICENSE.txt" -or ($FfDlls | Where-Object { $inner -eq "bin/$_" })
+                    if (-not $keep -or $entry.Name -eq "") { continue }
+                    $target = Join-Path $FfDir ($inner -replace "/", "\")
+                    New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
+                    [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $target, $true)
+                }
+            } finally { $zip.Dispose() }
+            "ok"
+        } catch { "$_" } finally { Remove-Item $FfZip -ErrorAction SilentlyContinue }
+    }
+}
+$SdlJob = $null
+if (-not (Test-Path $SdlDll)) {
+    $SdlJob = Start-Job -ArgumentList $SdlVersion, $SdlHash, $SdlDir, (Join-Path $Build "SDL3-$SdlVersion.zip") -ScriptBlock {
+        param($SdlVersion, $SdlHash, $SdlDir, $SdlZip)
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $ProgressPreference = "SilentlyContinue"
+        try {
+            Invoke-WebRequest -UseBasicParsing -OutFile $SdlZip "https://github.com/libsdl-org/SDL/releases/download/release-$SdlVersion/SDL3-$SdlVersion-win32-x64.zip" -ErrorAction Stop
+            if ((Get-FileHash $SdlZip -Algorithm SHA256).Hash -ne $SdlHash) { throw "the downloaded file does not match its hash" }
+            Expand-Archive -Force $SdlZip $SdlDir -ErrorAction Stop
+            "ok"
+        } catch { "$_" } finally { Remove-Item $SdlZip -ErrorAction SilentlyContinue }
+    }
+}
+# The dictionary the romaji is made with, into the compiler's Python, unless it is there.
+$RomajiJob = $null
+& $Py -c "import fugashi, unidic_lite" *> $null
+if ($LASTEXITCODE -ne 0) {
+    $RomajiJob = Start-Job -ArgumentList $Py -ScriptBlock {
+        param($Py)
+        & $Py -m pip install -q fugashi==1.5.2 unidic-lite==1.0.8 2>&1 | Out-String
+    }
+}
+# What a job said, once it is done: "ok", or why it failed.
+function Wait-Download($job) {
+    if (-not $job) { return "ok" }
+    $said = (Receive-Job -Wait -AutoRemoveJob $job | Out-String).Trim()
+    return $said
+}
 
 # ---- the toolkit's own tests
 if (-not $SkipTests) {
@@ -146,37 +215,12 @@ if ((Is-Stale $GenStamp $GenWanted) -or -not (Test-Path (Join-Path $Gen "diva_re
 
 # ---- FFmpeg, for the movies and the Memory Stick's music: its LGPL decoders and reader, loaded by
 # the game at run time. Only the headers it is compiled with, the DLLs it loads and the licence are
-# kept. The game runs without it, so a failure here only costs the movies and the music. The hash is the one the build's release publishes.
-$FfVersion = "n8.1.3-9-g29e619e767"
-$FfName = "ffmpeg-$FfVersion-win64-lgpl-shared-8.1"
-$FfHash = "3E47BDA1607740550141E37C0E49D1E5182B34699F15ADFD137EE266D346811A"
-$FfDir = Join-Path $env:LOCALAPPDATA "ProjectDivaRecomp\$FfName"
-$FfDlls = @("avcodec-62.dll", "avutil-60.dll", "swresample-6.dll", "avformat-62.dll")
-if (-not (Test-Path (Join-Path $FfDir "include\libavcodec\avcodec.h")) -or -not (Test-Path (Join-Path $FfDir "bin\avformat-62.dll"))) {
-    Step "downloading FFmpeg $FfVersion (for the movies)"
-    $FfZip = Join-Path $Build "$FfName.zip"
-    try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        $ProgressPreference = "SilentlyContinue"
-        Invoke-WebRequest -UseBasicParsing -OutFile $FfZip "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/$FfName.zip" -ErrorAction Stop
-        if ((Get-FileHash $FfZip -Algorithm SHA256).Hash -ne $FfHash) { throw "the downloaded file does not match its hash" }
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        $zip = [IO.Compression.ZipFile]::OpenRead($FfZip)
-        try {
-            foreach ($entry in $zip.Entries) {
-                $inner = $entry.FullName.Substring($entry.FullName.IndexOf("/") + 1)
-                $keep = $inner -like "include/*" -or $inner -eq "LICENSE.txt" -or ($FfDlls | Where-Object { $inner -eq "bin/$_" })
-                if (-not $keep -or $entry.Name -eq "") { continue }
-                $target = Join-Path $FfDir ($inner -replace "/", "\")
-                New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
-                [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $target, $true)
-            }
-        } finally { $zip.Dispose() }
-    } catch {
-        "FFmpeg not installed: $_" *>> $Log
-        Write-Host "Warning: could not download FFmpeg ($_). The opening movie will be skipped."
-    }
-    Remove-Item $FfZip -ErrorAction SilentlyContinue
+# kept. The game runs without it, so a failure here only costs the movies and the music. The hash is
+# the one the build's release publishes. Downloaded meanwhile (above).
+$said = Wait-Download $FfJob
+if ($said -ne "ok") {
+    "FFmpeg not installed: $said" *>> $Log
+    Write-Host "Warning: could not download FFmpeg ($said). The opening movie will be skipped."
 }
 $FfInclude = Join-Path $FfDir "include"
 $FfArgs = @()
@@ -199,25 +243,12 @@ $built = $LASTEXITCODE
 if ($built -ne 0) { Fail "compile the game" }
 
 # ---- SDL3, for controllers other than Xbox ones. The game runs without it, so a failure here
-# only costs those controllers. The hash is the one the official release publishes.
-$SdlVersion = "3.4.18"
-$SdlHash = "75C2C0FC74E7D1206AAEDC22893A35887332F4F85F5C8B74FDDC10D177985F2C"
-$SdlDir = Join-Path $env:LOCALAPPDATA "ProjectDivaRecomp\SDL3-$SdlVersion"
-$SdlDll = Join-Path $SdlDir "SDL3.dll"
-if (-not (Test-Path $SdlDll)) {
-    Step "downloading SDL $SdlVersion"
-    $SdlZip = Join-Path $Build "SDL3-$SdlVersion.zip"
-    try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        $ProgressPreference = "SilentlyContinue"
-        Invoke-WebRequest -UseBasicParsing -OutFile $SdlZip "https://github.com/libsdl-org/SDL/releases/download/release-$SdlVersion/SDL3-$SdlVersion-win32-x64.zip" -ErrorAction Stop
-        if ((Get-FileHash $SdlZip -Algorithm SHA256).Hash -ne $SdlHash) { throw "the downloaded file does not match its hash" }
-        Expand-Archive -Force $SdlZip $SdlDir -ErrorAction Stop
-    } catch {
-        "SDL not installed: $_" *>> $Log
-        Write-Host "Warning: could not download SDL ($_). Only Xbox controllers will work."
-    }
-    Remove-Item $SdlZip -ErrorAction SilentlyContinue
+# only costs those controllers. The hash is the one the official release publishes. Downloaded
+# meanwhile (above).
+$said = Wait-Download $SdlJob
+if ($said -ne "ok") {
+    "SDL not installed: $said" *>> $Log
+    Write-Host "Warning: could not download SDL ($said). Only Xbox controllers will work."
 }
 if (Test-Path $SdlDll) { Copy-Item -Force $SdlDll $Out }
 
@@ -286,11 +317,14 @@ $Work = @()
 foreach ($Language in $Languages) {
     $LangTable = Join-Path $LangDir "$($Language)_images.txt"
     $UiWords = Join-Path $LangDir "$($Language)_ui.txt"
+    # Only the words drawn into pictures count: the names of languages added elsewhere do not.
+    $PictureWords = (Get-Content $UiWords -Encoding UTF8 | Where-Object { $_.StartsWith("pictures.") }) -join "|"
+    $PictureWords = [BitConverter]::ToString([Security.Cryptography.SHA1]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($PictureWords))).Replace("-", "")
     $Item = [ordered]@{ Language = $Language }
     $Item.PicturesStamp = Join-Path $HdDir "pictures_$($Language)_made_from.txt"
     $Item.PicturesWanted = "$($FontFile.Name) $((Get-FileHash $LangTable).Hash) $((Get-FileHash $LangTool).Hash) $LettersHash large in lang"
     $Item.VectorsStamp = Join-Path $HdDir "vector_$($Language)_made_from.txt"
-    $Item.VectorsWanted = "$($FontFile.Name) $((Get-FileHash $LangTable).Hash) $((Get-FileHash $UiTool).Hash) $((Get-FileHash $HudTool).Hash) $((Get-FileHash $LangTool).Hash) $LettersHash $((Get-FileHash $UiWords).Hash)"
+    $Item.VectorsWanted = "$($FontFile.Name) $((Get-FileHash $LangTable).Hash) $((Get-FileHash $UiTool).Hash) $((Get-FileHash $HudTool).Hash) $((Get-FileHash $LangTool).Hash) $LettersHash $PictureWords"
     $Item.Pictures = if (Is-Stale $Item.PicturesStamp $Item.PicturesWanted) { "1" } else { "0" }
     $Item.Vectors = if (Is-Stale $Item.VectorsStamp $Item.VectorsWanted) { "1" } else { "0" }
     if ($Item.Pictures -eq "1" -or $Item.Vectors -eq "1") { $Work += [pscustomobject]$Item }
@@ -331,11 +365,15 @@ $RomajiStamp = Join-Path $HdDir "romaji_made_from.txt"
 $RomajiWanted = "$((Get-FileHash $RomajiTool).Hash) $((Get-FileHash $RomajiTitles).Hash)"
 if (Is-Stale $RomajiStamp $RomajiWanted) {
     Step "generating romaji for song names and lyrics"
-    & $Py -m pip install -q fugashi==1.5.2 unidic-lite==1.0.8 *>> $Log
+    (Wait-Download $RomajiJob) *>> $Log
+    $RomajiJob = $null
     & $Py $RomajiTool $Elf $RomajiTitles (Join-Path $env:LOCALAPPDATA "ProjectDivaRecomp\lang\romaji") *>> $Log
     if ($LASTEXITCODE -eq 0) { $RomajiWanted | Set-Content $RomajiStamp }
     else { Write-Host "Warning: the lyrics could not be converted to romaji. Song names may still be available. See $Log." }
 }
+
+# A download nothing waited for yet (the romaji's, when the romaji was already made) ends before this does.
+if ($RomajiJob) { (Wait-Download $RomajiJob) *>> $Log }
 
 if ($BuildOnly) { "FIM" *>> $Log; Hide-UserFolder; exit 0 }
 

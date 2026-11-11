@@ -98,6 +98,7 @@ static uint8_t *afs_entry(FILE *f, int index, const char *name, size_t *size) {
     uint8_t head[8];
     if (fseek(f, 0, SEEK_SET) || fread(head, 1, 8, f) != 8 || memcmp(head, "AFS", 3)) return NULL;
     const uint32_t count = head[4] | head[5] << 8 | head[6] << 16 | (uint32_t)head[7] << 24;
+    if (count > 100000) return NULL;   /* the game's has 1757 */
     uint8_t *table = (uint8_t *)malloc(count * 8u + 8u);
     if (!table || fread(table, 8, count + 1, f) != count + 1) { free(table); return NULL; }
 #define U32(p) ((uint32_t)(p)[0] | (uint32_t)(p)[1] << 8 | (uint32_t)(p)[2] << 16 | (uint32_t)(p)[3] << 24)
@@ -292,6 +293,13 @@ static int convert(const char *model_path, const char *dir, const char *cache, c
     const int nmat = m.nmaterials > 0 ? m.nmaterials : 1;
     model_picture *pics = (model_picture *)calloc((size_t)nmat, sizeof *pics);
     char (*paths)[1100] = calloc((size_t)nmat, sizeof *paths);
+    if (!pics || !paths) {
+        free(pics);
+        free(paths);
+        model_free(&m);
+        fprintf(stderr, "module skins: \"%s\": out of memory\n", name);
+        return 0;
+    }
     for (int i = 0; i < m.nmaterials; i++) {
         /* The path the model gives, from its folder, when it is there (as PMX files give them). */
         char relative[1100];
@@ -606,7 +614,7 @@ static void on_dress(void) {
     if (g_on_screen) g_chosen = s;
     /* She is not dressed again in the module she wears; a change of skin alone must be. */
     if (s != g_dressed && guest_in_ram(miku + DRESSED_AS)) psp_write32(miku + DRESSED_AS, 0xFFFFFFFFu);
-    if (s >= 0) fprintf(stderr, "module skins: Miku dressed in module %d%s%s (from %08X)\n", module, s >= 0 ? ", skin " : "", s >= 0 ? g_skins[s].name : "", from);
+    if (s >= 0) fprintf(stderr, "module skins: Miku dressed in module %d, skin %s (from %08X)\n", module, g_skins[s].name, from);
     g_dressed = s;
 }
 

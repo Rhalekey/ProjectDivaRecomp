@@ -6,7 +6,21 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 
 ## 2026-11-11
 
+### Installing
+- **Faster pictures**: each language's pictures take about 3.5 minutes where they took 5.4, with the same bytes out. The pixels are written whole rather than a byte at a time, PNG rows with no filter are left as they are, a shape is filled a run at a time, and the menu sheets drawn once for each of the six sets of button signs are drawn once, only their signs for each.
+- FFmpeg, SDL and the romaji's dictionary are downloaded while the game compiles, each waited for only where it is used.
+
+### Fixes
+- Files from outside read safely: a zip in `Import`, a PMX, FBX or IGB model, a TGA picture and the game's archives, cut short or made up, are refused or read within their bounds, where some were read past their end or asked for any memory a count said. A zip's names can no longer reach out of their folder through `\` or `:`.
+- Keys pressed in another program no longer reach the project's own screens: an Enter typed elsewhere could answer "Delete this data?", and a key rebound or a letter typed into an Edit's name.
+- `OPTIONS.INI`, `PLAYED.INI` and `SONGTIMING.INI` are written beside themselves and then put in place, so a game closed halfway leaves the old ones whole.
+- Discord's status shows the translations' accented letters, where it showed half-width kana in their places.
+- The Options rows' lines are cut short at their room if a translation is longer, never past it.
+
 ### Languages
+- **French, Spanish and Italian**: the game's text, the words in its pictures and this project's own, each language with its flag on the language screen and in the Options row's turn. Written without native speakers, as German was; corrections are welcome.
+- The Options row for the language goes through every language in `lang\languages.txt`, where it went through English, Japanese and German only. Right goes to the next and Left to the one before, there and in the rows for icons, notes and what hits notes, which all went forward whichever was pressed.
+- A language's menu pieces are drawn again only when the words in its pictures change, not when another language's name is added to its words.
 - **This project's own words in files**: the words of its menus, screens and messages, about 170 in each language, were in ten C files in four encodings. They are now in `lang\<code>_ui.txt`, `key = text` in UTF-8, read by `src/host/ui_text.c`, which gives each word as the game's font, the screens or the messages need it. The words drawn into the title screen's and the song list's pictures are there too, out of `Tools/ui_vector.py`. A word missing from a language shows in English.
 - **One list of languages**: `lang\languages.txt`, read by the language screen, the translation tables and the build. A language is added with its files and a flag.
 - **Accented letters**: `lang\letters.txt` lists the letters the game's font lacks and the characters it never shows that they are drawn over, read by the game and by `Tools/hd_font.py`. It has German's and those French, Spanish and Italian need, 53 in all. Before, German's seven were written out in four places.

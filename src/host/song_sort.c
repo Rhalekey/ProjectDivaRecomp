@@ -112,13 +112,14 @@ static void song_played(int song, int module) {
     if (module >= 0 && module < MODULES) g_module_played[module] = now;
     char path[1200];
     played_path(path, sizeof path, 1);
-    FILE *f = fopen(path, "w");
+    char writing[1220];
+    FILE *f = replace_file_begin(path, writing, sizeof writing);
     if (!f) return;
     for (int i = 0; i < MOST_ROWS; i++)
         if (g_played[i]) fprintf(f, "song %d = %lld\n", i, g_played[i]);
     for (int i = 0; i < MODULES; i++)
         if (g_module_played[i]) fprintf(f, "module %d = %lld\n", i, g_module_played[i]);
-    fclose(f);
+    replace_file_end(f, writing, path);
 }
 
 long long song_sort_module_played(int module) {

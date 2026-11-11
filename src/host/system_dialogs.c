@@ -134,7 +134,7 @@ static void draw_list(int purpose, const psp_save_slot *slots, int top, int chos
 /* Triangle on a controller or E on the keyboard, just pressed. */
 static int export_pressed(void) {
     static int was = 1;
-    const int now = (psp_window_pad_raw() >> 3 & 1) || (GetAsyncKeyState('E') & 0x8000);
+    const int now = (psp_window_pad_raw() >> 3 & 1) || (kit_has_focus() && (GetAsyncKeyState('E') & 0x8000));
     const int pressed = now && !was;
     was = now;
     return pressed;
@@ -321,6 +321,11 @@ static wchar_t typed(void) {
     static BYTE was[256];
     BYTE now[256];
     for (int vk = 0; vk < 256; vk++) now[vk] = (GetAsyncKeyState(vk) & 0x8000) ? 0x80 : 0;
+    /* Keys pressed in another program are not typed here. */
+    if (!kit_has_focus()) {
+        memcpy(was, now, sizeof was);
+        return 0;
+    }
     wchar_t result = 0;
     const int shift = now[VK_SHIFT] != 0;
     for (int vk = 0; vk < 256 && !result; vk++) {
@@ -375,7 +380,7 @@ static int keyboard(const uint16_t *description16, const uint16_t *initial, int 
         const wchar_t key = typed();
         if (key == L'\b' && len) text[--len] = 0, redraw = 1;
         else if (key && key != L'\b' && len < limit) text[len++] = key, text[len] = 0, redraw = 1;
-        if (!controls_screen_from_pad() && (GetAsyncKeyState(VK_RETURN) & 0x8000) && ok) {
+        if (!controls_screen_from_pad() && kit_has_focus() && (GetAsyncKeyState(VK_RETURN) & 0x8000) && ok) {
             entered = 1;
             break;
         }

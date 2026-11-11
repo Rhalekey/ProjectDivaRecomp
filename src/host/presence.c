@@ -12,6 +12,7 @@
  *   - high scores: read from the save, for the song chosen in the song list (see presence_chosen).
  */
 #include "presence.h"
+#include "ui_text.h"
 
 #include <psprecomp/mem.h>
 
@@ -109,8 +110,9 @@ static HANDLE open_pipe(void) {
 static void json_text(char *out, size_t size, const char *game_text) {
     wchar_t wide[FIELD];
     char utf8[FIELD * 3];
-    const int n = MultiByteToWideChar(932, 0, game_text, -1, wide, FIELD);
-    if (n <= 0 || WideCharToMultiByte(CP_UTF8, 0, wide, -1, utf8, sizeof utf8, NULL, NULL) <= 0) snprintf(utf8, sizeof utf8, "%s", game_text);
+    /* The translations' letters the game's font lacks are kept in letters.txt's places. */
+    ui_text_from_game(game_text, 1, wide, FIELD);
+    if (WideCharToMultiByte(CP_UTF8, 0, wide, -1, utf8, sizeof utf8, NULL, NULL) <= 0) snprintf(utf8, sizeof utf8, "%s", game_text);
     size_t o = 0;
     for (const char *p = utf8; *p && o + 7 < size; p++) {
         const unsigned char ch = (unsigned char)*p;

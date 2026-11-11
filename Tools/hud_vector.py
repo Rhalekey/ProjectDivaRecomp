@@ -67,18 +67,28 @@ class Canvas:
             return
         width = x1 - x0
         fn = colour if callable(colour) else None
+        # Each polygon's edges, once: the rows they span, where they start and how they lean. Only
+        # those spanning a row are looked at there, and a run's inside is counted once per row
+        # (whole pixels by a running count) rather than a pixel at a time for each subsample.
+        shapes = []
+        for poly in polys:
+            edges = []
+            for i, (ax, ay) in enumerate(poly):
+                bx, by = poly[(i + 1) % len(poly)]
+                if ay != by:
+                    edges.append((min(ay, by), max(ay, by), ax, ay, bx - ax, by - ay))
+            if edges:
+                shapes.append((min(e[0] for e in edges), max(e[1] for e in edges), edges))
         for y in range(y0, y1):
-            total = [0.0] * width
-            for poly in polys:
+            total = None
+            for low, high, edges in shapes:
+                if high <= y or low >= y + 1:
+                    continue
                 row = [0.0] * width
+                whole = [0] * (width + 1)
                 for s in range(SUBSAMPLES):
                     sy = y + (s + 0.5) / SUBSAMPLES
-                    crossings = []
-                    for i, (ax, ay) in enumerate(poly):
-                        bx, by = poly[(i + 1) % len(poly)]
-                        if (ay <= sy < by) or (by <= sy < ay):
-                            crossings.append(ax + (sy - ay) * (bx - ax) / (by - ay))
-                    crossings.sort()
+                    crossings = sorted([ax + (sy - ay) * dx / dy for lo, hi, ax, ay, dx, dy in edges if lo <= sy < hi])
                     for k in range(0, len(crossings) - 1, 2):
                         a, b = max(crossings[k], x0), min(crossings[k + 1], x1)
                         if b <= a:
@@ -88,13 +98,19 @@ class Canvas:
                             row[ia - x0] += (b - a) / SUBSAMPLES
                             continue
                         row[ia - x0] += (ia + 1 - a) / SUBSAMPLES
-                        for ix in range(ia + 1, ib):
-                            row[ix - x0] += 1 / SUBSAMPLES
+                        if ib > ia + 1:
+                            whole[ia + 1 - x0] += 1
+                            whole[ib - x0] -= 1
                         if ib < x1:
                             row[ib - x0] += (b - ib) / SUBSAMPLES
-                for i, v in enumerate(row):
-                    if v > total[i]:
-                        total[i] = v
+                inside = 0
+                for i in range(width):
+                    inside += whole[i]
+                    if inside:
+                        row[i] += inside / SUBSAMPLES
+                total = row if total is None else list(map(max, total, row))
+            if total is None:
+                continue
             base = (y * self.w + x0) * 4
             for i, v in enumerate(total):
                 if v <= 0:

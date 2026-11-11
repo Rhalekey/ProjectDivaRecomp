@@ -318,24 +318,31 @@ static int g_from_pad;
 
 /* On a controller the button under Cross confirms if the player chose Cross, and the other one goes
  * back; Circle the other way round. `split` is zero where either confirms, before that choice. */
+/* A key down only while the player is in the game's window or one of its screens: keys typed in
+ * another program, an Enter that would answer "Delete this data?", do nothing here. */
+static int key_down_here(int vk) {
+    const HWND f = GetForegroundWindow();
+    return key_down(vk) && f && (f == (HWND)psp_window_handle() || kit_has_focus());
+}
+
 static menu_input read_menu(int split) {
     const uint32_t pad = psp_window_pad_raw();
     const int cross = g_options.confirm_cross == 1;
     const int pad_ok = split ? (pad >> (cross ? PAD_SOUTH : PAD_EAST) & 1) : (pad >> PAD_SOUTH & 1) || (pad >> PAD_EAST & 1);
     const int pad_back = split && (pad >> (cross ? PAD_EAST : PAD_SOUTH) & 1);
     menu_input in;
-    in.up = key_down(VK_UP) || (pad >> PAD_UP & 1);
-    in.down = key_down(VK_DOWN) || (pad >> PAD_DOWN & 1);
-    in.left = key_down(VK_LEFT) || (pad >> PAD_LEFT & 1);
-    in.right = key_down(VK_RIGHT) || (pad >> PAD_RIGHT & 1);
-    in.ok = key_down(VK_RETURN) || pad_ok;
-    in.back = key_down(VK_ESCAPE) || pad_back;
+    in.up = key_down_here(VK_UP) || (pad >> PAD_UP & 1);
+    in.down = key_down_here(VK_DOWN) || (pad >> PAD_DOWN & 1);
+    in.left = key_down_here(VK_LEFT) || (pad >> PAD_LEFT & 1);
+    in.right = key_down_here(VK_RIGHT) || (pad >> PAD_RIGHT & 1);
+    in.ok = key_down_here(VK_RETURN) || pad_ok;
+    in.back = key_down_here(VK_ESCAPE) || pad_back;
     if (pad) {
         g_from_pad = 1;
     } else {
         static const int KEYS[] = {VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_RETURN, VK_ESCAPE};
         for (size_t i = 0; i < sizeof KEYS / sizeof KEYS[0]; i++) {
-            if (key_down(KEYS[i])) g_from_pad = 0;
+            if (key_down_here(KEYS[i])) g_from_pad = 0;
         }
     }
     return in;
@@ -767,7 +774,7 @@ static void capture_restart_key(void) {
     while (GetTickCount64() < until) {
         kit_frame();
         for (int vk = 0x08; vk <= 0xFE; vk++) {
-            if (vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU || !key_down(vk)) continue;
+            if (vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU || !key_down_here(vk)) continue;
             if (vk == VK_ESCAPE) return;
             int taken = 0;
             for (int i = 0; i < PSP_BIND_COUNT; i++) taken |= psp_window_get_key(i) == vk || psp_window_get_key2(i) == vk;
@@ -786,7 +793,7 @@ static void capture_restart_pad(void) {
     uint32_t chosen = 0;
     while (GetTickCount64() < until) {
         kit_frame();
-        if (key_down(VK_ESCAPE)) return;
+        if (key_down_here(VK_ESCAPE)) return;
         const uint32_t pad = psp_window_pad_raw();
         chosen |= pad;
         if (chosen && !pad) {
@@ -806,12 +813,12 @@ static void capture(int button, int column) {
         if (column != COLUMN_PAD) {
             /* Past the mouse buttons, and without Shift and such, which have a left and a right. */
             for (int vk = 0x08; vk <= 0xFE; vk++) {
-                if (vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU || !key_down(vk)) continue;
+                if (vk == VK_SHIFT || vk == VK_CONTROL || vk == VK_MENU || !key_down_here(vk)) continue;
                 if (vk != VK_ESCAPE) set_key(button, column == COLUMN_KEY2, vk);
                 return;
             }
         } else {
-            if (key_down(VK_ESCAPE)) return;
+            if (key_down_here(VK_ESCAPE)) return;
             const uint32_t pad = psp_window_pad_raw();
             for (int id = 0; id < 32; id++) {
                 if (pad >> id & 1) {

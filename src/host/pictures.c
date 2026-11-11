@@ -58,7 +58,6 @@ static int gdip_ready(void) {
     return 1;
 }
 
-/* Its pixels as R, G, B, A, top row first, or NULL. */
 /* ---- TGA, which GDI+ does not read: true colour or grey, plain or run-length ------------- */
 
 static uint8_t *read_tga(const char *path, UINT *w, UINT *h) {
@@ -80,7 +79,8 @@ static uint8_t *read_tga(const char *path, UINT *w, UINT *h) {
         return NULL;
     }
     const size_t n = (size_t)*w * *h;
-    uint8_t *out = (uint8_t *)malloc(n * 4);
+    /* A file cut short leaves the rest clear, not whatever memory held. */
+    uint8_t *out = (uint8_t *)calloc(n, 4);
     size_t at = 18 + (size_t)idlen, i = 0;
     while (out && i < n && at < (size_t)size) {
         int count = 1, raw = 1;
@@ -118,6 +118,7 @@ static uint8_t *read_tga(const char *path, UINT *w, UINT *h) {
     return out;
 }
 
+/* Its pixels as R, G, B, A, top row first, or NULL. */
 uint8_t *picture_read(const char *path, UINT *w, UINT *h) {
     const char *dot = strrchr(path, '.');
     if (dot && !_stricmp(dot, ".tga")) return read_tga(path, w, h);

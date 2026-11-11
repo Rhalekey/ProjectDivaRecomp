@@ -104,6 +104,22 @@ TEXTURE_FROM = (120, 108, 132, 96)  # how far right, on the same row, the window
 BUTTON_WORD_AT = 18    # where a button's word starts, after its sign and colon
 WINDOW_ROUND = 3.5       # the message window's corners, round
 
+# What is read from the game's archive, kept: the sheets are made once for each set of signs, six
+# times over, from the same pictures. Each caller gets rows of its own.
+_DECODED = {}
+
+
+def decoded(archive, name):
+    """decode_png of an entry of the archive, decoded once."""
+    if name not in _DECODED:
+        _DECODED[name] = decode_png(archive.read(name))
+    w, h, pixels = _DECODED[name]
+    return w, h, [list(row) for row in pixels]
+
+
+_ENLARGED = {}
+
+
 def ui_words(language):
     """{key: text} of lang/<language>_ui.txt, the project's words in that language."""
     path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lang', '%s_ui.txt' % language)
@@ -775,7 +791,7 @@ def logo_white(p):
 
 def title_sheet(archive, drawer, folder, words):
     picture = 'title.png'
-    w, h, pixels = decode_png(archive.read(picture))
+    w, h, pixels = decoded(archive, (picture))
     rects = layout_of(archive, picture)
     c = enlarged(archive, picture, pixels, w, h)
     for k, name in enumerate(('new_game', 'load_game', 'adhoc_mode')):
@@ -817,7 +833,7 @@ DEMO_SHADOW = (40, 40, 40)
 def demo_start_sheet(archive, family, folder, words):
     """PRESS START, its line, and the words under it: white, with a soft shadow below."""
     picture = 'start.png'
-    w, h, pixels = decode_png(archive.read(picture))
+    w, h, pixels = decoded(archive, (picture))
     c = Canvas(w, h)
     units = len(words) * 6 + (len(words) - 1) * 1.6
     stroke = 1.5
@@ -981,7 +997,7 @@ def titles(archive, out):
     """Takes the pictures already made with each name in this language, and redoes their lines."""
     for name, lines, box, plate_y, lines_below in TITLES:
         picture = archive.find(name)
-        w, h, pixels = decode_png(archive.read(picture))
+        w, h, pixels = decoded(archive, (picture))
         path = os.path.join(out, '%08X.rgba' % colour_hash(pixels))
         if os.path.exists(path):
             with open(path, 'rb') as f:
@@ -1152,7 +1168,7 @@ def streaked(sheet, pixels, box, skip=()):
 def sheet_of_arrows(archive, out):
     """The arrows and cursors of the lists, and the slider's handle."""
     picture = 'menu_basic04.png'
-    w, h, pixels = decode_png(archive.read(archive.find(picture)))
+    w, h, pixels = decoded(archive, (archive.find(picture)))
     rects = layout_of(archive, picture)
     c = enlarged(archive, picture, pixels, w, h)
     # The selected row's glows, before the arrows that go into some of them.
@@ -1362,7 +1378,7 @@ def project_badge(c, family, box):
 def sheet_of_icons(archive, family, out):
     """The small icons of the lists, on the sheet that also has the Project DIVA badge and the digits."""
     picture = 'menu_basic03.png'
-    w, h, pixels = decode_png(archive.read(archive.find(picture)))
+    w, h, pixels = decoded(archive, (archive.find(picture)))
     rects = layout_of(archive, picture)
     c = enlarged(archive, picture, pixels, w, h)
     icon_new(c, pixels, rects['basic_icon_new.png'])
@@ -1877,7 +1893,7 @@ def sheet_of_card(archive, out):
     shadow taken out of the picture before it is enlarged so no step is left under them, then a new
     shadow from the new lines, and its three small icons."""
     picture = 'menu_common.png'
-    w, h, pixels = decode_png(archive.read(archive.find(picture)))
+    w, h, pixels = decoded(archive, (archive.find(picture)))
     rects = layout_of(archive, picture)
     names = ('info_free_ele01.png', 'info_free_ele02.png', 'info_free_ele03.png')
     boxes = [rects[n] for n in names]
@@ -2238,7 +2254,7 @@ def word_paths(word, x0, x1, top, height, width=2.0):
 
 
 def sheet_of_result_window(archive, picture, out):
-    w, h, pixels = decode_png(archive.read(archive.find(picture)))
+    w, h, pixels = decoded(archive, (archive.find(picture)))
     write_sheet(result_window_words(archive, archive.find(picture), pixels), pixels, out)
 
 
@@ -2431,7 +2447,7 @@ EXTRA_WITH = {'basic_sele_sort': 'basic_tri_pvappr.png', 'basic_lr_module': 'bas
 
 def sheet_of_hints(archive, labels, drawer, out, sign_set):
     picture = 'menu_basic02.png'
-    w, h, pixels = decode_png(archive.read(archive.find(picture)))
+    w, h, pixels = decoded(archive, (archive.find(picture)))
     rects = layout_of(archive, picture)
     c = enlarged(archive, picture, pixels, w, h)
     tight = []
@@ -2574,22 +2590,27 @@ def button_sign(c, x, y, kind):
 
 def sheet_of_windows(archive, labels, drawer, out, sign_set):
     picture = 'menu_basic.png'
-    w, h, pixels = decode_png(archive.read(archive.find(picture)))
+    w, h, pixels = decoded(archive, (archive.find(picture)))
     rects = layout_of(archive, picture)
     c = enlarged(archive, picture, pixels, w, h)
-    wipe(c, (WINDOW_X, WINDOW_Y, WINDOW_SIZE, WINDOW_SIZE))
-    window(c)
-    wipe(c, (BLADE_X, BLADE_Y, BLADE_W, BLADE_H))
-    blade(c, pixels)
-    icon_ring(c, pixels, rects['basic_blade_ico.png'])
-    slider_end(c, pixels, rects['basic_slider_up.png'], True)
-    slider_end(c, pixels, rects['basic_slider_dn.png'], False)
-    # The rows' bars, and the same arrows in the bar of a row with a value, when it is not the one chosen.
-    bx, by, _, _ = rects['basic_planeon.png']
-    streaked(c, pixels, rects['basic_planeoff.png'])
-    streaked(c, pixels, rects['basic_planeon.png'], [(left, by + 4, right, by + 6 + BAR_ARROW_H) for left, right, _ in BAR_ARROWS])
-    for left, right, direction in BAR_ARROWS:
-        arrow_in_bar(c, pixels, (left, by + 5, right, by + 5 + BAR_ARROW_H), direction)
+    # All but its buttons is the same whatever the signs: drawn once, for the first set.
+    key = ('windows', picture, w, h)
+    if key not in _ENLARGED:
+        wipe(c, (WINDOW_X, WINDOW_Y, WINDOW_SIZE, WINDOW_SIZE))
+        window(c)
+        wipe(c, (BLADE_X, BLADE_Y, BLADE_W, BLADE_H))
+        blade(c, pixels)
+        icon_ring(c, pixels, rects['basic_blade_ico.png'])
+        slider_end(c, pixels, rects['basic_slider_up.png'], True)
+        slider_end(c, pixels, rects['basic_slider_dn.png'], False)
+        # The rows' bars, and the same arrows in the bar of a row with a value, when it is not the one chosen.
+        bx, by, _, _ = rects['basic_planeon.png']
+        streaked(c, pixels, rects['basic_planeoff.png'])
+        streaked(c, pixels, rects['basic_planeon.png'], [(left, by + 4, right, by + 6 + BAR_ARROW_H) for left, right, _ in BAR_ARROWS])
+        for left, right, direction in BAR_ARROWS:
+            arrow_in_bar(c, pixels, (left, by + 5, right, by + 5 + BAR_ARROW_H), direction)
+        _ENLARGED[key] = bytes(c.data)
+    c.data[:] = _ENLARGED[key]
     # Yes and No are placed to keep their row in the middle, and the others on their own buttons.
     # Back comes first: the edge of its sign reaches into OK, whose wipe then clears it.
     for name, confirm, moved in (('basic_btninfo_modoru.png', False, None), ('basic_btninfo_kettei.png', True, None),
@@ -2788,7 +2809,7 @@ def rhythm_symbols(sheet, rects):
 
 def sheet_of_rhythm(archive, out):
     picture = 'edit_rhythm.png'
-    w, h, pixels = decode_png(archive.read(archive.find(picture)))
+    w, h, pixels = decoded(archive, (archive.find(picture)))
     c = made_or_enlarged(archive, picture, pixels, out)
     rhythm_symbols(c, layout_of(archive, picture))
     write_sheet(c, pixels, out)
@@ -2796,7 +2817,7 @@ def sheet_of_rhythm(archive, out):
 
 def sheet_of_edit_buttons(archive, out):
     picture = 'edit_button.png'
-    w, h, pixels = decode_png(archive.read(archive.find(picture)))
+    w, h, pixels = decoded(archive, (archive.find(picture)))
     c = made_or_enlarged(archive, picture, pixels, out)
     rects = layout_of(archive, picture)
     edit_icons(c, rects)
@@ -2806,11 +2827,16 @@ def sheet_of_edit_buttons(archive, out):
 
 # ---- the rest
 def enlarged(archive, picture, pixels, w, h):
-    """What is not traced yet: the game's own, following its edges, with its plates cleaned."""
-    rows = smooth_enlarge(pixels, plate_rects(archive, picture), SCALE)
+    """What is not traced yet: the game's own, following its edges, with its plates cleaned. Made
+    once for each picture, as its pixels are the game's whatever the signs."""
+    key = (picture, w, h)
     c = Canvas(w, h)
-    for y, row in enumerate(rows):
-        c.data[y * c.w * 4:(y + 1) * c.w * 4] = b''.join(bytes(p) for p in row)
+    if key not in _ENLARGED:
+        rows = smooth_enlarge(pixels, plate_rects(archive, picture), SCALE)
+        for y, row in enumerate(rows):
+            c.data[y * c.w * 4:(y + 1) * c.w * 4] = b''.join(bytes(p) for p in row)
+        _ENLARGED[key] = bytes(c.data)
+    c.data[:] = _ENLARGED[key]
     return c
 
 
@@ -2821,7 +2847,7 @@ def wipe(c, box):
 
 def sheet_clean(archive, picture, out):
     entry = archive.find(picture)
-    w, h, pixels = decode_png(archive.read(entry))
+    w, h, pixels = decoded(archive, (entry))
     write_sheet(enlarged(archive, entry, pixels, w, h), pixels, out)
 
 
@@ -2931,7 +2957,7 @@ def result_words(c, pixels, rects):
 def result_hints(archive, labels, drawer, out, made_in, sign_set):
     """The two hints the results screen has in its own picture, in line with those elsewhere."""
     picture = 'menu_result.png'
-    w, h, pixels = decode_png(archive.read(picture))
+    w, h, pixels = decoded(archive, (picture))
     name = '%08X.rgba' % colour_hash(pixels)
     path = os.path.join(made_in, name)
     if not os.path.exists(path):
@@ -2942,16 +2968,21 @@ def result_hints(archive, labels, drawer, out, made_in, sign_set):
     if fw != w * SCALE:
         return
     c = Canvas(w, h)
-    for y in range(c.h):
-        c.data[y * c.w * 4:(y + 1) * c.w * 4] = data[(c.h - 1 - y) * c.w * 4:(c.h - y) * c.w * 4]
-    result_header(archive, picture, pixels, c)
-    rects = layout_of(archive, picture)
-    for star in ('result_star_act.png', 'result_star_white.png'):
-        result_star(c, pixels, rects[star])
-    for digit, strokes in RESULT_DIGITS.items():
-        result_digit(c, rects['result_num_%s.png' % digit], strokes, False)
-        result_digit(c, rects['result_numsm_%s.png' % digit], strokes, True)
-    result_words(c, pixels, rects)
+    # All but its Pick hint is the same whatever the signs: drawn once, for the first set.
+    key = ('results', path, len(data))
+    if key not in _ENLARGED:
+        for y in range(c.h):
+            c.data[y * c.w * 4:(y + 1) * c.w * 4] = data[(c.h - 1 - y) * c.w * 4:(c.h - y) * c.w * 4]
+        result_header(archive, picture, pixels, c)
+        rects = layout_of(archive, picture)
+        for star in ('result_star_act.png', 'result_star_white.png'):
+            result_star(c, pixels, rects[star])
+        for digit, strokes in RESULT_DIGITS.items():
+            result_digit(c, rects['result_num_%s.png' % digit], strokes, False)
+            result_digit(c, rects['result_numsm_%s.png' % digit], strokes, True)
+        result_words(c, pixels, rects)
+        _ENLARGED[key] = bytes(c.data)
+    c.data[:] = _ENLARGED[key]
     item = labels.get('@375,54,53,13', (0, 'Item'))[1]
     pick = labels.get('@444,54,32,13', (0, 'Pick'))[1]
     y0, x0 = 54, 354
@@ -2987,7 +3018,7 @@ def write_card_swaps(archive, out):
     """Which pictures are cards before a song, whose two buttons change places when Cross confirms."""
     with open(os.path.join(out, 'swap_regions.txt'), 'w', encoding='ascii') as f:
         for entry in sorted({e[0] for e in archive.entries if e[0].startswith('pv_start_') and '.p' in e[0]}):
-            w, _, pixels = decode_png(archive.read(entry))
+            w, _, pixels = decoded(archive, (entry))
             rects = layout_of(archive, entry)
             o, x = rects['button_o.png'], rects['button_x.png']
             f.write('%08X %d %d %d %d %d %d %d\n' % (colour_hash(pixels), o[0], o[1], x[0], x[1], o[2], o[3], w))
@@ -3101,7 +3132,7 @@ def sheets_of_cards(archive, out):
     toggles = {'se_on.png': 'ON', 'se_off.png': 'OFF'}
     name_ends = 50   # where the button sound's name ends, as the words for it are placed
     for entry in sorted({e[0] for e in archive.entries if e[0].startswith('pv_start_') and '.p' in e[0]}):
-        w, h, pixels = decode_png(archive.read(entry))
+        w, h, pixels = decoded(archive, (entry))
         path = os.path.join(out, '%08X.rgba' % colour_hash(pixels))
         if not os.path.exists(path):
             continue

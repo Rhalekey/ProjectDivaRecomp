@@ -37,6 +37,8 @@ void kit_close(void);
 int kit_width(void);
 int kit_right(int x);
 int kit_resized(void);
+/* Whether the player is in this screen's window (or the game's), and not in another program. */
+int kit_has_focus(void);
 
 /* Back to the background alone, with `title` in the title bar, ready to draw on. */
 void kit_clear(const wchar_t *title);

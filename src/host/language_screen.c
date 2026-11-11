@@ -66,6 +66,29 @@ static void flag_austria(double x, double y, double *r, double *g, double *b) {
     else set(r, g, b, 255, 255, 255);
 }
 
+/* Blue, white and red, upright. */
+static void flag_france(double x, double y, double *r, double *g, double *b) {
+    (void)y;
+    if (x < -1.0 / 3) set(r, g, b, 0, 85, 164);
+    else if (x < 1.0 / 3) set(r, g, b, 255, 255, 255);
+    else set(r, g, b, 239, 65, 53);
+}
+
+/* Red, yellow twice as wide, and red. */
+static void flag_spain(double x, double y, double *r, double *g, double *b) {
+    (void)x;
+    if (y < -0.5 || y >= 0.5) set(r, g, b, 170, 21, 27);
+    else set(r, g, b, 241, 191, 0);
+}
+
+/* Green, white and red, upright. */
+static void flag_italy(double x, double y, double *r, double *g, double *b) {
+    (void)y;
+    if (x < -1.0 / 3) set(r, g, b, 0, 140, 69);
+    else if (x < 1.0 / 3) set(r, g, b, 244, 245, 240);
+    else set(r, g, b, 205, 33, 42);
+}
+
 /* A language with no flag here has a plain one. */
 static void flag_none(double x, double y, double *r, double *g, double *b) {
     (void)x;
@@ -76,7 +99,7 @@ static void flag_none(double x, double y, double *r, double *g, double *b) {
 static const struct {
     const char *code;
     kit_flag_fn flag;
-} FLAGS[] = {{"en", flag_uk}, {"ja", flag_japan}, {"de", flag_austria}};
+} FLAGS[] = {{"en", flag_uk}, {"ja", flag_japan}, {"de", flag_austria}, {"fr", flag_france}, {"es", flag_spain}, {"it", flag_italy}};
 
 static kit_flag_fn flag_of(int language) {
     for (size_t i = 0; i < sizeof FLAGS / sizeof FLAGS[0]; i++)

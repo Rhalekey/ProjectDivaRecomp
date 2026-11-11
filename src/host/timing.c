@@ -117,12 +117,13 @@ static void read_song_timing(void) {
 static void write_song_timing(void) {
     char path[1200];
     song_timing_path(path, sizeof path, 1);
-    FILE *f = fopen(path, "w");
+    char writing[1220];
+    FILE *f = replace_file_begin(path, writing, sizeof writing);
     if (!f) return;
     fprintf(f, "; Each song's own correction to Note timing, in ms, and how many plays it is from. Learned as you play.\n");
     for (int i = 0; i < SONGS; i++)
         if (g_song_runs[i]) fprintf(f, "song %d = %.1f %d\n", i, (double)g_song_ms[i], g_song_runs[i]);
-    fclose(f);
+    replace_file_end(f, writing, path);
 }
 
 static int song_correction(void) {

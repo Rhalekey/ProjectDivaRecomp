@@ -341,6 +341,7 @@ static int open_afs(const char *host, psp_io_virtual *out) {
     uint8_t head[8];
     if (fread(head, 1, 8, f) != 8 || memcmp(head, "AFS\0", 4) != 0) goto none;
     a->count = read_u32(head + 4);
+    if (a->count > 100000) goto none;   /* the game's largest has 1757; a count past this is no archive */
     const uint32_t table_size = 8u + a->count * 8u + 8u;
 
     uint8_t *table = (uint8_t *)malloc(table_size);

@@ -94,7 +94,10 @@ igb *igb_read(const uint8_t *b, size_t size) {
     NEED(8);
     const uint32_t ssize = rd32(b + p), scount = rd32(b + p + 4);
     NEED(ssize);
+    /* A count the block could not hold is not believed: each string takes at least 4 bytes. */
+    if (ssize < 8 || scount > (ssize - 8) / 4) goto bad;
     g->strings = (char **)calloc(scount ? scount : 1, sizeof(char *));
+    if (!g->strings) goto bad;
     g->nstrings = (int)scount;
     size_t q = p + 8;
     for (uint32_t i = 0; i < scount; i++) {
@@ -103,6 +106,7 @@ igb *igb_read(const uint8_t *b, size_t size) {
         if (q + 4 + n > p + ssize) goto bad;
         if (n) {
             g->strings[i] = (char *)calloc(n + 1, 1);
+            if (!g->strings[i]) goto bad;
             memcpy(g->strings[i], b + q + 4, n);
         }
         q += 4 + n;
@@ -112,13 +116,16 @@ igb *igb_read(const uint8_t *b, size_t size) {
 
     /* meta fields */
     NEED(h[8]);
-    g->nmeta_fields = (int)h[9];
+    if ((uint64_t)h[9] * 12u > h[8]) goto bad;     /* its table inside its block */
     g->meta_fields = (igb_meta_field *)calloc(h[9] ? h[9] : 1, sizeof(igb_meta_field));
+    if (!g->meta_fields) goto bad;
+    g->nmeta_fields = (int)h[9];
     size_t names = p + h[9] * 12u;
     for (uint32_t i = 0; i < h[9]; i++) {
         const uint32_t n = rd32(b + p + i * 12);
         if (!n || names + n > p + h[8]) goto bad;
         g->meta_fields[i].name = (char *)calloc(n + 1, 1);
+        if (!g->meta_fields[i].name) goto bad;
         memcpy(g->meta_fields[i].name, b + names, n - 1);
         g->meta_fields[i].major = rd32(b + p + i * 12 + 4);
         g->meta_fields[i].minor = rd32(b + p + i * 12 + 8);
@@ -135,8 +142,10 @@ igb *igb_read(const uint8_t *b, size_t size) {
 
     /* meta objects */
     NEED(h[2]);
-    g->nmeta_objects = (int)h[3];
+    if ((uint64_t)h[3] * 24u > h[2]) goto bad;
     g->meta_objects = (igb_meta_object *)calloc(h[3] ? h[3] : 1, sizeof(igb_meta_object));
+    if (!g->meta_objects) goto bad;
+    g->nmeta_objects = (int)h[3];
     size_t rest = p + h[3] * 24u;
     for (uint32_t i = 0; i < h[3]; i++) {
         igb_meta_object *m = &g->meta_objects[i];
@@ -147,11 +156,15 @@ igb *igb_read(const uint8_t *b, size_t size) {
         m->nfields = (int)rd32(t + 12);
         m->parent = (int32_t)rd32(t + 16);
         m->slots = rd32(t + 20);
-        if (rest + m->name_len + (size_t)m->nfields * 6 > p + h[2]) goto bad;
+        if (m->nfields < 0 || rest + m->name_len + (size_t)m->nfields * 6 > p + h[2]) {
+            m->nfields = 0;
+            goto bad;
+        }
         m->name = (char *)calloc(m->name_len + 1, 1);
+        m->fields = (uint16_t(*)[3])calloc((size_t)(m->nfields ? m->nfields : 1), sizeof *m->fields);
+        if (!m->name || !m->fields) goto bad;
         memcpy(m->name, b + rest, m->name_len);
         rest += m->name_len;
-        m->fields = (uint16_t(*)[3])calloc((size_t)(m->nfields ? m->nfields : 1), sizeof *m->fields);
         for (int k = 0; k < m->nfields; k++) {
             m->fields[k][0] = rd16(b + rest);
             m->fields[k][1] = rd16(b + rest + 2);

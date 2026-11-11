@@ -3,3 +3,6 @@
 en | English
 ja | 日本語
 de | Deutsch
+fr | Français
+es | Español
+it | Italiano

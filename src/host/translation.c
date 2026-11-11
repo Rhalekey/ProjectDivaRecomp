@@ -113,7 +113,8 @@ static const entry *find_entry(const char *text, int *script) {
     for (uint32_t i = hash(text) % TABLE_SIZE;; i = (i + 1) % TABLE_SIZE) {
         if (!g_table[i].original) return NULL;
         if (strcmp(g_table[i].original, text)) continue;
-        if (g_shown[g_table[i].kind]) return &g_table[i];
+        /* Shown only with a place in guest memory: a text the game cannot reach is left as it is. */
+        if (g_shown[g_table[i].kind] && g_table[i].guest) return &g_table[i];
         if (script && g_table[i].kind >= KIND_SONG) *script = 1;
     }
 }
@@ -569,23 +570,8 @@ const char *translation_shown(const char *original) {
 
 void translation_shown_utf8(const char *original, char *out, size_t size) {
     const char *shown = translation_shown(original);
-    const char *text = shown ? shown : original;
     wchar_t wide[512];
-    size_t n = 0;
-    for (const unsigned char *c = (const unsigned char *)text; *c && n + 1 < sizeof wide / sizeof wide[0];) {
-        if (shown && ui_text_letter_of(*c)) {
-            wide[n++] = ui_text_letter_of(*c);
-            c++;
-            continue;
-        }
-        /* Shift-JIS: a lead byte and the one after it, or one byte. */
-        const int pair = ((*c >= 0x81 && *c <= 0x9F) || (*c >= 0xE0 && *c <= 0xFC)) && c[1];
-        wchar_t got[2];
-        const int made = MultiByteToWideChar(932, 0, (const char *)c, pair ? 2 : 1, got, 2);
-        for (int k = 0; k < made && n + 1 < sizeof wide / sizeof wide[0]; k++) wide[n++] = got[k];
-        c += pair ? 2 : 1;
-    }
-    wide[n] = 0;
+    ui_text_from_game(shown ? shown : original, shown != NULL, wide, sizeof wide / sizeof wide[0]);
     if (!size) return;
     if (!WideCharToMultiByte(CP_UTF8, 0, wide, -1, out, (int)size, NULL, NULL)) out[0] = '\0';
 }
