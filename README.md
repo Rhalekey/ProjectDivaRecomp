@@ -2,7 +2,7 @@
 
 Static recompilation of *Hatsune Miku: Project DIVA* (PSP, ULJM05472 v1.01) to run natively on PC, built so that mods are easy to create.
 
-**Status:** playable but incomplete. Songs run from start to their results screen at 60 fps with sound, drawn by the GPU at up to 8 times the PSP's resolution, and progress is saved to `%LOCALAPPDATA%\ProjectDivaRecomp\data`. The menus can be played in Japanese, English, German, French, Spanish or Italian. The opening movie plays through FFmpeg, which the build downloads. System dialogs and the save slot list are not shown. Ad hoc play works over the local network.
+**Status:** fully playable. Everything the original game does works: every song from start to results at 60 fps with sound, Free Play, Rhythm Game Edit with its save slots and keyboard, Miku's Room, the Visual Library, modules, saves, the opening movie (through FFmpeg, which the build downloads) and Ad Hoc over the local network. It is drawn by the GPU at up to 8 times the PSP's resolution, progress is saved to `%LOCALAPPDATA%\ProjectDivaRecomp\data`, and the menus can be played in Japanese, English, German, French, Spanish or Italian. The one real limit: the frame rate cannot be raised past 60, as the game's speed follows it.
 
 What has changed is in the [changelog](CHANGELOG.md). To install and play, see [INSTALL.md](INSTALL.md).
 
@@ -125,7 +125,7 @@ The same program plays two ways, set by a file in `profiles\`:
 
 Build and run one with `Tools\build.ps1 -Edition raw`. To change a setting for yourself, put the line in `%LOCALAPPDATA%\ProjectDivaRecomp\settings.ini`, which is read after the edition's file.
 
-The raw edition is as close to the original as this project can make it, not a proven match. It still has no system dialogs, and its frame rate has not been compared with a real PSP.
+The raw edition is as close to the original as this project can make it, not a proven match. Its system dialogs, such as the save slot list, still choose by themselves, as they are shown only in the recommended edition, and its frame rate has not been compared with a real PSP.
 
 ## Languages
 
