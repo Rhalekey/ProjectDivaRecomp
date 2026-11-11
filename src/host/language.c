@@ -26,7 +26,7 @@ const char *language_data_dir(void) { return g_data_dir; }
 
 static int g_vectors_off;
 
-/* Those of the language being played. Japanese has no words for them yet. */
+/* Those of the language being played, Japanese too: its own words, as the game has them. */
 static void pick_vectors(void) {
     char pictures[1200];
     /* The folder beside the language's own with what differs: _x for Cross confirming, and in the
@@ -41,7 +41,7 @@ static void pick_vectors(void) {
     } else {
         snprintf(pictures, sizeof pictures, "%s\\..\\textures_hd\\vector\\%s", g_data_dir, g_options.language);
     }
-    psp_render_gl_set_vector_dir(g_vectors_off || !strcmp(g_options.language, "ja") ? NULL : pictures);
+    psp_render_gl_set_vector_dir(g_vectors_off ? NULL : pictures);
 }
 
 void language_confirm_changed(void) { pick_vectors(); }

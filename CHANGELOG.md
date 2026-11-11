@@ -18,6 +18,7 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 - The Options rows' lines are cut short at their room if a translation is longer, never past it.
 
 ### Languages
+- **Japanese menu pieces from vectors**: the footer's hints, the windows' buttons, the editor's buttons, the results' header and the titles are drawn as vectors in Japanese too, with the game's own words (`lang\ja_images.txt`), as they already were in the other languages. The cards before the songs keep the game's own Japanese. The build draws only these for Japanese, as its pictures with words are the game's.
 - **French, Spanish and Italian**: the game's text, the words in its pictures and this project's own, each language with its flag on the language screen and in the Options row's turn. Written without native speakers, as German was; corrections are welcome.
 - The Options row for the language goes through every language in `lang\languages.txt`, where it went through English, Japanese and German only. Right goes to the next and Left to the one before, there and in the rows for icons, notes and what hits notes, which all went forward whichever was pressed.
 - A language's menu pieces are drawn again only when the words in its pictures change, not when another language's name is added to its words.

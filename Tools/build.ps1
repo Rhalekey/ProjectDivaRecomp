@@ -277,11 +277,12 @@ if (Is-Stale $FxStamp $FxWanted) {
     $FxWanted | Set-Content $FxStamp
 }
 
-# ---- the languages, from lang\languages.txt. Japanese is the game's own, with no pictures to make.
+# ---- the languages, from lang\languages.txt, each with a table of the words in its pictures. Japanese
+# is the game's own: its pictures with words are left as they are, and only the menus' pieces drawn.
 $LangDir = Join-Path $Root "lang"
 $Languages = @(Get-Content (Join-Path $LangDir "languages.txt") -Encoding UTF8 |
     Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object { ($_ -split '\|')[0].Trim() } |
-    Where-Object { $_ -ne 'ja' -and (Test-Path (Join-Path $LangDir "$($_)_images.txt")) })
+    Where-Object { Test-Path (Join-Path $LangDir "$($_)_images.txt") })
 $LettersHash = (Get-FileHash (Join-Path $LangDir "letters.txt")).Hash
 
 # ---- text from a font of the player's own if one is in the folder, or else from the free
@@ -325,7 +326,7 @@ foreach ($Language in $Languages) {
     $Item.PicturesWanted = "$($FontFile.Name) $((Get-FileHash $LangTable).Hash) $((Get-FileHash $LangTool).Hash) $LettersHash large in lang"
     $Item.VectorsStamp = Join-Path $HdDir "vector_$($Language)_made_from.txt"
     $Item.VectorsWanted = "$($FontFile.Name) $((Get-FileHash $LangTable).Hash) $((Get-FileHash $UiTool).Hash) $((Get-FileHash $HudTool).Hash) $((Get-FileHash $LangTool).Hash) $LettersHash $PictureWords"
-    $Item.Pictures = if (Is-Stale $Item.PicturesStamp $Item.PicturesWanted) { "1" } else { "0" }
+    $Item.Pictures = if ($Language -ne "ja" -and (Is-Stale $Item.PicturesStamp $Item.PicturesWanted)) { "1" } else { "0" }
     $Item.Vectors = if (Is-Stale $Item.VectorsStamp $Item.VectorsWanted) { "1" } else { "0" }
     if ($Item.Pictures -eq "1" -or $Item.Vectors -eq "1") { $Work += [pscustomobject]$Item }
 }

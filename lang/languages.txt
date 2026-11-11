@@ -1,5 +1,5 @@
 # The languages the game can be played in, in the order the language screen lists them:
-# code | name in itself. Each but ja has lang\<code>.txt and <code>_images.txt; all have <code>_ui.txt.
+# code | name in itself. Each has <code>_ui.txt and <code>_images.txt, and each but ja <code>.txt.
 en | English
 ja | 日本語
 de | Deutsch

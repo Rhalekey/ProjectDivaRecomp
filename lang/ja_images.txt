@@ -1,0 +1,98 @@
+# Words inside the game's pictures, in Japanese, as the game has them, redrawn as vectors.
+# See Tools/lang_images.py. The cards before the songs keep the game's own Japanese.
+# picture | name | where the words start | style | text
+
+menu_basic.png | basic_btninfo_kettei.png | 18 | button | 決定
+menu_basic.png | basic_btninfo_modoru.png | 18 | button | 戻る
+menu_basic.png | basic_btninfo_yes.png | 18 | button+7 | はい
+menu_basic.png | basic_btninfo_no.png | 18 | button+24 | いいえ
+menu_basic.png | basic_btninfo_saisikou.png | 18 | button | 再試行
+
+menu_basic02.png | basic_sp_sentaku01.png | 15 | hint | 選択
+menu_basic02.png | basic_sp_sentaku02.png | 15 | hint | 選択/編集
+menu_basic02.png | basic_batsu_modoru.png | 14 | hint | 戻る
+menu_basic02.png | basic_batsu_sakujyo.png | 15 | hint | 削除
+menu_basic02.png | basic_batsu_cancel.png | 15 | hint | キャンセル
+menu_basic02.png | basic_shikaku_layoutc.png | 15 | hint | レイアウト変更
+menu_basic02.png | basic_shikaku_preview.png | 15 | hint | プレビュー
+menu_basic02.png | basic_shikaku_sityou.png | 15 | hint | 試聴
+menu_basic02.png | basic_shikaku_info.png | 15 | hint | インフォメーション
+menu_basic02.png | basic_shikaku_play.png | 15 | hint | 楽曲再生
+menu_basic02.png | basic_shikaku_lrhanten.png | 14 | hint | 左右反転
+menu_basic02.png | basic_shikaku_copy.png | 15 | hint | コピー
+menu_basic02.png | basic_shikaku_zoomout.png | 15 | hint | ズームアウト
+menu_basic02.png | basic_cursor_idou.png | 15 | hint | 移動(カメラ移動)
+menu_basic02.png | basic_tri_savedel.png | 15 | hint | データ削除
+menu_basic02.png | basic_tri_musicplay.png | 15 | hint | メトロノーム
+menu_basic02.png | basic_tri_updownrev.png | 14 | hint | 上下反転
+menu_basic02.png | basic_tri_zoomin.png | 15 | hint | ズームイン
+menu_basic02.png | basic_tri_paste.png | 15 | hint | ペースト
+menu_basic02.png | basic_tri_pvappr.png | 15 | hint | PV鑑賞
+menu_basic02.png | basic_tri_bgmappr.png | 15 | hint | BGM変更
+menu_basic02.png | basic_cross_pre.png | 15 | hint | ←→プリセット変更
+menu_basic02.png | basic_cross_4idou.png | 15 | hint | 4小節移動
+menu_basic02.png | basic_cross_bpm.png | 15 | hint | BPM変更
+menu_basic02.png | basic_cross_idou.png | 15 | hint | 移動
+menu_basic02.png | basic_cross_cameraidou.png | 15 | hint | 移動(カメラ移動)
+menu_basic02.png | basic_cross_time.png | 15 | hint | 時間増減
+menu_basic02.png | basic_cross_koumoku.png | 11 | hint | 項目移動
+menu_basic02.png | basic_cross_rhythm.png | 15 | hint | 拍子変更
+menu_basic02.png | basic_cross_preset.png | 15 | hint | プリセット変更
+menu_basic02.png | basic_randl_change.png | 15 | hint | 変更
+menu_basic02.png | basic_4btn_target.png | 51 | hint | リズム配置
+menu_basic02.png | basic_lr_targetidou.png | 31 | hint | ターゲット移動
+menu_basic02.png | basic_lr_change.png | 31 | hint | 切り替え
+menu_basic02.png | basic_lr_rhythmidou.png | 31 | hint | 小節移動
+menu_basic02.png | basic_sele_test.png | 34 | hint | テストプレイ
+menu_basic02.png | basic_sele_modoru.png | 33 | hint | 戻る
+menu_basic02.png | basic_start_kettei.png | 30 | hint | 決定
+menu_basic02.png | basic_start_system.png | 30 | hint | システム
+menu_basic02.png | basic_start_menu.png | 30 | hint | メニュー
+menu_basic02.png | basic_cursor_kidou.png | 34 | hint | 軌道の設定
+menu_basic02.png | basic_sp_kakunin.png | 15 | hint | 確認
+menu_basic02.png | basic_lcro_centeridou.png | 32 | hint | 中心点移動
+
+menu_title_home.png | title_home_title.png | 36 | title | ホーム
+menu_title_edit.png | title_edit_title.png | 36 | title | リズムゲームエディット
+menu_title_gallery.p | title_gallery_title.png | 36 | title | ビジュアルライブラリ
+menu_title_myroom.pn | title_myroom_title.png | 36 | title | ミクルーム
+menu_title_adhok.png | title_adhok_title.png | 36 | title | アドホックモード
+
+edit_button.png | @314,115,60,11 | 0 | plate | END
+edit_button.png | @391,133,74,14 | 0 | plate | END
+# Edit mode. The stack of buttons on the left is one picture, so each row is named by position.
+edit_button.png | @411,162,89,24 | 0 | wide | リズム
+edit_button.png | @411,190,89,24 | 0 | wide | ターゲット
+edit_button.png | @411,218,89,24 | 0 | wide | ステージ
+edit_button.png | @2,228,89,24 | 0 | wide | モデル表示
+edit_button.png | @2,256,89,24 | 0 | wide | 表情
+edit_button.png | @2,284,89,24 | 0 | wide | モーション
+edit_button.png | @2,312,89,24 | 0 | wide | 背景
+edit_button.png | @2,340,89,24 | 0 | wide | カメラ
+edit_button.png | @247,131,65,13 | 0 | plate | プレビュー
+edit_button.png | @254,152,70,13 | 0 | plate | プレビュー
+edit_button.png | @5,174,46,11 | 0 | plate | 1小節
+edit_button.png | @256,174,46,11 | 0 | plate | 200小節
+edit_button.png | @5,191,56,11 | 0 | plate | 1小節
+edit_button.png | @344,191,56,11 | 0 | plate | 200小節
+edit_button.png | @5,210,56,11 | 0 | plate | 1小節
+edit_button.png | @346,210,58,11 | 0 | plate | 200小節
+edit_button.png | @98,229,46,11 | 0 | plate | 1小節
+edit_button.png | @266,229,46,11 | 0 | plate | 200小節
+edit_button.png | cameramd_info_nowstart.png | 0 | plate | 開始位置設定中
+edit_button.png | @308,172,90,14 | 0 | clear | 終了位置設定中
+edit_button.png | @93,284,211,24 | 0 | clear | ○ボタンを押して
+edit_button.png | @93,308,211,24 | 0 | clear | 開始位置を設定します
+edit_button.png | @93,332,211,24 | 0 | clear | ○ボタンを押して
+edit_button.png | @93,356,211,24 | 0 | clear | 終了位置を設定します
+edit.png | @305,169,49,14 | 3 | plate | 配置容量:
+edit.png | @305,207,49,14 | 3 | plate | 読込容量:
+
+# The results screen.
+menu_result.png | @38,2,70,16 | 0 | plate | リザルト
+menu_result.png | @375,54,53,13 | 0 | plate | 項目移動
+menu_result.png | @444,54,32,13 | 0 | plate | 選択
+
+# The question on the BPM screen, lit and not.
+edit_rhythm.png | @147,372,88,32 | 0 | plate | BPMとは?
+edit_rhythm.png | @147,418,88,30 | 0 | plate | BPMとは?

@@ -186,3 +186,7 @@ save.saved = セーブしました
 save.deleted = セーブデータを削除しました
 save.failed = セーブできませんでした
 save.unreadable = セーブデータを読めません
+
+pictures.hint.sort = 並べ替え
+pictures.hint.module = モジュール
+pictures.hint.practice = 練習

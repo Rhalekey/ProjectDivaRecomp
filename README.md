@@ -27,7 +27,7 @@ Everything below is in the recommended edition, the default. The [changelog](CHA
 - 60 fps in songs, where the PSP ran them at about 30.
 
 **Redrawn**
-- The song screen's HUD, notes and targets, and the menus' pieces in English and German, as vectors at four times the size.
+- The song screen's HUD, notes and targets, and the menus' pieces in every language, Japanese included, as vectors at four times the size.
 - The title screen's logo and menu, the card before a song and the results screen.
 - Letters spaced by their real widths, from a free font or one of your own.
 - New screens for the language, the confirm button, the button icons, the notes and the controls.
