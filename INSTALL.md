@@ -44,7 +44,7 @@ Compiling is slow, and it is normal for it to seem stuck: it can take a long tim
 
 ## 4. Play
 
-Double-click **`Play.bat`**. After the intros, the game asks for a language: Japanese, English or German.
+Double-click **`Play.bat`**. After the intros, the game asks for a language: Japanese, English, German, French, Spanish or Italian.
 
 | Keyboard | PSP button |
 |---|---|
@@ -69,7 +69,7 @@ Buttons go by position, not by what is printed on them. The bottom button is alw
 - **Options**, in the main menu: volume, background dim, note timing, language, song names and lyrics in romaji, the confirm button, and changing keys and buttons. Each button can have a second key, which helps with fast repeated notes.
 - **Graphics**, in the main menu: display mode, resolution, smoothing, image shape and the frame rate counter.
 
-Ad hoc play does not work. This is expected. The opening movie needs FFmpeg, which the build downloads; if it could not, the build says so and the movie is skipped.
+Ad hoc play works between computers on the same local network; allow `diva.exe` on private networks when Windows asks. The opening movie needs FFmpeg, which the build downloads; if it could not, the build says so and the movie is skipped.
 
 ## If something goes wrong
 

@@ -2,7 +2,7 @@
 
 Static recompilation of *Hatsune Miku: Project DIVA* (PSP, ULJM05472 v1.01) to run natively on PC, built so that mods are easy to create.
 
-**Status:** playable but incomplete. Songs run from start to their results screen at 60 fps with sound, drawn by the GPU at up to 8 times the PSP's resolution, and progress is saved to `%LOCALAPPDATA%\ProjectDivaRecomp\data`. The menus can be played in English, German or Japanese. The opening movie plays through FFmpeg, which the build downloads. System dialogs and the save slot list are not shown, and ad hoc play does not work.
+**Status:** playable but incomplete. Songs run from start to their results screen at 60 fps with sound, drawn by the GPU at up to 8 times the PSP's resolution, and progress is saved to `%LOCALAPPDATA%\ProjectDivaRecomp\data`. The menus can be played in Japanese, English, German, French, Spanish or Italian. The opening movie plays through FFmpeg, which the build downloads. System dialogs and the save slot list are not shown. Ad hoc play works over the local network.
 
 What has changed is in the [changelog](CHANGELOG.md). To install and play, see [INSTALL.md](INSTALL.md).
 
@@ -29,11 +29,15 @@ Everything below is in the recommended edition, the default. The [changelog](CHA
 **Redrawn**
 - The song screen's HUD, notes and targets, and the menus' pieces in every language, Japanese included, as vectors at four times the size.
 - The title screen's logo and menu, the card before a song and the results screen.
+- The song screen's hit effects, drawn from shapes and gradients.
 - Letters spaced by their real widths, from a free font or one of your own.
 - New screens for the language, the confirm button, the button icons, the notes and the controls.
 
 **Playing**
-- **Note timing**, measured by each song, so that presses on time count as on time.
+- **Note timing**, measured by each song, so that presses on time count as on time. Each song also learns its own correction as you play it.
+- Buttons are read about once a millisecond, and a press counts when it was made, not at the game's next frame.
+- **Practice** with Start in the Free Play song list: a song cannot be failed and nothing is kept from it.
+- **Mute on miss** can be turned off, so a missed note no longer silences the singing.
 - **Background dim** for songs.
 - Notes as PlayStation shapes, Xbox or Nintendo letters, or arrow keys, with targets in the same shape.
 - The d-pad, the arrow keys and the stick can hit notes too.
@@ -48,6 +52,12 @@ Everything below is in the recommended edition, the default. The [changelog](CHA
 - The Free Play songs can be sorted with Select by name, best score, BPM or last played; the modules by name, those obtained or last played in.
 - L and R in the song list change the module worn, and Miku behind the menu changes into it.
 - Kagamine Rin's and Len's songs can be sung in the module worn, which the original game does not allow.
+- Discord's status shows what you are playing.
+
+**Rhythm Game Edit**
+- Edits made with your own music, put in `%LOCALAPPDATA%\ProjectDivaRecomp\data\ms\MUSIC`: MP3, and also M4A, AAC, Ogg, Opus, FLAC, WAV or WMA.
+- Edit data saved, loaded and deleted by slot, as on the PSP, and named with an on-screen keyboard or by typing.
+- **Export song** writes an Edit's song and its Edits to a zip, and a zip put in `Import` is brought in.
 
 **Ad Hoc**
 - Ad Hoc's Send Data and Receive Data work between computers on the same local network, or between two copies of the game on one computer, with no PSP wireless. The first time, allow `diva.exe` on private networks when Windows asks. As on the PSP, an Edit made with a song from the Memory Stick needs that song on the computer that receives it too.
@@ -55,6 +65,8 @@ Everything below is in the recommended edition, the default. The [changelog](CHA
 **Languages and mods**
 - English, German, French, Spanish and Italian, besides the game's Japanese, with song names and lyrics in romaji if wanted.
 - Mods as folders of files that replace the game's, with nothing on disk changed.
+- **Note skins**: folders of pictures in `mods\notes`, chosen in Options > Notes.
+- **Module skins**: models of your own in `mods\modules` (IGB, binary FBX or PMX), worn over one of the game's modules and converted as the game starts.
 
 ## Suggestions welcome
 
@@ -188,6 +200,24 @@ The game converts it when it starts, onto Miku's skeleton: its bones are matched
 A folder can instead hold `body.igb` (and `head.igb`) already in the game's format, as `Tools\igb.py` reads and writes them.
 
 A look is worn over one of the game's modules, its base, whose motions and everything else it keeps; only the models are its own. Up to 75 fit in the list. Its face does not move yet, and glTF/VRM is still to come.
+
+## Rhythm Game Edit: your music, export and import
+
+**Your own music.** Put your songs in `%LOCALAPPDATA%\ProjectDivaRecomp\data\ms\MUSIC`, the Memory Stick's music folder. They show under "Memory Stick" when choosing a song for an Edit, to preview, play and save with. MP3 works, and so do M4A, AAC, Ogg, Opus, FLAC, WAV and WMA, which show in the list as MP3s of their name.
+
+**Exporting.** In Rhythm Game Edit's list to load or delete from, choose an Edit and press Triangle (E on the keyboard). A zip is written to `Documents\Project DIVA Recomp\Export` with every Edit made with that song, and the song itself if it is your own music. Only share music you have the right to share.
+
+**Importing.** Put a zip in `Documents\Project DIVA Recomp\Import` and open the list to load from. Its Edits go into free slots, its song into the music folder, and the zip is moved to `Import\Imported`.
+
+## Ad Hoc over the local network
+
+Ad Hoc's Send Data and Receive Data work between computers on the same local network, with no PSP wireless:
+
+1. Start the game on both computers and open Ad Hoc on both.
+2. The first time, allow `diva.exe` on private networks when Windows asks. If the other computer is never found, check that the network is set as private and that the firewall lets `diva.exe` through.
+3. One sends and the other receives, as on the PSP. Others see this computer's name.
+
+An Edit made with your own music needs that song on the computer that receives it too, unless it was sent as an exported zip. To try it on one computer, `Tools\build.ps1 -Second` starts a second copy with its own Memory Stick.
 
 ## Tools
 

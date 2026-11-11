@@ -175,14 +175,17 @@ static word *find_word(int n, const char *key) {
 /* A key with no word anywhere: itself, kept so that it can be given back as all three. */
 static word *missing(const char *key) {
     static word kept[64];
+    static word none = {"", "", NULL, NULL};
     static int nkept;
     for (int i = 0; i < nkept; i++)
         if (!strcmp(kept[i].key, key)) return &kept[i];
-    if (nkept == 64) return &kept[63];
-    fprintf(stderr, "ui text: no word for %s\n", key);
-    word *w = &kept[nkept++];
+    if (nkept == 64) return &none;   /* past that many, a sign that the files are missing: blank */
+    word *w = &kept[nkept];
     w->key = _strdup(key);
+    if (!w->key) return &none;
+    fprintf(stderr, "ui text: no word for %s\n", key);
     w->utf8 = w->key;
+    nkept++;
     return w;
 }
 

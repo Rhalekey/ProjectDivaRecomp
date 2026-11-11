@@ -15,7 +15,11 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 - Keys pressed in another program no longer reach the project's own screens: an Enter typed elsewhere could answer "Delete this data?", and a key rebound or a letter typed into an Edit's name.
 - `OPTIONS.INI`, `PLAYED.INI` and `SONGTIMING.INI` are written beside themselves and then put in place, so a game closed halfway leaves the old ones whole.
 - Discord's status shows the translations' accented letters, where it showed half-width kana in their places.
-- The Options rows' lines are cut short at their room if a translation is longer, never past it.
+- The Options rows' lines are cut short at their room if a translation is longer, never past it. Their names and values are too, never inside a Japanese letter.
+- A language in `OPTIONS.INI` that `lang\languages.txt` does not list plays in English, where the project's words were English over the game's Japanese.
+- Past 64 words missing from the language files, each further one shows blank, not as the 64th.
+- Ad hoc: a network that will not start closes what it opened, and can be tried again.
+- The README lists what was added since: practice, mute on miss, Note timing by song, Rhythm Game Edit's music, slots and export, note and module skins, Discord's status and the hit effects.
 
 ### Languages
 - **Japanese menu pieces from vectors**: the footer's hints, the windows' buttons, the editor's buttons, the results' header and the titles are drawn as vectors in Japanese too, with the game's own words (`lang\ja_images.txt`), as they already were in the other languages. The cards before the songs keep the game's own Japanese. The build draws only these for Japanese, as its pictures with words are the game's.

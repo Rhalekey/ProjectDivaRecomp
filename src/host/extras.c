@@ -131,15 +131,15 @@ static void write_string(uint32_t to, const char *s) {
     while (*s++);
 }
 
-/* A line into its room of LINE_ROOM bytes, cut short if a translation is longer, never inside a
- * Shift-JIS letter of two bytes. */
-static void write_line(uint32_t to, const char *s) {
+/* Text into a room of `room` bytes, cut short if a translation is longer, never inside a Shift-JIS
+ * letter of two bytes. */
+static void write_in_room(uint32_t to, const char *s, uint32_t room) {
     if (!to) return;
     uint32_t n = 0;
-    while (s[n] && n + 1 < LINE_ROOM) {
+    while (s[n] && n + 1 < room) {
         const unsigned char c = (unsigned char)s[n];
         const int pair = (c >= 0x81 && c <= 0x9F) || (c >= 0xE0 && c <= 0xFC);
-        if (pair && (n + 2 >= LINE_ROOM || !s[n + 1])) break;
+        if (pair && (n + 2 >= room || !s[n + 1])) break;
         psp_write8(to + n, c);
         if (pair) {
             psp_write8(to + n + 1, (uint8_t)s[n + 1]);
@@ -149,6 +149,9 @@ static void write_line(uint32_t to, const char *s) {
     }
     psp_write8(to + n, 0);
 }
+
+static void write_line(uint32_t to, const char *s) { write_in_room(to, s, LINE_ROOM); }
+static void write_label_text(uint32_t to, const char *s) { write_in_room(to, s, LABEL_SIZE); }
 
 static uint32_t new_string(const char *s) {
     const uint32_t at = psp_sysmem_alloc((uint32_t)strlen(s) + 1, 1);
@@ -241,11 +244,11 @@ static const char *value_of(int row) {
 /* The value goes between the arrows in the row's bar, which leave it 49 pixels. Spaces are all
  * that can move it, so it comes as near the middle as they allow. */
 static void write_between_arrows(uint32_t to, const char *name, const char *value) {
-    char text[LABEL_SIZE];
+    char text[LINE_ROOM * 2];
     const float gap = ARROWS_MIDDLE - letters_width_small(value) / 2.0f - letters_width_small(name);
     const int spaces = (int)(gap / LETTERS_SMALL_SPACE + 0.5f);
-    snprintf(text, sizeof text, "%s%*s%s", name, spaces > 1 ? spaces : 1, "", value);
-    write_string(to, text);
+    snprintf(text, sizeof text, "%s%*s%s", name, spaces > 1 && spaces < LINE_ROOM ? spaces : 1, "", value);
+    write_label_text(to, text);
 }
 
 /* What the last song says, against what is set now, so that setting it right reads as on time. */
@@ -261,7 +264,7 @@ static void write_timing_lines(void) {
 }
 
 static void write_label(int row) {
-    char text[LABEL_SIZE];
+    char text[LINE_ROOM * 2];
     const char *value = value_of(row);
     if (row == ROW_DIM || row == ROW_TIMING) {
         write_between_arrows(g_labels[row], row_word("extras", ROW_KEY[row], "name"), value);
@@ -269,7 +272,7 @@ static void write_label(int row) {
         return;
     }
     snprintf(text, sizeof text, "%-*s%s", LABEL_WIDTH - (int)strlen(value), row_word("extras", ROW_KEY[row], "name"), value);
-    write_string(g_labels[row], text);
+    write_label_text(g_labels[row], text);
 }
 
 /* As many times the PSP's picture as can be chosen. */
@@ -297,11 +300,11 @@ static const char *graphics_value_of(int row) {
 }
 
 static void write_graphics_label(int row) {
-    char text[LABEL_SIZE];
+    char text[LINE_ROOM];
     write_between_arrows(g_graphics_labels[row], row_word("graphics", G_KEY[row], "name"), graphics_value_of(row));
     if (row != G_RESOLUTION) return;
     snprintf(text, sizeof text, "%dx%d", 480 * g_settings.render_scale, 272 * g_settings.render_scale);
-    write_string(g_graphics_lines[row][1], text);
+    write_line(g_graphics_lines[row][1], text);
 }
 
 static void write_all_labels(void) {

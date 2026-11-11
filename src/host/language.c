@@ -69,7 +69,7 @@ void language_show_vectors(int on) {
 void language_apply(const char *code) {
     /* The code may be in the place it is copied to. */
     char chosen[sizeof g_options.language];
-    snprintf(chosen, sizeof chosen, "%s", code);
+    snprintf(chosen, sizeof chosen, "%s", ui_text_find(code) >= 0 ? code : "en");
     snprintf(g_options.language, sizeof g_options.language, "%s", chosen);
 
     const int japanese = !strcmp(chosen, "ja");
