@@ -274,6 +274,8 @@ int main(int argc, char **argv) {
     /* DIVA_FPS is for tests: the game's speed follows this rate. */
     const char *fps = getenv("DIVA_FPS");
     psp_display_set_refresh_rate(fps ? strtod(fps, NULL) : ORIGINAL_REFRESH_HZ);
+    /* The name other copies see ad hoc; the computer's name when not given. */
+    if (getenv("DIVA_NICKNAME")) psp_netadhoc_set_nickname(getenv("DIVA_NICKNAME"));
 
     /* Everything from the end of .bss up is the game's to allocate. */
     psp_sysmem_set_range((m.mem_end + 0xFFFu) & ~0xFFFu, USER_MEMORY_END);

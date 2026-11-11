@@ -4,6 +4,12 @@ Everything this project has added to or changed about *Hatsune Miku: Project DIV
 
 The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhalekey/psprecomp/tree/diva-recomp), branch `diva-recomp`. Those this game depends on are listed here too.
 
+## 2026-11-11
+
+### System screens
+- **Ad Hoc over the local network**: Send Data and Receive Data reach other computers on the same network, or another copy of the game on the same computer, instead of the PSP's own wireless. Each copy says on the network who it is and which room it is in, a few times a second; rooms are found by those messages, and Edits go straight to the other computer, sent again until it confirms them. Others see the computer's name. `Tools\build.ps1 -Second` starts a second copy, with its own Memory Stick holding a copy of the main save and the options only, to try it on one computer.
+- For it, in the recompiler: `sceNet`, `sceNetAdhoc`, `sceNetAdhocctl` and `sceNetAdhocMatching` over UDP, and Netconf's ad hoc dialog joining its room. The game's handlers are called at a frame's wait of the thread that uses the network: called at any wait, one ran inside the game's own allocator and the game crashed once the last data arrived.
+
 ## 2026-11-10
 
 ### System screens

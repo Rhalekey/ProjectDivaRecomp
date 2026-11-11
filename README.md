@@ -49,6 +49,9 @@ Everything below is in the recommended edition, the default. The [changelog](CHA
 - L and R in the song list change the module worn, and Miku behind the menu changes into it.
 - Kagamine Rin's and Len's songs can be sung in the module worn, which the original game does not allow.
 
+**Ad Hoc**
+- Ad Hoc's Send Data and Receive Data work between computers on the same local network, or between two copies of the game on one computer, with no PSP wireless. The first time, allow `diva.exe` on private networks when Windows asks. As on the PSP, an Edit made with a song from the Memory Stick needs that song on the computer that receives it too.
+
 **Languages and mods**
 - English and German, besides the game's Japanese, with song names and lyrics in romaji if wanted.
 - Mods as folders of files that replace the game's, with nothing on disk changed.

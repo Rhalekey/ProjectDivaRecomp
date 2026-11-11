@@ -1,6 +1,10 @@
 # Builds the recompilation from your own game dump, then runs it for a while.
 #
-#   powershell -ExecutionPolicy Bypass -File Tools\build.ps1 [-Game <dir>] [-Edition raw|recommended] [-Seconds <n>] [-SkipTests] [-SaveTextures] [-Player]
+#   powershell -ExecutionPolicy Bypass -File Tools\build.ps1 [-Game <dir>] [-Edition raw|recommended] [-Seconds <n>] [-SkipTests] [-SaveTextures] [-Player] [-Second]
+#
+# -Second also starts a second copy of the game, to try ad hoc play on one computer: its saves are a
+# copy of the main save and options only (no Edits, no music), in %LOCALAPPDATA%\ProjectDivaRecomp\data2,
+# and its log is build\logs\run2.txt.
 #
 # -Player ignores the test switches in dev.ini, as Play.bat does. They are in src\host\settings.c.
 #
@@ -15,7 +19,8 @@ param(
     [switch]$BuildOnly,
     [switch]$Player,
     [int]$Seconds = 60,
-    [switch]$SkipTests
+    [switch]$SkipTests,
+    [switch]$Second
 )
 
 $Root = Split-Path -Parent $PSScriptRoot
@@ -321,6 +326,19 @@ if ($SaveTextures) { $env:DIVA_SAVE_TEXTURES = "1" } else { Remove-Item Env:DIVA
 # Saves live outside build\, so that cleaning a build never loses them.
 $Data = Join-Path $env:LOCALAPPDATA "ProjectDivaRecomp\data"
 $Exe = Join-Path $Out "diva.exe"
+if ($Second) {
+    # The second copy's own Memory Stick: the main save and the options, nothing else.
+    $Data2 = Join-Path $env:LOCALAPPDATA "ProjectDivaRecomp\data2"
+    $Saves2 = Join-Path $Data2 "ms\PSP\SAVEDATA"
+    New-Item -ItemType Directory -Force $Saves2 | Out-Null
+    foreach ($Folder in "ULJM05472MAIN00", "ULJM05472RECOMP") {
+        $From = Join-Path $Data "ms\PSP\SAVEDATA\$Folder"
+        if ((Test-Path $From) -and -not (Test-Path (Join-Path $Saves2 $Folder))) { Copy-Item -Recurse $From $Saves2 }
+    }
+    $env:DIVA_NICKNAME = "Second copy"
+    Start-Process -FilePath $Exe -ArgumentList "`"$Elf`"", "`"$Game`"", "`"$Data2`"", $Seconds -RedirectStandardError (Join-Path $Logs "run2.txt") -RedirectStandardOutput (Join-Path $Logs "run2_out.txt")
+    Remove-Item Env:DIVA_NICKNAME
+}
 & $Exe $Elf $Game $Data $Seconds *> $RunLog
 "game exit code: $LASTEXITCODE" *>> $Log
 "FIM" *>> $Log
