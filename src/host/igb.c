@@ -621,3 +621,15 @@ int igb_collect(igb *g) {
     free(remap);
     return dropped;
 }
+
+int igb_add_string(igb *g, const char *s) {
+    for (int i = 0; i < g->nstrings; i++)
+        if (g->strings[i] && !strcmp(g->strings[i], s)) return i;
+    char **bigger = (char **)realloc(g->strings, (size_t)(g->nstrings + 1) * sizeof(char *));
+    if (!bigger) return -1;
+    g->strings = bigger;
+    const size_t n = strlen(s) + 1;
+    g->strings[g->nstrings] = (char *)malloc(n);
+    if (g->strings[g->nstrings]) memcpy(g->strings[g->nstrings], s, n);
+    return g->nstrings++;
+}

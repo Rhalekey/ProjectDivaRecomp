@@ -170,16 +170,17 @@ A picture left out keeps the game's own. `mods\notes\_template` is written by th
 Each folder in `mods\modules` adds looks to Module Convert's list, after the game's modules. Put a character model in it, with its pictures anywhere inside:
 
 ```
-mods\modules\my look\model.fbx    a skinned character (binary FBX); each model in the folder is one look
+mods\modules\my look\model.pmx    a skinned character: MMD's PMX or a binary FBX; each model in the folder is one look
 mods\modules\my look\skin.ini     optional: base = N, the module it is worn over (0 if left out)
-                                  optional: picture = file, or picture <model> = file, its picture
+                                  optional: picture = file, or picture <model> = file, its first material's picture
+                                  optional: triangles = N, the most it keeps (8000 if left out)
 ```
 
-The game converts it when it starts, onto Miku's skeleton: its bones are matched to hers by name (as Mixamo, MMD and Blender's rigs name them), it is scaled to her height, and each part is moved and stretched onto her matching bone, so it dances her motions. Its picture is the one named after the model, else the one the file names, found anywhere in the folder; it is made at most 256 by 256 in 256 colours. The result is kept in `%LOCALAPPDATA%\ProjectDivaRecomp\modules_cache` and made again only when the model, its picture or `skin.ini` change. A folder with a single model is named after the folder; with several, each is the folder's name and the model's.
+The game converts it when it starts, onto Miku's skeleton: its bones are matched to hers by name (as Mixamo, MMD in Japanese, and Blender's rigs name them), it is scaled to her height, and each part is moved and stretched onto her matching bone, so it dances her motions. A model of more triangles than the game's are made simpler, keeping outlines and the pictures' seams, and simpler still if it would not fit in the game's room for a model (about 1 MB). Each material shows its own picture, found by the path the model gives or by name anywhere in the folder (PNG, JPEG, BMP, GIF or TGA), made at most 256 by 256 in 256 colours, larger pictures given more room; materials an MMD model hides until a facial expression shows them are left out. The result is kept in `%LOCALAPPDATA%\ProjectDivaRecomp\modules_cache` and made again only when the model, its pictures or `skin.ini` change. A folder with a single model is named after the folder; with several, each is the folder's name and the model's.
 
 A folder can instead hold `body.igb` (and `head.igb`) already in the game's format, as `Tools\igb.py` reads and writes them.
 
-A look is worn over one of the game's modules, its base, whose motions and everything else it keeps; only the models are its own. Up to 11 fit in the list for now. Only the first material's picture is shown for now, and only FBX is read; PMX and glTF/VRM are to come.
+A look is worn over one of the game's modules, its base, whose motions and everything else it keeps; only the models are its own. Up to 75 fit in the list. Its face does not move yet, and glTF/VRM is still to come.
 
 ## Tools
 

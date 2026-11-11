@@ -33,6 +33,11 @@ typedef struct {
 
 /* Fills m from a binary FBX file; returns 0 and says why in err if it cannot. Y is up. */
 int model_load_fbx(const char *path, model *m, char *err, size_t errlen);
+/* The same from a PMX file (MikuMikuDance, 2.0 or 2.1). */
+int model_load_pmx(const char *path, model *m, char *err, size_t errlen);
+/* Collapses edges until at most `target` triangles are left (or no more can go without tearing or
+ * turning a triangle over). Returns how many are left. */
+int model_simplify(model *m, int target);
 void model_free(model *m);
 
 /* Decompresses zlib data (as FBX arrays are) into out, of the size expected; nonzero if done. */

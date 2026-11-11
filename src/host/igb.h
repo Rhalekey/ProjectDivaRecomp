@@ -72,6 +72,8 @@ void igb_set_memory(igb *g, int slot, const void *data, uint32_t size);
 /* New ones of the kind of another; return their slot. */
 int igb_add_memory(igb *g, int like, const void *data, uint32_t size);
 int igb_add_object(igb *g, int like);
+/* A string in the strings table (the one already there if it is); returns its index. */
+int igb_add_string(igb *g, const char *s);
 /* Leaves out what nothing reaches from the info list. Returns how many. */
 int igb_collect(igb *g);
 

@@ -186,18 +186,26 @@ typedef struct {
     int measured;
 } placing;
 
+/* A piece's most triangles: the game makes each piece's vertices into one block for the PSP, of
+ * about 28 bytes a vertex, and a block past 64 KB is not drawn (2373 vertices were not, 2229 were). */
+#define PIECE_TRIANGLES 600
+
 /* Slots of module 0's body file, found by reading it (Tools/igb.py dump), checked by class. */
 enum {
     BODY_NODES = 26, LIKE_BMS = 361, LIKE_NODES = 357, LIKE_NODES_MEM = 359, LIKE_PALETTE = 355, LIKE_PALETTE_MEM = 356,
     LIKE_GEOMETRY = 323, EMPTY_NODES = 319, LIKE_GEO_ATTRS = 324, LIKE_GEO_ATTRS_MEM = 325, LIKE_ATTR = 437, LIKE_VA = 306,
-    LIKE_COMPS = 320, LIKE_POS = 446, LIKE_NRM = 447, LIKE_COL = 416, LIKE_UV = 448, LIKE_W = 443, LIKE_IX = 417, BODY_IMAGE = 63
+    LIKE_COMPS = 320, LIKE_POS = 446, LIKE_NRM = 447, LIKE_COL = 416, LIKE_UV = 448, LIKE_W = 443, LIKE_IX = 417, BODY_IMAGE = 63,
+    /* body3, the attribute set the body is drawn with, and what it holds, to copy for other materials */
+    BODY_SET = 25, BODY_ATTRS = 27, BODY_ATTRS_MEM = 36, BODY_TEXBIND = 21, BODY_TEXATTR = 19, BODY_MIPMAPS = 20, BODY_CLUT = 64,
+    SKINNED_KIDS = 272          /* the skinned graph's children: body3 and the sleeves */
 };
 
 static int template_is_known(const igb *g) {
     static const struct { int slot; const char *cls; } CHECK[] = {
         {BODY_NODES, "igNodeList"}, {LIKE_BMS, "igBlendMatrixSelect"}, {LIKE_NODES, "igNodeList"}, {LIKE_PALETTE, "igIntList"},
         {LIKE_GEOMETRY, "igGeometry"}, {LIKE_GEO_ATTRS, "igAttrList"}, {LIKE_ATTR, "igGeometryAttr1_5"}, {LIKE_VA, "igVertexArray1_1"},
-        {BODY_IMAGE, "igImage"}};
+        {BODY_IMAGE, "igImage"}, {BODY_SET, "igAttrSet"}, {BODY_ATTRS, "igAttrList"}, {BODY_TEXBIND, "igTextureBindAttr"},
+        {BODY_TEXATTR, "igTextureAttr"}, {BODY_MIPMAPS, "igImageMipMapList"}, {BODY_CLUT, "igClut"}, {SKINNED_KIDS, "igNodeList"}};
     for (size_t i = 0; i < sizeof CHECK / sizeof CHECK[0]; i++) {
         const char *c = igb_class(g, CHECK[i].slot);
         if (!c || strcmp(c, CHECK[i].cls)) return 0;
@@ -227,6 +235,91 @@ static void hide_all(igb *g, int upto) {
         } else if (!c) {
             const char *t = igb_memory_type(g, s);
             if (t && !strcmp(t, "igVec3fMetaField")) memset(g->items[s].memory.data, 0, g->items[s].memory.size);
+        }
+    }
+}
+
+static void put_i32(uint8_t *p, int32_t v);
+
+/* Miku's own parts made as small as they can be while everything that refers to them still holds:
+ * each vertex array three vertices, one strip of three, her hands' poses three vertices each, and
+ * the sleeves' picture 8 by 8. The game reads a model into room of about 1 MB, and her parts took
+ * two thirds of it. */
+#define HAND_VERTICES 1020u
+#define SLEEVES_IMAGE 61
+static void shrink_all(igb *g, int upto) {
+    static const float ONE_ZERO[2] = {1.0f, 0.0f};
+    for (int s = 0; s < upto; s++) {
+        const char *c = igb_class(g, s);
+        if (!c) continue;
+        if (!strcmp(c, "igVertexArray1_1")) {
+            const uint32_t n = (uint32_t)igb_field_i32(g, s, 1);
+            if (n <= 3) continue;
+            const int comps = igb_field_i32(g, s, 0);
+            if (comps >= 0 && !igb_is_object(g, comps))
+                for (uint32_t k = 0; k + 4 <= g->items[comps].memory.size; k += 4) {
+                    const int block = s32(g->items[comps].memory.data + k);
+                    if (block < 0 || igb_is_object(g, block)) continue;
+                    const uint32_t size = g->items[block].memory.size;
+                    if (size % n) continue;
+                    uint8_t zero[64] = {0};
+                    igb_set_memory(g, block, zero, size / n * 3 <= sizeof zero ? size / n * 3 : (uint32_t)sizeof zero);
+                }
+            const int w = igb_field_i32(g, s, 5), ix = igb_field_i32(g, s, 6);
+            if (w >= 0 && !igb_is_object(g, w)) {
+                float three[6];
+                for (int i = 0; i < 3; i++) memcpy(three + i * 2, ONE_ZERO, 8);
+                igb_set_memory(g, w, three, 24);
+            }
+            if (ix >= 0 && !igb_is_object(g, ix)) {
+                const uint8_t zero[6] = {0};
+                igb_set_memory(g, ix, zero, 6);
+            }
+            igb_set_i32(g, s, 1, 3);
+        } else if (!strcmp(c, "igPrimLengthArray1_1")) {
+            const int block = igb_field_i32(g, s, 0);
+            if (block >= 0 && !igb_is_object(g, block) && g->items[block].memory.size == 4) {
+                uint8_t three[4];
+                put_i32(three, 3);
+                igb_set_memory(g, block, three, 4);
+            }
+        } else if (!strcmp(c, "igVec3fList")) {
+            if ((uint32_t)igb_field_i32(g, s, 0) != HAND_VERTICES) continue;
+            const int block = igb_field_i32(g, s, 2);
+            const uint8_t zero[36] = {0};
+            if (block >= 0 && !igb_is_object(g, block)) igb_set_memory(g, block, zero, 36);
+            igb_set_i32(g, s, 0, 3);
+            igb_set_i32(g, s, 1, 3);
+        } else if (!strcmp(c, "igIntList")) {
+            /* The vertices each pose moves, and an end mark after them. */
+            if ((uint32_t)igb_field_i32(g, s, 0) != HAND_VERTICES + 1) continue;
+            const int block = igb_field_i32(g, s, 2);
+            if (block < 0 || igb_is_object(g, block) || g->items[block].memory.size < 4) continue;
+            const uint8_t *old = g->items[block].memory.data;
+            uint8_t four[16];
+            for (int i = 0; i < 3; i++) put_i32(four + i * 4, i);
+            memcpy(four + 12, old + g->items[block].memory.size - 4, 4);
+            igb_set_memory(g, block, four, 16);
+            igb_set_i32(g, s, 0, 4);
+            igb_set_i32(g, s, 1, 4);
+        } else if (!strcmp(c, "igGeometryAttr1_5")) {
+            /* Triangles of the hands: one. */
+            if (igb_field_i32(g, s, 3) == 3 && igb_field_i32(g, s, 4) == (int)(HAND_VERTICES / 3)) igb_set_i32(g, s, 4, 1);
+        } else if (!strcmp(c, "igMorphBase")) {
+            if (igb_field_i32(g, s, 8) == 3 && igb_field_i32(g, s, 9) == (int)(HAND_VERTICES / 3)) igb_set_i32(g, s, 9, 1);
+        }
+    }
+    /* The sleeves' picture, which nothing shows now. */
+    const char *c = igb_class(g, SLEEVES_IMAGE);
+    if (c && !strcmp(c, "igImage")) {
+        const int block = igb_field_i32(g, SLEEVES_IMAGE, 11);
+        const uint8_t zero[64] = {0};
+        if (block >= 0 && !igb_is_object(g, block)) {
+            igb_set_memory(g, block, zero, 64);
+            igb_set_i32(g, SLEEVES_IMAGE, 0, 8);
+            igb_set_i32(g, SLEEVES_IMAGE, 1, 8);
+            igb_set_i32(g, SLEEVES_IMAGE, 10, 64);
+            igb_set_i32(g, SLEEVES_IMAGE, 17, 8);
         }
     }
 }
@@ -288,9 +381,9 @@ static int pow2_at_most(unsigned v, unsigned most) {
 }
 
 /* The picture scaled down (by averaging) and made 8 bit with a palette. */
-static int make_texture(const uint8_t *pixels, unsigned w, unsigned h, int *tw, int *th, uint8_t **indices, uint8_t clut[1024]) {
-    *tw = pow2_at_most(w, 256);
-    *th = pow2_at_most(h, 256);
+static int make_texture(const uint8_t *pixels, unsigned w, unsigned h, unsigned most, int *tw, int *th, uint8_t **indices, uint8_t clut[1024]) {
+    *tw = pow2_at_most(w, most);
+    *th = pow2_at_most(h, most);
     const int W = *tw, H = *th;
     rgba *small = (rgba *)malloc((size_t)W * H * sizeof(rgba));
     rgba *sorted = (rgba *)malloc((size_t)W * H * sizeof(rgba));
@@ -331,7 +424,7 @@ static int make_texture(const uint8_t *pixels, unsigned w, unsigned h, int *tw, 
 
 /* ---- the whole --------------------------------------------------------------------------------- */
 
-int model_convert(const model *m, const uint8_t *pixels, unsigned pw, unsigned ph, const model_templates *t, uint8_t **body, size_t *body_size,
+int model_convert(const model *m, const model_picture *pictures, const model_templates *t, uint8_t **body, size_t *body_size,
                   uint8_t **head, size_t *head_size, char *err, size_t errlen) {
     miku_bone mb[MIKU_BONES];
     int nmb = 0;
@@ -421,6 +514,22 @@ int model_convert(const model *m, const uint8_t *pixels, unsigned pw, unsigned p
     /* What each bone follows: itself if matched, or its nearest matched ancestor. */
     int *follows = (int *)malloc((size_t)m->nbones * sizeof(int));
     for (int i = 0; i < m->nbones; i++) {
+        /* MMD's legs are often weighted to bones beside the matched ones, named as they are with a
+         * D after (足D for 足): those follow the matched one. */
+        char stem[96], other[96];
+        int side, other_side;
+        stem_of(m->bones[i].name, stem, sizeof stem, &side);
+        const size_t n = strlen(stem);
+        follows[i] = -1;
+        if (pl[i].miku < 0 && n > 1 && stem[n - 1] == 'd') {
+            stem[n - 1] = 0;
+            for (int j = 0; j < m->nbones && follows[i] < 0; j++) {
+                if (pl[j].miku < 0) continue;
+                stem_of(m->bones[j].name, other, sizeof other, &other_side);
+                if (other_side == side && !strcmp(other, stem)) follows[i] = j;
+            }
+        }
+        if (follows[i] >= 0) continue;
         int b = i, guard = 0;
         while (b >= 0 && pl[b].miku < 0 && guard++ < 256) b = m->bones[b].parent;
         follows[i] = b >= 0 && pl[b].miku >= 0 ? b : matched[0][0];
@@ -494,12 +603,25 @@ int model_convert(const model *m, const uint8_t *pixels, unsigned pw, unsigned p
     }
     const int original = g->nitems;
     hide_all(g, original);
+    shrink_all(g, original);
 
-    /* Pieces of at most eight of her bones each, triangles taken in order. */
+    /* Materials showing the same picture are made one. */
+    const int nmat = m->nmaterials > 0 ? m->nmaterials : 1;
+    int *canon = (int *)malloc((size_t)nmat * sizeof(int));
+    for (int i = 0; i < nmat; i++) {
+        canon[i] = i;
+        const uint8_t *pi = pictures && i < m->nmaterials ? pictures[i].pixels : NULL;
+        for (int j = 0; j < i && canon[i] == i; j++) {
+            const uint8_t *pj = pictures && j < m->nmaterials ? pictures[j].pixels : NULL;
+            if (pi == pj) canon[i] = canon[j];
+        }
+    }
+
+    /* Pieces of at most eight of her bones each, and of one material, triangles taken in order. */
     const int ntri = m->ncorners / 3;
     int *piece_of = (int *)malloc((size_t)(ntri ? ntri : 1) * sizeof(int));
     int (*piece_bones)[8] = NULL;
-    int *piece_nb = NULL, npieces = 0, cap = 0;
+    int *piece_nb = NULL, *piece_mat = NULL, *piece_tris = NULL, npieces = 0, cap = 0;
     for (int tri = 0; tri < ntri; tri++) {
         int want[6], nw = 0;
         for (int c = 0; c < 3; c++)
@@ -512,7 +634,10 @@ int model_convert(const model *m, const uint8_t *pixels, unsigned pw, unsigned p
                 if (!seen) want[nw++] = o->blend[q];
             }
         int found = -1;
+        const int raw_mat = m->material ? m->material[tri] : 0;
+        const int mat = raw_mat >= 0 && raw_mat < nmat ? canon[raw_mat] : 0;
         for (int p = 0; p < npieces && found < 0; p++) {
+            if (piece_mat[p] != mat || piece_tris[p] >= PIECE_TRIANGLES) continue;
             int total = piece_nb[p];
             for (int z = 0; z < nw; z++) {
                 int has = 0;
@@ -527,9 +652,13 @@ int model_convert(const model *m, const uint8_t *pixels, unsigned pw, unsigned p
                 cap = cap ? cap * 2 : 8;
                 piece_bones = realloc(piece_bones, (size_t)cap * sizeof *piece_bones);
                 piece_nb = realloc(piece_nb, (size_t)cap * sizeof *piece_nb);
+                piece_mat = realloc(piece_mat, (size_t)cap * sizeof *piece_mat);
+                piece_tris = realloc(piece_tris, (size_t)cap * sizeof *piece_tris);
             }
             found = npieces++;
             piece_nb[found] = 0;
+            piece_mat[found] = mat;
+            piece_tris[found] = 0;
         }
         for (int z = 0; z < nw; z++) {
             int has = 0;
@@ -538,6 +667,7 @@ int model_convert(const model *m, const uint8_t *pixels, unsigned pw, unsigned p
             if (!has) piece_bones[found][piece_nb[found]++] = want[z];
         }
         piece_of[tri] = found;
+        piece_tris[found]++;
     }
 
     int *new_bms = (int *)malloc((size_t)(npieces ? npieces : 1) * sizeof(int));
@@ -607,40 +737,116 @@ int model_convert(const model *m, const uint8_t *pixels, unsigned pw, unsigned p
         igb_set_i32(g, bms, 6, pal);
         new_bms[p] = bms;
     }
-    free(piece_of);
+    int *piece_of_saved = piece_of;
     free(piece_bones);
     free(piece_nb);
+    free(piece_tris);
     free(cs);
 
-    /* body3's children: hers, then the pieces. */
-    const int old_count = igb_field_i32(g, BODY_NODES, 0), old_list = igb_field_i32(g, BODY_NODES, 2);
-    const int kids = old_count + npieces;
-    uint8_t *list = (uint8_t *)malloc((size_t)kids * 4);
-    if (old_list >= 0 && !igb_is_object(g, old_list) && g->items[old_list].memory.size >= (uint32_t)old_count * 4)
-        memcpy(list, g->items[old_list].memory.data, (size_t)old_count * 4);
-    for (int p = 0; p < npieces; p++) put_i32(list + (old_count + p) * 4, new_bms[p]);
-    const int m_body = igb_add_memory(g, LIKE_NODES_MEM, list, (uint32_t)kids * 4);
-    igb_set_i32(g, BODY_NODES, 0, kids);
-    igb_set_i32(g, BODY_NODES, 1, kids);
-    igb_set_i32(g, BODY_NODES, 2, m_body);
-    free(list);
-    free(new_bms);
-
-    /* The picture body3 shows. */
-    if (pixels) {
-        int tw, th;
-        uint8_t *indices, clut[1024];
-        if (make_texture(pixels, pw, ph, &tw, &th, &indices, clut)) {
-            igb_set_i32(g, BODY_IMAGE, 0, tw);
-            igb_set_i32(g, BODY_IMAGE, 1, th);
-            igb_set_i32(g, BODY_IMAGE, 10, tw * th);
-            igb_set_i32(g, BODY_IMAGE, 17, tw);
-            igb_set_memory(g, igb_field_i32(g, BODY_IMAGE, 11), indices, (uint32_t)(tw * th));
-            const int clut_obj = igb_field_i32(g, BODY_IMAGE, 15);
-            igb_set_memory(g, igb_field_i32(g, clut_obj, 3), clut, 1024);
-            free(indices);
-        }
+    /* The materials used, in the order first met: the first is drawn with body3, each other with a
+     * copy of body3 showing its own picture. Pictures get smaller as there are more of them, to
+     * keep to about two of 256 by 256. */
+    int *used = (int *)malloc((size_t)(m->nmaterials > 0 ? m->nmaterials : 1) * sizeof(int)), nused = 0;
+    for (int p = 0; p < npieces; p++) {
+        int seen = 0;
+        for (int u = 0; u < nused; u++)
+            if (used[u] == piece_mat[p]) seen = 1;
+        if (!seen) used[nused++] = piece_mat[p];
     }
+    /* Each picture as big as its share of all the pictures' areas allows, of about four of 256 by
+     * 256: a face of few triangles has a picture full of detail. */
+    double total_area = 0;
+    for (int u = 0; u < nused; u++) {
+        const model_picture *pic = pictures && used[u] < m->nmaterials ? &pictures[used[u]] : NULL;
+        if (pic && pic->pixels) total_area += fmin((double)pic->w * pic->h, 1024.0 * 1024.0);
+    }
+    const int old_set_kids = igb_field_i32(g, SKINNED_KIDS, 0), old_set_list = igb_field_i32(g, SKINNED_KIDS, 2);
+    uint8_t *sets = (uint8_t *)malloc((size_t)(old_set_kids + nused) * 4);
+    if (old_set_list >= 0 && !igb_is_object(g, old_set_list) && g->items[old_set_list].memory.size >= (uint32_t)old_set_kids * 4)
+        memcpy(sets, g->items[old_set_list].memory.data, (size_t)old_set_kids * 4);
+    int nsets = old_set_kids;
+    for (int u = 0; u < nused; u++) {
+        const int mat = used[u];
+        int npk = 0;
+        for (int p = 0; p < npieces; p++)
+            if (piece_mat[p] == mat) npk++;
+        /* Its picture: made 8 bit. */
+        const model_picture *pic = pictures && mat >= 0 && mat < m->nmaterials ? &pictures[mat] : NULL;
+        int tw = 0, th = 0;
+        uint8_t *indices = NULL, clut[1024];
+        const double share = pic && pic->pixels && total_area > 0 ? fmin((double)pic->w * pic->h, 1024.0 * 1024.0) / total_area : 1;
+        unsigned most = 32;
+        while (most < 256 && (double)(most * 2) * (most * 2) <= 262144.0 * share * 1.5) most *= 2;
+        const int have = pic && pic->pixels && make_texture(pic->pixels, pic->w, pic->h, most, &tw, &th, &indices, clut);
+        int image = BODY_IMAGE, nodes_obj = BODY_NODES;
+        if (u > 0) {
+            /* A copy of body3, with its own attributes, picture and pieces. */
+            const int texattr = igb_add_object(g, BODY_TEXATTR), mips = igb_add_object(g, BODY_MIPMAPS);
+            igb_set_i32(g, texattr, 12, mips);
+            image = igb_add_object(g, BODY_IMAGE);
+            const int clut_obj = igb_add_object(g, BODY_CLUT);
+            igb_set_i32(g, image, 15, clut_obj);
+            const int image_mem = igb_field_i32(g, BODY_IMAGE, 11), clut_mem = igb_field_i32(g, BODY_CLUT, 3);
+            igb_set_i32(g, image, 11, igb_add_memory(g, image_mem, g->items[image_mem].memory.data, g->items[image_mem].memory.size));
+            igb_set_i32(g, clut_obj, 3, igb_add_memory(g, clut_mem, g->items[clut_mem].memory.data, g->items[clut_mem].memory.size));
+            /* A name of its own, as pictures may be known by name. */
+            char name[48];
+            snprintf(name, sizeof name, "skinmod_material%d.png", u);
+            igb_set_i32(g, image, 20, igb_add_string(g, name));
+            igb_set_i32(g, texattr, 8, image);
+            const int texbind = igb_add_object(g, BODY_TEXBIND);
+            igb_set_i32(g, texbind, 1, texattr);
+            const igb_bytes *attrs_mem = &g->items[BODY_ATTRS_MEM].memory;
+            uint8_t attrs[64];
+            const uint32_t na = attrs_mem->size < sizeof attrs ? attrs_mem->size : (uint32_t)sizeof attrs;
+            memcpy(attrs, attrs_mem->data, na);
+            for (uint32_t i = 0; i + 4 <= na; i += 4)
+                if (s32(attrs + i) == BODY_TEXBIND) put_i32(attrs + i, texbind);
+            const int attr_list = igb_add_object(g, BODY_ATTRS);
+            igb_set_i32(g, attr_list, 2, igb_add_memory(g, BODY_ATTRS_MEM, attrs, na));
+            nodes_obj = igb_add_object(g, BODY_NODES);
+            const int set = igb_add_object(g, BODY_SET);
+            igb_set_i32(g, set, 3, nodes_obj);
+            igb_set_i32(g, set, 4, attr_list);
+            put_i32(sets + nsets * 4, set);
+            nsets++;
+        }
+        /* Its pieces, after Miku's own for body3. */
+        const int old_count = u == 0 ? igb_field_i32(g, BODY_NODES, 0) : 0, old_list = igb_field_i32(g, BODY_NODES, 2);
+        const int kids = old_count + npk;
+        uint8_t *list = (uint8_t *)malloc((size_t)(kids ? kids : 1) * 4);
+        if (old_count && old_list >= 0 && !igb_is_object(g, old_list) && g->items[old_list].memory.size >= (uint32_t)old_count * 4)
+            memcpy(list, g->items[old_list].memory.data, (size_t)old_count * 4);
+        int k = old_count;
+        for (int p = 0; p < npieces; p++)
+            if (piece_mat[p] == mat) put_i32(list + (k++) * 4, new_bms[p]);
+        const int m_list = igb_add_memory(g, LIKE_NODES_MEM, list, (uint32_t)kids * 4);
+        igb_set_i32(g, nodes_obj, 0, kids);
+        igb_set_i32(g, nodes_obj, 1, kids);
+        igb_set_i32(g, nodes_obj, 2, m_list);
+        free(list);
+        if (have) {
+            igb_set_i32(g, image, 0, tw);
+            igb_set_i32(g, image, 1, th);
+            igb_set_i32(g, image, 10, tw * th);
+            igb_set_i32(g, image, 17, tw);
+            igb_set_memory(g, igb_field_i32(g, image, 11), indices, (uint32_t)(tw * th));
+            igb_set_memory(g, igb_field_i32(g, igb_field_i32(g, image, 15), 3), clut, 1024);
+        }
+        free(indices);
+    }
+    if (nsets > old_set_kids) {
+        const int m_sets = igb_add_memory(g, LIKE_NODES_MEM, sets, (uint32_t)nsets * 4);
+        igb_set_i32(g, SKINNED_KIDS, 0, nsets);
+        igb_set_i32(g, SKINNED_KIDS, 1, nsets);
+        igb_set_i32(g, SKINNED_KIDS, 2, m_sets);
+    }
+    free(sets);
+    free(used);
+    free(piece_of_saved);
+    free(canon);
+    free(piece_mat);
+    free(new_bms);
     igb_collect(g);
     *body = igb_write(g, body_size);
     igb_free(g);

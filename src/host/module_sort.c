@@ -41,7 +41,7 @@
 #define LIST_ROWS 20u
 #define ROW_SIZE 24u
 #define ROW_VALUE 12u
-#define MOST_ROWS 64
+#define MOST_ROWS 128            /* a list's room, made larger by module_skins.c when it has many */
 
 enum { B_SELECT = 0x0001 };
 enum { SORT_GAME, SORT_NAME, SORT_OBTAINED, SORT_RECENT, SORT_COUNT };

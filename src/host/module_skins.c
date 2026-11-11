@@ -65,7 +65,9 @@
 #define DRESSED_CANCEL 0x08A8C368u
 #define LOADED_FOR_MENU 0x08A94DA4u
 
-#define MAX_SKINS 11                /* the list's room past the game's 53 rows */
+#define LIST_CREATE 0x08AF2344u     /* (list, room): every window list is made with room for 64 */
+#define LIST_ROOM 128u              /* the room given instead when there are skins past the 11 that fit in 64 */
+#define MAX_SKINS 75                /* the list's room past the game's 53 rows */
 #define LIST_COUNT 4u
 #define LIST_ROW 16u
 #define LIST_ROWS 20u
@@ -148,7 +150,8 @@ static void stem(const char *path, char *out, size_t size) {
 
 static int is_picture(const char *name) {
     const char *dot = strrchr(name, '.');
-    return dot && (!_stricmp(dot, ".png") || !_stricmp(dot, ".jpg") || !_stricmp(dot, ".jpeg") || !_stricmp(dot, ".bmp") || !_stricmp(dot, ".gif"));
+    return dot && (!_stricmp(dot, ".png") || !_stricmp(dot, ".jpg") || !_stricmp(dot, ".jpeg") || !_stricmp(dot, ".bmp") || !_stricmp(dot, ".gif") ||
+                   !_stricmp(dot, ".tga"));
 }
 
 static const char *stristr(const char *hay, const char *needle) {
@@ -215,7 +218,9 @@ static int find_picture(const char *dir, const char *model_path, const char *own
 
 /* ---- converting, once, into a cache ---------------------------------------------------------- */
 
-#define CONVERTER_VERSION 2
+#define CONVERTER_VERSION 7
+#define BODY_ROOM 960000u          /* a body file's most bytes: 985 KB loaded, 1.03 MB wrecked the memory */
+#define DEFAULT_TRIANGLES 8000
 
 static void file_mark(const char *path, char *out, size_t size) {
     WIN32_FILE_ATTRIBUTE_DATA a;
@@ -230,52 +235,110 @@ static int write_file(const char *path, const uint8_t *data, size_t n) {
     return fclose(f) == 0 && ok;
 }
 
-/* Converts the model into cache\body.igb and head.igb unless they were made from it as it is. */
+/* Converts the model into cache\body.igb and head.igb unless they were made from it as it is.
+ * made_from.txt: the converter's version and the model's and skin.ini's marks on its first line,
+ * then each picture used, its mark and path. */
 static int convert(const char *model_path, const char *dir, const char *cache, const char *disc_dir, const char *name, const char *own,
                    const char *chosen) {
-    char stamp_path[1200], wanted[1400], had[1400] = "", picture[1100] = "", mark_m[64], mark_p[64], mark_i[64], ini[1200];
+    char stamp_path[1200], ini[1200], mark_m[64], mark_i[64], line[1400];
     snprintf(stamp_path, sizeof stamp_path, "%s\\made_from.txt", cache);
     snprintf(ini, sizeof ini, "%s\\skin.ini", dir);
     file_mark(ini, mark_i, sizeof mark_i);
-    model m;
-    char err[300];
-    /* The picture is only known once the model is read; so the stamp first names the model alone. */
     file_mark(model_path, mark_m, sizeof mark_m);
     FILE *f = fopen(stamp_path, "r");
     if (f) {
-        if (!fgets(had, sizeof had, f)) had[0] = 0;
-        fclose(f);
-        char old_picture[1100] = "";
-        int version = 0;
-        char old_mark[64] = "", old_pmark[64] = "", old_imark[64] = "";
-        if (sscanf(had, "%d %63s %63s %63s %1099[^\n]", &version, old_mark, old_imark, old_pmark, old_picture) >= 4 && version == CONVERTER_VERSION &&
+        int same = 0, version = 0;
+        char old_mark[64] = "", old_imark[64] = "";
+        if (fgets(line, sizeof line, f) && sscanf(line, "%d %63s %63s", &version, old_mark, old_imark) == 3 && version == CONVERTER_VERSION &&
             !strcmp(old_mark, mark_m) && !strcmp(old_imark, mark_i)) {
-            file_mark(old_picture, mark_p, sizeof mark_p);
-            if (!strcmp(old_pmark, mark_p)) return 1;
+            same = 1;
+            char pmark[64], ppath[1100], now[64];
+            while (same && fgets(line, sizeof line, f))
+                if (sscanf(line, "%63s %1099[^\n]", pmark, ppath) == 2) {
+                    file_mark(ppath, now, sizeof now);
+                    if (strcmp(now, pmark)) same = 0;
+                }
         }
+        fclose(f);
+        if (same) return 1;
     }
     if (!templates(disc_dir)) {
         fprintf(stderr, "module skins: \"%s\": the game's own module files could not be read\n", name);
         return 0;
     }
+    model m;
+    char err[300];
     const char *dot = strrchr(model_path, '.');
-    if (!dot || _stricmp(dot, ".fbx") || !model_load_fbx(model_path, &m, err, sizeof err)) {
-        fprintf(stderr, "module skins: \"%s\": %s\n", name, dot && !_stricmp(dot, ".fbx") ? err : "not a model this can read");
+    const int fbx = dot && !_stricmp(dot, ".fbx"), pmx_file = dot && !_stricmp(dot, ".pmx");
+    if (!(fbx ? model_load_fbx(model_path, &m, err, sizeof err) : pmx_file ? model_load_pmx(model_path, &m, err, sizeof err) : 0)) {
+        fprintf(stderr, "module skins: \"%s\": %s\n", name, fbx || pmx_file ? err : "not a model this can read");
         return 0;
     }
-    uint8_t *pixels = NULL;
-    unsigned pw = 0, ph = 0;
-    if (chosen[0]) snprintf(picture, sizeof picture, "%s\\%s", dir, chosen);
-    if (chosen[0] || find_picture(dir, model_path, own, m.nmaterials ? m.picture[0] : "", picture, sizeof picture)) pixels = picture_read(picture, &pw, &ph);
-    if (!pixels) fprintf(stderr, "module skins: \"%s\": no picture found for it (it names \"%s\")\n", name, m.nmaterials ? m.picture[0] : "");
-    if (m.nmaterials > 1) fprintf(stderr, "module skins: \"%s\": %d materials, only the first's picture is shown for now\n", name, m.nmaterials);
+    /* At most so many triangles (skin.ini's "triangles = N"): the game's memory for models is small. */
+    int most = DEFAULT_TRIANGLES;
+    FILE *fi = fopen(ini, "r");
+    if (fi) {
+        char l[256];
+        int n;
+        while (fgets(l, sizeof l, fi))
+            if (sscanf(l, " triangles = %d", &n) == 1 && n >= 500) most = n;
+        fclose(fi);
+    }
+    const int had = m.ncorners / 3;
+    if (had > most) fprintf(stderr, "module skins: \"%s\": %d triangles made %d\n", name, had, model_simplify(&m, most));
+    /* A picture for each material: skin.ini's or the model's own part's for the first, then each by
+     * the name its material gives. Materials naming the same file share it. */
+    const int nmat = m.nmaterials > 0 ? m.nmaterials : 1;
+    model_picture *pics = (model_picture *)calloc((size_t)nmat, sizeof *pics);
+    char (*paths)[1100] = calloc((size_t)nmat, sizeof *paths);
+    for (int i = 0; i < m.nmaterials; i++) {
+        /* The path the model gives, from its folder, when it is there (as PMX files give them). */
+        char relative[1100];
+        snprintf(relative, sizeof relative, "%s\\%s", dir, m.picture[i]);
+        for (char *c = relative; *c; c++)
+            if (*c == '/') *c = '\\';
+        const int given = m.picture[i][0] && !strchr(m.picture[i], ':') && m.picture[i][0] != '\\' && exists(relative);
+        if (i == 0 && chosen[0]) snprintf(paths[0], sizeof paths[0], "%s\\%s", dir, chosen);
+        else if (given && !(i == 0 && own[0])) snprintf(paths[i], sizeof paths[i], "%s", relative);
+        else if (!find_picture(dir, model_path, i == 0 ? own : "", m.picture[i], paths[i], sizeof paths[i])) paths[i][0] = 0;
+        int earlier = -1;
+        for (int j = 0; j < i && earlier < 0; j++)
+            if (paths[i][0] && !_stricmp(paths[i], paths[j])) earlier = j;
+        if (earlier >= 0) pics[i] = pics[earlier];
+        else if (paths[i][0]) pics[i].pixels = picture_read(paths[i], &pics[i].w, &pics[i].h);
+        if (!pics[i].pixels) fprintf(stderr, "module skins: \"%s\": no picture found for material %d (it names \"%s\")\n", name, i, m.picture[i]);
+    }
     uint8_t *body = NULL, *head = NULL;
     size_t bn = 0, hn = 0;
-    const int ok = model_convert(&m, pixels, pw, ph, &g_templates, &body, &bn, &head, &hn, err, sizeof err);
+    int ok = model_convert(&m, pics, &g_templates, &body, &bn, &head, &hn, err, sizeof err);
+    /* The game reads a model into room of about 1 MB: past it, fewer triangles, until it fits. */
+    for (int tries = 0; ok && bn > BODY_ROOM && tries < 6; tries++) {
+        const int now = m.ncorners / 3, want = (int)((double)now * BODY_ROOM / (double)bn * 0.9);
+        if (want < 300) break;
+        fprintf(stderr, "module skins: \"%s\": %zu bytes, too big for the game; %d triangles made %d\n", name, bn, now, model_simplify(&m, want));
+        free(body);
+        free(head);
+        body = head = NULL;
+        ok = model_convert(&m, pics, &g_templates, &body, &bn, &head, &hn, err, sizeof err);
+    }
+    if (ok && bn > BODY_ROOM) {
+        snprintf(err, sizeof err, "still %zu bytes after making it simpler; its pictures may be too many", bn);
+        free(body);
+        free(head);
+        ok = 0;
+    }
+    const int materials = m.nmaterials;
     model_free(&m);
-    free(pixels);
+    for (int i = 0; i < materials; i++) {
+        int earlier = 0;
+        for (int j = 0; j < i; j++)
+            if (pics[j].pixels == pics[i].pixels) earlier = 1;
+        if (!earlier) free((void *)pics[i].pixels);
+    }
+    free(pics);
     if (!ok) {
         fprintf(stderr, "module skins: \"%s\": %s\n", name, err);
+        free(paths);
         return 0;
     }
     char path[1200];
@@ -286,15 +349,20 @@ static int convert(const char *model_path, const char *dir, const char *cache, c
     written = written && write_file(path, head, hn);
     free(body);
     free(head);
-    file_mark(picture, mark_p, sizeof mark_p);
-    snprintf(wanted, sizeof wanted, "%d %s %s %s %s\n", CONVERTER_VERSION, mark_m, mark_i, mark_p, picture);
-    if (written) {
-        f = fopen(stamp_path, "w");
-        if (f) { fputs(wanted, f); fclose(f); }
+    if (written && (f = fopen(stamp_path, "w"))) {
+        fprintf(f, "%d %s %s\n", CONVERTER_VERSION, mark_m, mark_i);
+        for (int i = 0; i < materials; i++)
+            if (paths[i][0]) {
+                char mark[64];
+                file_mark(paths[i], mark, sizeof mark);
+                fprintf(f, "%s %s\n", mark, paths[i]);
+            }
+        fclose(f);
     }
-    const char *model_file = strrchr(model_path, '\\'), *picture_file = strrchr(picture, '\\');
-    fprintf(stderr, "module skins: \"%s\" converted from %s%s%s\n", name, model_file ? model_file + 1 : model_path, picture[0] ? " with " : "",
-            picture_file ? picture_file + 1 : picture);
+    const char *model_file = strrchr(model_path, '\\'), *picture_file = materials && paths[0][0] ? strrchr(paths[0], '\\') : NULL;
+    fprintf(stderr, "module skins: \"%s\" converted from %s, %d material%s%s%s\n", name, model_file ? model_file + 1 : model_path, materials,
+            materials == 1 ? "" : "s", picture_file ? ", first with " : "", picture_file ? picture_file + 1 : "");
+    free(paths);
     return written;
 }
 
@@ -400,12 +468,14 @@ int module_skins_scan(const char *mods_dir, const char *disc_dir, const char *da
         char models[32][300];
         int nmodels = 0;
         char inner[1200];
-        snprintf(inner, sizeof inner, "%s\\*.fbx", dir);
+        snprintf(inner, sizeof inner, "%s\\*", dir);
         WIN32_FIND_DATAA mf;
         HANDLE mh = FindFirstFileA(inner, &mf);
         if (mh != INVALID_HANDLE_VALUE) {
             do {
-                if (!(mf.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && nmodels < 32) snprintf(models[nmodels++], sizeof models[0], "%s", mf.cFileName);
+                const char *ext = strrchr(mf.cFileName, '.');
+                if (!(mf.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && ext && (!_stricmp(ext, ".fbx") || !_stricmp(ext, ".pmx")) && nmodels < 32)
+                    snprintf(models[nmodels++], sizeof models[0], "%s", mf.cFileName);
             } while (FindNextFileA(mh, &mf));
             FindClose(mh);
         }
@@ -474,7 +544,7 @@ int module_skins_row(uint32_t words) {
 static void add_rows(uint32_t list) {
     if (!g_count || !guest_in_ram(list)) return;
     const uint32_t count = psp_read32(list + LIST_COUNT), rows = psp_read32(list + LIST_ROWS);
-    if (count > 64 || !guest_in_ram(rows)) return;
+    if (count > LIST_ROOM || !guest_in_ram(rows)) return;
     for (uint32_t i = 0; i < count; i++)
         if (module_skins_row(psp_read32(rows + i * ROW_SIZE)) >= 0) return;   /* added already */
     for (int i = 0; i < g_count; i++) {
@@ -588,8 +658,15 @@ static void on_change_asked(void) {
     fprintf(stderr, "module skins: changing into %s\n", wanted >= 0 ? g_skins[wanted].name : "the module itself");
 }
 
+/* The window manager makes every list with room for 64 rows (LIST_CREATE, as its windows open):
+ * more, if the module list needs it for the skins. */
+static void on_list_create(void) {
+    if (psp_cpu.r[PSP_REG_A1] == 64 && g_count > 64 - MODULES) psp_cpu.r[PSP_REG_A1] = LIST_ROOM;
+}
+
 int module_skins_hook(uint32_t addr) {
     switch (addr) {
+    case LIST_CREATE: on_list_create(); return 1;
     case CHANGE_ASKED: on_change_asked(); return 1;
     case MODULE_AT: on_module_at(); return 1;
     case AFTER_ROWS: add_rows(guest_call(LIST_OF, guest_call(LIST_HOLDER, 0, 0, 0, 0), 0, 0, 0)); return 1;
