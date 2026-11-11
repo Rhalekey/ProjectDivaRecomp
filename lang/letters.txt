@@ -1,0 +1,57 @@
+# Letters the game's font has no place for. Each is drawn over a half-width kana, which the game
+# never shows: the kana's byte (A1 to DF), then the letter. Read by src/host/ui_text.c, which
+# puts these bytes in the text, and by Tools/hd_font.py, which draws the letters there.
+# Add letters at the end only: a byte that changes letter changes every picture made with it.
+A1 ä
+A2 ö
+A3 ü
+A4 Ä
+A5 Ö
+A6 Ü
+A7 ß
+A8 à
+A9 á
+AA â
+AB æ
+AC ç
+AD è
+AE é
+AF ê
+B0 ë
+B1 ì
+B2 í
+B3 î
+B4 ï
+B5 ñ
+B6 ò
+B7 ó
+B8 ô
+B9 œ
+BA ù
+BB ú
+BC û
+BD ÿ
+BE À
+BF Á
+C0 Â
+C1 Ç
+C2 È
+C3 É
+C4 Ê
+C5 Ë
+C6 Ì
+C7 Í
+C8 Î
+C9 Ï
+CA Ñ
+CB Ò
+CC Ó
+CD Ô
+CE Œ
+CF Ù
+D0 Ú
+D1 Û
+D2 ¿
+D3 ¡
+D4 «
+D5 »

@@ -21,6 +21,7 @@
 #include "options.h"
 #include "practice.h"
 #include "translation.h"
+#include "ui_text.h"
 
 #include <psprecomp/cpu.h>
 #include <psprecomp/dispatch.h>
@@ -67,14 +68,9 @@
 
 enum { B_SELECT = 0x0001, B_START = 0x0008, B_L = 0x0100, B_R = 0x0200 };
 enum { SORT_GAME, SORT_NAME, SORT_SCORE, SORT_BPM, SORT_RECENT, SORT_COUNT };
-/* Shown as the order changes, in English, Japanese and German (UI_ENGLISH, UI_JAPANESE, UI_GERMAN). */
-static const char *const SORT_NAME_SHOWN[SORT_COUNT][UI_COUNT] = {
-    {"Songs in the game's order", "\xE6\x9B\xB2\xEF\xBC\x9A\xE6\xA8\x99\xE6\xBA\x96\xE3\x81\xAE\xE9\xA0\x86", "Lieder in der Reihenfolge des Spiels"},
-    {"Songs by name", "\xE6\x9B\xB2\xEF\xBC\x9A\xE5\x90\x8D\xE5\x89\x8D\xE9\xA0\x86", "Lieder nach Namen"},
-    {"Songs by best score", "\xE6\x9B\xB2\xEF\xBC\x9A\xE3\x83\x8F\xE3\x82\xA4\xE3\x82\xB9\xE3\x82\xB3\xE3\x82\xA2\xE9\xA0\x86", "Lieder nach Bestwert"},
-    {"Songs by BPM", "\xE6\x9B\xB2\xEF\xBC\x9A" "BPM\xE9\xA0\x86", "Lieder nach BPM"},
-    {"Songs last played first", "\xE6\x9B\xB2\xEF\xBC\x9A\xE6\x9C\x80\xE8\xBF\x91\xE3\x83\x97\xE3\x83\xAC\xE3\x82\xA4\xE3\x81\x97\xE3\x81\x9F\xE9\xA0\x86", "Zuletzt gespielte Lieder zuerst"},
-};
+/* Shown as the order changes, by key in lang\<code>_ui.txt. */
+static const char *const SORT_NAME_SHOWN[SORT_COUNT] = {"sort.songs.game", "sort.songs.name", "sort.songs.score", "sort.songs.bpm",
+                                                         "sort.songs.recent"};
 
 /* ---- when each song was last played, kept here as the game keeps no such thing: in PLAYED.INI
  * beside OPTIONS.INI, a line "song N = seconds since 1970" for each song played. */
@@ -521,8 +517,8 @@ static void on_song_list(void) {
     if (fresh && shoulders != (B_L | B_R) && g_songs_in_front) next_module(fresh & B_R ? 1 : -1);
     if (pressed) {
         g_sort = (g_sort + 1) % SORT_COUNT;
-        psp_render_gl_show_message(SORT_NAME_SHOWN[g_sort][language_ui()]);
-        fprintf(stderr, "song sort: %s\n", SORT_NAME_SHOWN[g_sort][UI_ENGLISH]);
+        psp_render_gl_show_message(ui_text(SORT_NAME_SHOWN[g_sort]));
+        fprintf(stderr, "song sort: %s\n", ui_text_in(ui_text_find("en"), SORT_NAME_SHOWN[g_sort]));
     }
     const uint32_t list = guest_call(SONG_LIST_OF, GAME_WINDOW_MANAGER, 0, 0, 0);
     sort_list(list);
@@ -578,18 +574,11 @@ int song_sort_list_in_front(void) { return g_songs_in_front && GetTickCount64() 
 #define PLAY_MENU_SOUND 0x08AB179Cu
 #define SOUND_NO 3u
 #define PSP_TRIANGLE 0x1000u
-static const char *const PV_LOCKED[UI_COUNT] = {
-    [UI_ENGLISH] = "PV not unlocked yet: clear this song with GREAT or PERFECT",
-    [UI_JAPANESE] = "\xE3\x81\x93\xE3\x81\xAE\x50\x56\xE3\x81\xAF\xE6\x9C\xAA\xE8\xA7\xA3\xE7\xA6\x81\xEF\xBC\x9A"
-                    "\x47\x52\x45\x41\x54\xE4\xBB\xA5\xE4\xB8\x8A\xE3\x81\xA7\xE3\x82\xAF\xE3\x83\xAA\xE3\x82\xA2\xE3\x81\x99"
-                    "\xE3\x82\x8B\xE3\x81\xA8\xE8\xA7\xA3\xE7\xA6\x81",
-    [UI_GERMAN] = "PV noch gesperrt: Lied mit GREAT oder PERFECT schaffen",
-};
 
 static void on_menu_sound(void) {
     if (psp_cpu.r[PSP_REG_A1] != SOUND_NO || !song_sort_list_in_front()) return;
     if (!(psp_window_buttons() & PSP_TRIANGLE)) return;
-    psp_render_gl_show_message(PV_LOCKED[language_ui()]);
+    psp_render_gl_show_message(ui_text("songs.pv_locked"));
 }
 
 int song_sort_hook(uint32_t addr) {

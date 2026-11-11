@@ -34,6 +34,7 @@
 #include "translation.h"
 #include "lifesearch.h"
 #include "watch.h"
+#include "ui_text.h"
 
 #include <psprecomp/cpu.h>
 #include <psprecomp/dispatch.h>
@@ -133,27 +134,21 @@ static void report(const char *why) {
 /* What is worth telling the player of what the system's save screens would have said, in the
  * language of the game. Loading says nothing when it works. Having no save says nothing either:
  * the game asks at every start, and a new player has no use for hearing it. */
-static const char *in_language(const char *english, const char *german, const char *japanese) {
-    const int ui = language_ui();
-    return ui == UI_GERMAN ? german : ui == UI_JAPANESE ? japanese : english;
-}
 
 static void on_savedata_event(int event) {
     switch (event) {
     case PSP_SAVEDATA_SAVED:
-        psp_render_gl_show_message(in_language("Game saved", "Spiel gespeichert", "\xE3\x82\xBB\xE3\x83\xBC\xE3\x83\x96\xE3\x81\x97\xE3\x81\xBE\xE3\x81\x97\xE3\x81\x9F"));
+        psp_render_gl_show_message(ui_text("save.saved"));
         break;
     case PSP_SAVEDATA_DELETED:
-        psp_render_gl_show_message(in_language("Save data deleted", "Spielstand gel\xC3\xB6scht", "\xE3\x82\xBB\xE3\x83\xBC\xE3\x83\x96\xE3\x83\x87\xE3\x83\xBC\xE3\x82\xBF\xE3\x82\x92\xE5\x89\x8A\xE9\x99\xA4\xE3\x81\x97\xE3\x81\xBE\xE3\x81\x97\xE3\x81\x9F"));
+        psp_render_gl_show_message(ui_text("save.deleted"));
         break;
     case PSP_SAVEDATA_FAILED:
-        psp_render_gl_show_message(in_language("Could not save", "Speichern fehlgeschlagen", "\xE3\x82\xBB\xE3\x83\xBC\xE3\x83\x96\xE3\x81\xA7\xE3\x81\x8D\xE3\x81\xBE\xE3\x81\x9B\xE3\x82\x93\xE3\x81\xA7\xE3\x81\x97\xE3\x81\x9F"));
+        psp_render_gl_show_message(ui_text("save.failed"));
         break;
     case PSP_SAVEDATA_UNREADABLE:
         /* Playing on would start from nothing, and saving would then overwrite it. */
-        psp_render_gl_show_held_message(in_language("Your save data could not be read. Close the game before saving. Press a button.",
-                                                     "Spielstand nicht lesbar. Vor dem Speichern das Spiel schlie\xC3\x9F" "en. Taste dr\xC3\xBC" "cken.",
-                                                     "\xE3\x82\xBB\xE3\x83\xBC\xE3\x83\x96\xE3\x83\x87\xE3\x83\xBC\xE3\x82\xBF\xE3\x82\x92\xE8\xAA\xAD\xE3\x82\x81\xE3\x81\xBE\xE3\x81\x9B\xE3\x82\x93"));
+        psp_render_gl_show_held_message(ui_text("save.unreadable"));
         break;
     default:
         break;
@@ -298,6 +293,10 @@ int main(int argc, char **argv) {
     }
 
     hooks_start();
+    {
+        const char *lang_dir = getenv("DIVA_LANG_DIR");
+        ui_text_start(lang_dir ? lang_dir : "lang");
+    }
     int chosen = 0;
     if (g_settings.translations || g_settings.extras) chosen = options_load(g_data_dir);
     if (g_settings.extras && g_options.ask_language >= 0) g_settings.language_prompt = g_options.ask_language;

@@ -8,6 +8,7 @@
 #include "edit_share.h"
 
 #include "language.h"
+#include "ui_text.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -227,23 +228,14 @@ static int zip_folder(zip_out *z, const wchar_t *folder, const char *prefix) {
 }
 
 /* ---- words --------------------------------------------------------------------------------- */
-static const wchar_t *const SAID_EXPORTED[UI_COUNT] = {L"Exported to Documents\\Project DIVA Recomp\\Export: %ls",
-                                                       L"\x66f8\x304d\x51fa\x3057\x307e\x3057\x305f: %ls",
-                                                       L"Exportiert nach Dokumente\\Project DIVA Recomp\\Export: %ls"};
-static const wchar_t *const SAID_FAILED[UI_COUNT] = {L"Could not export", L"\x66f8\x304d\x51fa\x305b\x307e\x305b\x3093\x3067\x3057\x305f",
-                                                     L"Export fehlgeschlagen"};
-static const wchar_t *const SAID_IMPORTED[UI_COUNT] = {L"Imported %d Edit(s)", L"%d\x4ef6\x8aad\x307f\x8fbc\x307f\x307e\x3057\x305f",
-                                                       L"%d Edit(s) importiert"};
-static const wchar_t *const SAID_FULL[UI_COUNT] = {L"No free slot for %ls", L"\x7a7a\x304d\x304c\x3042\x308a\x307e\x305b\x3093: %ls",
-                                                   L"Kein freier Platz f\x00fcr %ls"};
 
 /* ---- export --------------------------------------------------------------------------------- */
 int edit_share_export(const psp_save_slot *slots, int count, int chosen, wchar_t *message, int cap) {
-    const int ui = language_ui();
+    const int ui = ui_text_language();
     wchar_t song[200], folder[MAX_PATH], file[MAX_PATH + 200], safe[200];
     song_of(&slots[chosen], song, 200);
     if (!song[0] || share_folder(L"Export", folder, MAX_PATH) != 0) {
-        swprintf(message, cap, L"%ls", SAID_FAILED[ui]);
+        swprintf(message, cap, L"%ls", ui_wtext_in(ui, "share.failed"));
         return 0;
     }
     /* A file name of the song's, without what Windows does not allow in one. */
@@ -256,7 +248,7 @@ int edit_share_export(const psp_save_slot *slots, int count, int chosen, wchar_t
     zip_out *z = (zip_out *)calloc(1, sizeof *z);
     if (!z || !(z->f = _wfopen(file, L"wb"))) {
         free(z);
-        swprintf(message, cap, L"%ls", SAID_FAILED[ui]);
+        swprintf(message, cap, L"%ls", ui_wtext_in(ui, "share.failed"));
         return 0;
     }
     wchar_t mp3[1300], mp3_name[300];
@@ -282,7 +274,7 @@ int edit_share_export(const psp_save_slot *slots, int count, int chosen, wchar_t
     fclose(z->f);
     free(z);
     const wchar_t *shown = wcsrchr(file, L'\\');
-    swprintf(message, cap, SAID_EXPORTED[ui], shown ? shown + 1 : file);
+    swprintf(message, cap, ui_wtext_in(ui, "share.exported"), shown ? shown + 1 : file);
     fprintf(stderr, "edits: exported %d Edit(s) of a song%s\n", edits, mp3_name[0] ? ", with its MP3" : "");
     return 1;
 }
@@ -372,13 +364,13 @@ int edit_share_import(const psp_save_slot *slots, int count, wchar_t *message, i
     HANDLE h = FindFirstFileW(pattern, &d);
     if (h == INVALID_HANDLE_VALUE) return 0;
     int taken[1001] = {0}, total = 0;
-    const int ui = language_ui();
+    const int ui = ui_text_language();
     do {
         wchar_t path[MAX_PATH + 300];
         swprintf(path, MAX_PATH + 300, L"%ls\\%ls", folder, d.cFileName);
         const int got = import_zip(path, slots, count < 1001 ? count : 1001, taken);
         if (got < 0) {
-            swprintf(message, cap, SAID_FULL[ui], d.cFileName);
+            swprintf(message, cap, ui_wtext_in(ui, "share.full"), d.cFileName);
             continue;
         }
         total += got;
@@ -392,7 +384,7 @@ int edit_share_import(const psp_save_slot *slots, int count, wchar_t *message, i
         MoveFileW(path, moved);
     } while (FindNextFileW(h, &d));
     FindClose(h);
-    if (total) swprintf(message, cap, SAID_IMPORTED[ui], total);
+    if (total) swprintf(message, cap, ui_wtext_in(ui, "share.imported"), total);
     fprintf(stderr, "edits: imported %d Edit(s)\n", total);
     return total;
 }

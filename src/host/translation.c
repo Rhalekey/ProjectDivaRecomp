@@ -33,6 +33,7 @@
 #include "presence.h"
 
 #include "letters.h"
+#include "ui_text.h"
 
 #include <psprecomp/cpu.h>
 #include <psprecomp/hle.h>
@@ -56,16 +57,20 @@
 #define QUEUE_FIRST_TEXT 0x08C45F08u
 
 #define BIGGER_QUEUE_BUFFER 16384u
-#define TABLE_SIZE 16384u
+#define TABLE_SIZE 32768u
 #define SEEN_SIZE  16384u
 
 enum { REG_A0 = 4, REG_A1 = 5, REG_A2 = 6, REG_A3 = 7, REG_T3 = 11 };
 
-/* The interface in each language, then what the player turns on by itself. */
-enum { KIND_ENGLISH, KIND_GERMAN, KIND_SONG, KIND_LYRIC, KIND_COUNT };
+/* The interface in each language, by its number in lang\languages.txt, then what the player turns
+ * on by itself. */
+#define KIND_SONG UI_TEXT_MOST_LANGUAGES
+#define KIND_LYRIC (KIND_SONG + 1)
+#define KIND_COUNT (KIND_SONG + 2)
 
 typedef struct {
     char *original;
+    char *text;     /* what is shown, kept here for a language's interface until it is played */
     uint32_t guest;
     int kind;
     int center;     /* a line in a dialog, placed by the game for the length of the original */
@@ -77,6 +82,10 @@ static entry g_table[TABLE_SIZE];
 static int g_loaded;
 static int g_shown[KIND_COUNT];
 static int g_has[KIND_COUNT];
+/* The interface's words go into guest memory only for the language being played, all into one
+ * block, as large as the largest language needs: more languages cost the game no memory. */
+static uint32_t g_kind_bytes[KIND_COUNT];
+static uint32_t g_interface_block, g_interface_room;
 static int g_active;
 static uint32_t g_queue_buffer;
 static FILE *g_missing;
@@ -390,48 +399,26 @@ static int get_ready(void) {
     return 1;
 }
 
-/* Letters the game's font does not have, in what it does have and never uses: half-width
- * kana. Tools\hd_font.py draws them there. A table is UTF-8, and is turned into these. */
-static void to_font_letters(const char *from, char *to, size_t size) {
-    static const struct {
-        char utf8[3];
-        char letter;
-    } LETTERS[] = {
-        {"\xc3\xa4", '\xa1'}, {"\xc3\xb6", '\xa2'}, {"\xc3\xbc", '\xa3'}, {"\xc3\x84", '\xa4'},
-        {"\xc3\x96", '\xa5'}, {"\xc3\x9c", '\xa6'}, {"\xc3\x9f", '\xa7'},
-    };
-    size_t at = 0;
-    while (*from && at + 1 < size) {
-        int found = 0;
-        for (size_t i = 0; i < sizeof LETTERS / sizeof LETTERS[0] && !found; i++) {
-            if (from[0] == LETTERS[i].utf8[0] && from[1] == LETTERS[i].utf8[1]) {
-                to[at++] = LETTERS[i].letter;
-                from += 2;
-                found = 1;
-            }
-        }
-        if (!found) to[at++] = *from++;
-    }
-    to[at] = '\0';
-}
-
 /* Returns how many lines it loaded, or -1 if there is no such file. */
 static int load_table(const char *path, int kind) {
     FILE *f = fopen(path, "r");
     if (!f) return -1;
 
-    /* Two passes: the guest memory for the text is allocated once its size is known. */
-    uint32_t bytes = 0;
+    /* Song names and lyrics are always in guest memory. Two passes: it is allocated once its size
+     * is known. */
     char line[1024];
-    while (fgets(line, sizeof line, f)) bytes += (uint32_t)strlen(line) + 1;
-    uint32_t next = bytes ? psp_sysmem_alloc(bytes, 1) : 0;
-    if (!next) {
-        fprintf(stderr, "translation: no memory for %s\n", path);
-        fclose(f);
-        return 0;
+    uint32_t next = 0;
+    if (kind >= KIND_SONG) {
+        uint32_t bytes = 0;
+        while (fgets(line, sizeof line, f)) bytes += (uint32_t)strlen(line) + 1;
+        next = bytes ? psp_sysmem_alloc(bytes, 1) : 0;
+        if (!next) {
+            fprintf(stderr, "translation: no memory for %s\n", path);
+            fclose(f);
+            return 0;
+        }
+        rewind(f);
     }
-
-    rewind(f);
     int loaded = 0, skipped = 0;
     char letters[sizeof line];
     while (fgets(line, sizeof line, f)) {
@@ -467,9 +454,9 @@ static int load_table(const char *path, int kind) {
                 text = after + 1;
             }
         }
-        /* Song names and lyrics are already in the game's own encoding. */
+        /* Song names and lyrics are already in the game's own encoding; the rest is UTF-8. */
         if (kind < KIND_SONG) {
-            to_font_letters(text, letters, sizeof letters);
+            ui_text_to_game(text, letters, sizeof letters);
             text = letters;
         }
         if (g_loaded + 1 >= (int)(TABLE_SIZE / 2)) {
@@ -489,16 +476,18 @@ static int load_table(const char *path, int kind) {
         }
 
         const uint32_t size = (uint32_t)strlen(text) + 1;
-        memcpy(psp_mem_ptr(next, size), text, size);
+        if (next) memcpy(psp_mem_ptr(next, size), text, size);
         uint32_t i = hash(original) % TABLE_SIZE;
         while (g_table[i].original) i = (i + 1) % TABLE_SIZE;
         g_table[i].original = _strdup(original);
+        g_table[i].text = next ? NULL : _strdup(text);
         g_table[i].guest = next;
+        g_kind_bytes[kind] += size;
         g_table[i].kind = kind;
         g_table[i].center = center;
         g_table[i].middle = middle;
         g_table[i].center_at = 0;
-        next += size;
+        if (next) next += size;
         loaded++;
         g_loaded++;
     }
@@ -507,11 +496,26 @@ static int load_table(const char *path, int kind) {
     return loaded;
 }
 
-static const struct {
-    const char *code;
-    int kind;
-} LANGUAGES[] = {{"en", KIND_ENGLISH}, {"de", KIND_GERMAN}};
-#define NUM_LANGUAGES ((int)(sizeof LANGUAGES / sizeof LANGUAGES[0]))
+/* The words of a language's interface, into the block, where the game can read them. */
+static void place_interface(int kind) {
+    uint32_t at = g_interface_block;
+    for (uint32_t i = 0; i < TABLE_SIZE; i++) {
+        entry *e = &g_table[i];
+        if (!e->original || e->kind >= KIND_SONG) continue;
+        if (e->kind != kind || !e->text) {
+            e->guest = 0;
+            continue;
+        }
+        const uint32_t size = (uint32_t)strlen(e->text) + 1;
+        if (at + size > g_interface_block + g_interface_room) {
+            e->guest = 0;
+            continue;
+        }
+        memcpy(psp_mem_ptr(at, size), e->text, size);
+        e->guest = at;
+        at += size;
+    }
+}
 
 void translation_set_language(const char *code) {
     if (g_interface >= 0) g_shown[g_interface] = 0;
@@ -519,26 +523,32 @@ void translation_set_language(const char *code) {
     if (g_missing) fclose(g_missing);
     g_missing = NULL;
     memset(g_seen, 0, sizeof g_seen);
-    for (int i = 0; i < NUM_LANGUAGES; i++) {
-        if (strcmp(LANGUAGES[i].code, code)) continue;
-        g_interface = LANGUAGES[i].kind;
-        g_shown[g_interface] = 1;
-        if (getenv("DIVA_LANG_LOG")) {
-            char path[1200];
-            snprintf(path, sizeof path, "%s\\lang_missing_%s.txt", g_data_dir, code);
-            g_missing = fopen(path, "a");
-        }
+    const int kind = ui_text_find(code);
+    if (kind < 0 || !g_has[kind] || !g_interface_block) return;
+    place_interface(kind);
+    g_interface = kind;
+    g_shown[kind] = 1;
+    if (getenv("DIVA_LANG_LOG")) {
+        char path[1200];
+        snprintf(path, sizeof path, "%s\\lang_missing_%s.txt", g_data_dir, code);
+        g_missing = fopen(path, "a");
     }
 }
 
 void translation_start(const char *dir, const char *data_dir) {
     snprintf(g_data_dir, sizeof g_data_dir, "%s", data_dir);
     if (!get_ready()) return;
-    for (int i = 0; i < NUM_LANGUAGES; i++) {
+    for (int i = 0; i < ui_text_languages() && i < UI_TEXT_MOST_LANGUAGES; i++) {
         char path[1200];
-        snprintf(path, sizeof path, "%s\\%s.txt", dir, LANGUAGES[i].code);
-        if (load_table(path, LANGUAGES[i].kind) < 0) fprintf(stderr, "translation: cannot read %s\n", path);
+        snprintf(path, sizeof path, "%s\\%s.txt", dir, ui_text_code(i));
+        const int loaded = load_table(path, i);
+        /* Japanese is the game's own, with no table. */
+        if (loaded < 0 && strcmp(ui_text_code(i), "ja")) fprintf(stderr, "translation: cannot read %s\n", path);
+        g_has[i] = loaded > 0;
+        if (g_kind_bytes[i] > g_interface_room) g_interface_room = g_kind_bytes[i];
     }
+    if (g_interface_room) g_interface_block = psp_sysmem_alloc(g_interface_room, 1);
+    if (g_interface_room && !g_interface_block) fprintf(stderr, "translation: no memory for the interface's words\n");
 }
 
 void translation_romaji_start(const char *dir) {
@@ -558,15 +568,13 @@ const char *translation_shown(const char *original) {
 }
 
 void translation_shown_utf8(const char *original, char *out, size_t size) {
-    /* The places to_font_letters gives the letters the game's font lacks, in its order. */
-    static const wchar_t LETTERS[] = {0x00E4, 0x00F6, 0x00FC, 0x00C4, 0x00D6, 0x00DC, 0x00DF};
     const char *shown = translation_shown(original);
     const char *text = shown ? shown : original;
     wchar_t wide[512];
     size_t n = 0;
     for (const unsigned char *c = (const unsigned char *)text; *c && n + 1 < sizeof wide / sizeof wide[0];) {
-        if (shown && *c >= 0xA1 && *c <= 0xA7) {
-            wide[n++] = LETTERS[*c - 0xA1];
+        if (shown && ui_text_letter_of(*c)) {
+            wide[n++] = ui_text_letter_of(*c);
             c++;
             continue;
         }

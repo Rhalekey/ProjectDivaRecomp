@@ -129,6 +129,10 @@ The Japanese is never replaced. `lang\en.txt` lists the address of each original
 
 `Tools\lang.py` shows both sides of a translation, and lists what the game has displayed with no translation yet.
 
+This project's own words, in its menus, screens and messages, are in `lang\<code>_ui.txt`, one `key = text` per line in UTF-8, for every language including Japanese. A word missing from a language shows in English. `lang\languages.txt` lists the languages in the order the language screen shows them, with each one's name in itself. To add a language, add its line there and its files: `<code>_ui.txt`, `<code>.txt` for the game's text and `<code>_images.txt` for its pictures. Its flag is drawn in `src\host\language_screen.c`. The game's font has no accented letters, so `lang\letters.txt` lists those the translations use, each drawn over a character the game never shows. A letter missing from that list shows without its accent, or as `?`.
+
+The build draws each language's pictures in a process of its own, as many at once as the computer has processors and free memory for.
+
 ## Fonts
 
 `fonts\` holds [M PLUS Rounded 1c](https://fonts.google.com/specimen/M+PLUS+Rounded+1c) under the SIL Open Font License (`fonts\OFL.txt`). `Tools\hd_font.py` redraws the game's letters from it at four times their size. To use another font, put its file in `%LOCALAPPDATA%\ProjectDivaRecomp\fonts`, where it takes priority. Fonts placed there stay on your computer.

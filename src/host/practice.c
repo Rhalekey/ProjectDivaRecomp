@@ -4,6 +4,7 @@
 #include "language.h"
 #include "options.h"
 #include "settings.h"
+#include "ui_text.h"
 
 #include <psprecomp/cpu.h>
 #include <psprecomp/mem.h>
@@ -37,20 +38,10 @@ static void on_layer_volume(void) {
     }
 }
 
-static const char *const SHOWN_ON[UI_COUNT] = {
-    [UI_ENGLISH] = "Practice on: you cannot fail, and notes score nothing",
-    [UI_JAPANESE] = "\xE7\xB7\xB4\xE7\xBF\x92\xE3\x83\xA2\xE3\x83\xBC\xE3\x83\x89\xEF\xBC\x9A\xE3\x82\xAA\xE3\x83\xB3\xE3\x80\x80\xE3\x82\xB2\xE3\x83\xBC\xE3\x83\xA0\xE3\x82\xAA\xE3\x83\xBC\xE3\x83\x90\xE3\x83\xBC\xE3\x81\xAA\xE3\x81\x97\xE3\x80\x81\xE3\x82\xB9\xE3\x82\xB3\xE3\x82\xA2\xE3\x81\xAF\xE8\xA8\x98\xE9\x8C\xB2\xE3\x81\x95\xE3\x82\x8C\xE3\x81\xBE\xE3\x81\x9B\xE3\x82\x93",
-    [UI_GERMAN] = "Übung an: kein Scheitern, Noten geben keine Punkte",
-};
-static const char *const SHOWN_OFF[UI_COUNT] = {
-    [UI_ENGLISH] = "Practice off",
-    [UI_JAPANESE] = "\xE7\xB7\xB4\xE7\xBF\x92\xE3\x83\xA2\xE3\x83\xBC\xE3\x83\x89\xEF\xBC\x9A\xE3\x82\xAA\xE3\x83\x95",
-    [UI_GERMAN] = "Übung aus",
-};
 
 void practice_toggle(void) {
     g_on = !g_on;
-    psp_render_gl_show_message((g_on ? SHOWN_ON : SHOWN_OFF)[language_ui()]);
+    psp_render_gl_show_message(ui_text(g_on ? "practice.on" : "practice.off"));
     fprintf(stderr, "practice: %s\n", g_on ? "on" : "off");
 }
 

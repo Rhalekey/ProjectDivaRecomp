@@ -6,6 +6,7 @@
 #include "language.h"
 #include "options.h"
 #include "screen_kit.h"
+#include "ui_text.h"
 
 #include <psprecomp/hle.h>
 #include <psprecomp/render.h>
@@ -18,25 +19,6 @@
 #include <windows.h>
 
 /* ---- words ------------------------------------------------------------------------------- */
-static const wchar_t *const TITLE_SAVE[UI_COUNT] = {L"Save", L"\x30bb\x30fc\x30d6", L"Speichern"};
-static const wchar_t *const TITLE_LOAD[UI_COUNT] = {L"Load", L"\x30ed\x30fc\x30c9", L"Laden"};
-static const wchar_t *const TITLE_DELETE[UI_COUNT] = {L"Delete", L"\x524a\x9664", L"L\x00f6schen"};
-static const wchar_t *const NEW_DATA[UI_COUNT] = {L"New data", L"\x65b0\x3057\x3044\x30c7\x30fc\x30bf", L"Neue Daten"};
-static const wchar_t *const ASK_OVERWRITE[UI_COUNT] = {L"Save over this data?", L"\x3053\x306e\x30c7\x30fc\x30bf\x306b\x4e0a\x66f8\x304d\x3057\x307e\x3059\x304b\xff1f",
-                                                       L"Diese Daten \x00fc\x0062\x0065rschreiben?"};
-static const wchar_t *const ASK_DELETE[UI_COUNT] = {L"Delete this data?", L"\x3053\x306e\x30c7\x30fc\x30bf\x3092\x524a\x9664\x3057\x307e\x3059\x304b\xff1f",
-                                                    L"Diese Daten l\x00f6schen?"};
-static const wchar_t *const WORD_YES[UI_COUNT] = {L"Yes", L"\x306f\x3044", L"Ja"};
-static const wchar_t *const WORD_NO[UI_COUNT] = {L"No", L"\x3044\x3044\x3048", L"Nein"};
-static const wchar_t *const WORD_CHOOSE[UI_COUNT] = {L"Select", L"\x6c7a\x5b9a", L"Ausw\x00e4hlen"};
-static const wchar_t *const WORD_BACK[UI_COUNT] = {L"Back", L"\x623b\x308b", L"Zur\x00fc\x0063k"};
-static const wchar_t *const WORD_MOVE[UI_COUNT] = {L"Move", L"\x79fb\x52d5", L"Bewegen"};
-static const wchar_t *const TITLE_KEYBOARD[UI_COUNT] = {L"Enter text", L"\x6587\x5b57\x5165\x529b", L"Texteingabe"};
-static const wchar_t *const WORD_SPACE[UI_COUNT] = {L"Space", L"\x30b9\x30da\x30fc\x30b9", L"Leerzeichen"};
-static const wchar_t *const WORD_ERASE[UI_COUNT] = {L"Erase", L"\x4e00\x6587\x5b57\x524a\x9664", L"Zeichen l\x00f6schen"};
-static const wchar_t *const WORD_DONE[UI_COUNT] = {L"Done", L"\x5b8c\x4e86", L"Fertig"};
-static const wchar_t *const WORD_EXPORT[UI_COUNT] = {L"Export song", L"\x66f2\x3092\x66f8\x304d\x51fa\x3057", L"Lied exportieren"};
-static const wchar_t *const WORD_TYPE[UI_COUNT] = {L"Type", L"\x5165\x529b", L"Tippen"};
 
 /* ---- what both screens share --------------------------------------------------------------- */
 static int confirm_glyph(void) { return g_options.confirm_cross == 1 ? KIT_GLYPH_CROSS : KIT_GLYPH_CIRCLE; }
@@ -46,13 +28,13 @@ static int back_glyph(void) { return g_options.confirm_cross == 1 ? KIT_GLYPH_CI
 static int hints_choose_back(int ui) {
     int right = kit_width() - 32;
     if (controls_screen_from_pad()) {
-        right = kit_hint(right, back_glyph(), WORD_BACK[ui]);
-        right = kit_hint(right, confirm_glyph(), WORD_CHOOSE[ui]);
+        right = kit_hint(right, back_glyph(), ui_wtext_in(ui, "common.back"));
+        right = kit_hint(right, confirm_glyph(), ui_wtext_in(ui, "common.select"));
     } else {
-        right = kit_hint_key(right, L"Esc", WORD_BACK[ui]);
-        right = kit_hint_key(right, L"Enter", WORD_CHOOSE[ui]);
+        right = kit_hint_key(right, L"Esc", ui_wtext_in(ui, "common.back"));
+        right = kit_hint_key(right, L"Enter", ui_wtext_in(ui, "common.select"));
     }
-    return kit_hint(right, KIT_GLYPH_DPAD, WORD_MOVE[ui]);
+    return kit_hint(right, KIT_GLYPH_DPAD, ui_wtext_in(ui, "common.move"));
 }
 
 static void wide(const char *utf8, wchar_t *out, int cap) {
@@ -109,8 +91,7 @@ static int g_row_count;
 static wchar_t g_message[400];    /* what came of an export or an import, under the list */
 
 static void draw_list(int purpose, const psp_save_slot *slots, int top, int chosen, int ui) {
-    const wchar_t *const *title = purpose == PSP_SAVE_CHOOSE_SAVE ? TITLE_SAVE : purpose == PSP_SAVE_CHOOSE_LOAD ? TITLE_LOAD : TITLE_DELETE;
-    kit_clear(title[ui]);
+    kit_clear(ui_wtext_in(ui, purpose == PSP_SAVE_CHOOSE_SAVE ? "dialogs.save" : purpose == PSP_SAVE_CHOOSE_LOAD ? "dialogs.load" : "dialogs.delete"));
     const int w = kit_width() - 2 * LIST_X;
     kit_panel(LIST_X, LIST_Y, w, ROWS_SHOWN * (ROW_H + ROW_GAP) + ROW_GAP);
     for (int r = top; r < g_row_count && r < top + ROWS_SHOWN; r++) {
@@ -119,7 +100,7 @@ static void draw_list(int purpose, const psp_save_slot *slots, int top, int chos
         if (on) kit_selected(x, y, rw, ROW_H);
         const uint32_t ink = on ? KIT_INK : KIT_TEXT, soft = on ? KIT_INK : KIT_SOFT;
         if (g_rows[r] < 0) {
-            kit_text(x + 24, y + ROW_H / 2, 20, 1, ink, NEW_DATA[ui], KIT_LEFT);
+            kit_text(x + 24, y + ROW_H / 2, 20, 1, ink, ui_wtext_in(ui, "dialogs.new_data"), KIT_LEFT);
             continue;
         }
         const psp_save_slot *s = &slots[g_rows[r]];
@@ -145,8 +126,8 @@ static void draw_list(int purpose, const psp_save_slot *slots, int top, int chos
     /* A song's Edits, and its MP3 if it is the player's own, can be exported from the lists of
      * Rhythm Game Edit's data. */
     if (purpose != PSP_SAVE_CHOOSE_SAVE && chosen < g_row_count && g_rows[chosen] >= 0 && !strncmp(slots[g_rows[chosen]].name, "EDIT", 4)) {
-        if (controls_screen_from_pad()) kit_hint(right, KIT_GLYPH_TRIANGLE, WORD_EXPORT[ui]);
-        else kit_hint_key(right, L"E", WORD_EXPORT[ui]);
+        if (controls_screen_from_pad()) kit_hint(right, KIT_GLYPH_TRIANGLE, ui_wtext_in(ui, "dialogs.export"));
+        else kit_hint_key(right, L"E", ui_wtext_in(ui, "dialogs.export"));
     }
 }
 
@@ -173,7 +154,7 @@ static int ask_yes_no(const wchar_t *question, int ui) {
                 const int bx = x + 60 + i * 210, by = y + 104, on = (i == 0) == yes;
                 if (on) kit_selected(bx, by, 190, 52);
                 else kit_faint(bx, by, 190, 52);
-                kit_text(bx + 95, by + 26, 18, 1, on ? KIT_INK : KIT_TEXT, i == 0 ? WORD_YES[ui] : WORD_NO[ui], KIT_CENTRE);
+                kit_text(bx + 95, by + 26, 18, 1, on ? KIT_INK : KIT_TEXT, i == 0 ? ui_wtext_in(ui, "dialogs.yes") : ui_wtext_in(ui, "dialogs.no"), KIT_CENTRE);
             }
             redraw = 0;
         }
@@ -243,7 +224,7 @@ static int choose_save(int purpose, const psp_save_slot *slots, int count, const
         new_slot = -1 - g_rows[0];
         g_rows[0] = -1;
     }
-    const int ui = language_ui();
+    const int ui = ui_text_language();
     int chosen = 0, top = 0, result = -1;
     controls_input was = {1, 1, 1, 1, 1, 1};
     int redraw = 1;
@@ -272,8 +253,8 @@ static int choose_save(int purpose, const psp_save_slot *slots, int count, const
             kit_wait_for_release();
             const int slot = g_rows[chosen] < 0 ? new_slot : g_rows[chosen];
             int sure = 1;
-            if (purpose == PSP_SAVE_CHOOSE_SAVE && g_rows[chosen] >= 0) sure = ask_yes_no(ASK_OVERWRITE[ui], ui);
-            else if (purpose == PSP_SAVE_CHOOSE_DELETE) sure = ask_yes_no(ASK_DELETE[ui], ui);
+            if (purpose == PSP_SAVE_CHOOSE_SAVE && g_rows[chosen] >= 0) sure = ask_yes_no(ui_wtext_in(ui, "dialogs.ask_overwrite"), ui);
+            else if (purpose == PSP_SAVE_CHOOSE_DELETE) sure = ask_yes_no(ui_wtext_in(ui, "dialogs.ask_delete"), ui);
             if (sure) {
                 result = slot;
                 break;
@@ -303,7 +284,7 @@ static const char *const KEY_ROWS[] = {
 #define KEYS_Y 162   /* the last line ends at 472, above the strip of hints at 492 */
 
 static void draw_keyboard(const wchar_t *description, const wchar_t *text, int limit, int line, int column, int ui) {
-    kit_clear(TITLE_KEYBOARD[ui]);
+    kit_clear(ui_wtext_in(ui, "dialogs.keyboard"));
     const int full_w = KEY_COLUMNS * (KEY_W + KEY_GAP) - KEY_GAP, x0 = (kit_width() - full_w) / 2;
     kit_text(x0, 82, 16, 0, KIT_SOFT, description, KIT_LEFT);
     kit_panel(x0, 98, full_w, 52);
@@ -322,7 +303,7 @@ static void draw_keyboard(const wchar_t *description, const wchar_t *text, int l
             kit_text(x + KEY_W / 2, y + KEY_H / 2, 18, 1, on ? KIT_INK : KIT_TEXT, ch, KIT_CENTRE);
         }
     }
-    const wchar_t *const words[SPECIALS] = {WORD_SPACE[ui], WORD_ERASE[ui], WORD_DONE[ui]};
+    const wchar_t *const words[SPECIALS] = {ui_wtext_in(ui, "dialogs.space"), ui_wtext_in(ui, "dialogs.erase"), ui_wtext_in(ui, "dialogs.done")};
     const int sw = (full_w - (SPECIALS - 1) * KEY_GAP) / SPECIALS, y = KEYS_Y + KEY_LINES * (KEY_H + KEY_GAP);
     for (int i = 0; i < SPECIALS; i++) {
         const int x = x0 + i * (sw + KEY_GAP), on = line == KEY_LINES && column == i;
@@ -331,7 +312,7 @@ static void draw_keyboard(const wchar_t *description, const wchar_t *text, int l
         kit_text(x + sw / 2, y + KEY_H / 2, 18, 1, on ? KIT_INK : KIT_TEXT, words[i], KIT_CENTRE);
     }
     int right = hints_choose_back(ui);
-    if (!controls_screen_from_pad()) kit_hint_key(right, L"A-Z", WORD_TYPE[ui]);
+    if (!controls_screen_from_pad()) kit_hint_key(right, L"A-Z", ui_wtext_in(ui, "dialogs.type"));
 }
 
 /* A key of the computer's keyboard just pressed, as the character it types, 0 if none. Backspace
@@ -368,7 +349,7 @@ static int keyboard(const uint16_t *description16, const uint16_t *initial, int 
         fprintf(stderr, "keyboard: could not open, so the text stays as it was\n");
         return 0;
     }
-    const int ui = language_ui();
+    const int ui = ui_text_language();
     int line = 0, column = 0, entered = 0;
     controls_input was = {1, 1, 1, 1, 1, 1};
     typed();
@@ -439,37 +420,24 @@ static int keyboard(const uint16_t *description16, const uint16_t *initial, int 
 /* The game asks for the system's message only for an error, by its number, as the Memory Stick
  * being full. It is told over the game, as "Game saved" is, held until a button is pressed; the
  * game goes on as after its OK. */
-static const wchar_t *const SAID_FULL[UI_COUNT] = {L"The Memory Stick is full.", L"\x30e1\x30e2\x30ea\x30fc\x30b9\x30c6\x30a3\x30c3\x30af\x306e\x7a7a\x304d\x304c\x3042\x308a\x307e\x305b\x3093\x3002",
-                                                   L"Der Memory Stick ist voll."};
-static const wchar_t *const SAID_BROKEN[UI_COUNT] = {L"The save data is damaged.", L"\x30bb\x30fc\x30d6\x30c7\x30fc\x30bf\x304c\x58ca\x308c\x3066\x3044\x307e\x3059\x3002",
-                                                     L"Der Spielstand ist besch\x00e4" L"digt."};
-static const wchar_t *const SAID_NO_DATA[UI_COUNT] = {L"There is no save data.", L"\x30bb\x30fc\x30d6\x30c7\x30fc\x30bf\x304c\x3042\x308a\x307e\x305b\x3093\x3002",
-                                                      L"Kein Spielstand vorhanden."};
-static const wchar_t *const SAID_ACCESS[UI_COUNT] = {L"The Memory Stick could not be read or written.",
-                                                     L"\x30e1\x30e2\x30ea\x30fc\x30b9\x30c6\x30a3\x30c3\x30af\x306b\x30a2\x30af\x30bb\x30b9\x3067\x304d\x307e\x305b\x3093\x3002",
-                                                     L"Der Memory Stick konnte nicht gelesen oder beschrieben werden."};
-static const wchar_t *const SAID_ERROR[UI_COUNT] = {L"An error occurred.", L"\x30a8\x30e9\x30fc\x304c\x767a\x751f\x3057\x307e\x3057\x305f\x3002",
-                                                    L"Ein Fehler ist aufgetreten."};
-static const wchar_t *const SAID_PRESS[UI_COUNT] = {L"Press a button.", L"\x30dc\x30bf\x30f3\x3092\x62bc\x3057\x3066\x304f\x3060\x3055\x3044\x3002",
-                                                    L"Taste dr\x00fc" L"cken."};
 
 static int message(uint32_t error, const char *text, uint32_t options) {
     (void)options;
-    const int ui = language_ui();
+    const int ui = ui_text_language();
     wchar_t said[700];
     if (text && text[0]) {
         wchar_t t[600];
         wide(text, t, 600);
-        swprintf(said, 700, L"%ls %ls", t, SAID_PRESS[ui]);
+        swprintf(said, 700, L"%ls %ls", t, ui_wtext_in(ui, "dialogs.press"));
     } else {
         /* The save errors go by their last byte: 0x8011 03 then what was done and what went wrong. */
         const int save = (error & 0xFFFFFF00u) == 0x80110300u, what = (int)(error & 0x0F);
-        const wchar_t *why = SAID_ERROR[ui];
-        if (save && what == 3) why = SAID_FULL[ui];
-        else if (save && what == 6) why = SAID_BROKEN[ui];
-        else if (save && (what == 7 || what == 9)) why = SAID_NO_DATA[ui];
-        else if (save) why = SAID_ACCESS[ui];
-        swprintf(said, 700, L"%ls (%08X) %ls", why, (unsigned)error, SAID_PRESS[ui]);
+        const wchar_t *why = ui_wtext_in(ui, "dialogs.error");
+        if (save && what == 3) why = ui_wtext_in(ui, "dialogs.full");
+        else if (save && what == 6) why = ui_wtext_in(ui, "dialogs.broken");
+        else if (save && (what == 7 || what == 9)) why = ui_wtext_in(ui, "dialogs.no_data");
+        else if (save) why = ui_wtext_in(ui, "dialogs.access");
+        swprintf(said, 700, L"%ls (%08X) %ls", why, (unsigned)error, ui_wtext_in(ui, "dialogs.press"));
     }
     char utf8[2100];
     WideCharToMultiByte(CP_UTF8, 0, said, -1, utf8, sizeof utf8, NULL, NULL);

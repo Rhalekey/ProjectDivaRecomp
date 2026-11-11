@@ -246,6 +246,13 @@ if (Is-Stale $FxStamp $FxWanted) {
     $FxWanted | Set-Content $FxStamp
 }
 
+# ---- the languages, from lang\languages.txt. Japanese is the game's own, with no pictures to make.
+$LangDir = Join-Path $Root "lang"
+$Languages = @(Get-Content (Join-Path $LangDir "languages.txt") -Encoding UTF8 |
+    Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object { ($_ -split '\|')[0].Trim() } |
+    Where-Object { $_ -ne 'ja' -and (Test-Path (Join-Path $LangDir "$($_)_images.txt")) })
+$LettersHash = (Get-FileHash (Join-Path $LangDir "letters.txt")).Hash
+
 # ---- text from a font of the player's own if one is in the folder, or else from the free
 # one this project carries. Made once for each font.
 $FontDir = Join-Path $env:LOCALAPPDATA "ProjectDivaRecomp\fonts"
@@ -254,8 +261,8 @@ $FontFile = Get-ChildItem $FontDir -File | Where-Object { $_.Extension -match '^
 if (-not $FontFile) { $FontFile = Get-Item (Join-Path $Root "fonts\MPLUSRounded1c-Medium.ttf") }
 if ($FontFile) {
     $Stamp = Join-Path $HdDir "font_made_from.txt"
-    # The number changes when what the tool writes does.
-    $Made = "$($FontFile.Name) 5"
+    # The number changes when what the tool writes does; the letters it draws are lang\letters.txt.
+    $Made = "$($FontFile.Name) 5 $LettersHash"
     if (Is-Stale $Stamp $Made) {
         Step "drawing the font $($FontFile.Name) (takes a few minutes, only the first time)"
         python (Join-Path $Root "Tools\hd_font.py") $Game $FontFile.FullName $HdDir *>> $Log
@@ -264,41 +271,56 @@ if ($FontFile) {
     }
 }
 
-# ---- pictures with words in them, made from the game's own, for each language. These use
-# the font as well, so they are made again when it or the words change. Their large versions go in
-# the language's own folder, which the game looks in first: the shared one would hold whichever
-# language was made last, and show it in the others, Japanese included.
+# ---- pictures with words in them, made from the game's own, for each language, and the menus'
+# common pieces from vectors. These use the font as well, so they are made again when it or the words
+# change. The large versions of the first go in the language's own folder, which the game looks in
+# first: the shared one would hold whichever language was made last, and show it in the others.
+#
+# Each language takes minutes, and they do not depend on one another, so several are made at once:
+# as many as this computer has processors, and its free memory has room for at $PerLanguageMB each.
+# One processor makes them one at a time, as before.
+$PerLanguageMB = 400   # measured: about 150 MB at most for each tool
 $LangTool = Join-Path $Root "Tools\lang_images.py"
-foreach ($Language in @("en", "de")) {
-    $LangArt = Join-Path $env:LOCALAPPDATA "ProjectDivaRecomp\lang\$Language"
-    $LangTable = Join-Path $Root "lang\$($Language)_images.txt"
-    $LangStamp = Join-Path $HdDir "pictures_$($Language)_made_from.txt"
-    $LangWanted = "$($FontFile.Name) $((Get-FileHash $LangTable).Hash) $((Get-FileHash $LangTool).Hash) large in lang"
-    if (Is-Stale $LangStamp $LangWanted) {
-        Step "translating the pictures ($Language)"
-        python $LangTool $Game $LangTable $LangArt $FontFile.FullName $LangArt *>> $Log
-        if ($LASTEXITCODE -ne 0) { Fail "translate the pictures" }
-        $LangWanted | Set-Content $LangStamp
-    }
-}
-
-# ---- the menus' common pieces, from vectors, for each language with words for them.
 $UiTool = Join-Path $Root "Tools\ui_vector.py"
-foreach ($Language in @("en", "de")) {
-    $UiDir = Join-Path $HdDir "vector\$Language"
-    $UiTable = Join-Path $Root "lang\$($Language)_images.txt"
-    $UiStamp = Join-Path $HdDir "vector_$($Language)_made_from.txt"
-    $UiWanted = "$($FontFile.Name) $((Get-FileHash $UiTable).Hash) $((Get-FileHash $UiTool).Hash) $((Get-FileHash $HudTool).Hash) $((Get-FileHash $LangTool).Hash)"
-    if (Is-Stale $UiStamp $UiWanted) {
-        Step "drawing the menus from vectors ($Language)"
-        $env:DIVA_UI_SMOOTH = "1"
-        python $LangTool $Game $UiTable (Join-Path $env:TEMP "diva_ui_$Language") $FontFile.FullName $UiDir *>> $Log
-        Remove-Item Env:DIVA_UI_SMOOTH
-        if ($LASTEXITCODE -ne 0) { Fail "clean the pictures" }
-        python $UiTool $Game $FontFile.FullName $UiTable $UiDir *>> $Log
-        if ($LASTEXITCODE -ne 0) { Fail "draw the menus from vectors" }
-        $UiWanted | Set-Content $UiStamp
+$Work = @()
+foreach ($Language in $Languages) {
+    $LangTable = Join-Path $LangDir "$($Language)_images.txt"
+    $UiWords = Join-Path $LangDir "$($Language)_ui.txt"
+    $Item = [ordered]@{ Language = $Language }
+    $Item.PicturesStamp = Join-Path $HdDir "pictures_$($Language)_made_from.txt"
+    $Item.PicturesWanted = "$($FontFile.Name) $((Get-FileHash $LangTable).Hash) $((Get-FileHash $LangTool).Hash) $LettersHash large in lang"
+    $Item.VectorsStamp = Join-Path $HdDir "vector_$($Language)_made_from.txt"
+    $Item.VectorsWanted = "$($FontFile.Name) $((Get-FileHash $LangTable).Hash) $((Get-FileHash $UiTool).Hash) $((Get-FileHash $HudTool).Hash) $((Get-FileHash $LangTool).Hash) $LettersHash $((Get-FileHash $UiWords).Hash)"
+    $Item.Pictures = if (Is-Stale $Item.PicturesStamp $Item.PicturesWanted) { "1" } else { "0" }
+    $Item.Vectors = if (Is-Stale $Item.VectorsStamp $Item.VectorsWanted) { "1" } else { "0" }
+    if ($Item.Pictures -eq "1" -or $Item.Vectors -eq "1") { $Work += [pscustomobject]$Item }
+}
+if ($Work.Count) {
+    $FreeMB = [int]((Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory / 1024)
+    $AtOnce = [Math]::Min([Math]::Min($Work.Count, [Environment]::ProcessorCount), [Math]::Floor($FreeMB / $PerLanguageMB))
+    if ($AtOnce -lt 1) { $AtOnce = 1 }
+    Step "drawing the pictures of $($Work.Count) language(s), $AtOnce at a time ($([Environment]::ProcessorCount) processors, $FreeMB MB free)"
+    $Worker = Join-Path $Root "Tools\lang_pictures.ps1"
+    $Running = @()
+    foreach ($Item in $Work) {
+        while (@($Running | Where-Object { -not $_.Process.HasExited }).Count -ge $AtOnce) { Start-Sleep -Milliseconds 500 }
+        $ItemLog = Join-Path $Logs "pictures_$($Item.Language).txt"
+        Remove-Item $ItemLog -ErrorAction SilentlyContinue
+        $Arguments = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$Worker`"", "-Root", "`"$Root`"", "-Game", "`"$Game`"",
+            "-Font", "`"$($FontFile.FullName)`"", "-Language", $Item.Language, "-Log", "`"$ItemLog`"",
+            "-Pictures", $Item.Pictures, "-PicturesStamp", "`"$($Item.PicturesStamp)`"", "-PicturesWanted", "`"$($Item.PicturesWanted)`"",
+            "-Vectors", $Item.Vectors, "-VectorsStamp", "`"$($Item.VectorsStamp)`"", "-VectorsWanted", "`"$($Item.VectorsWanted)`"")
+        $Process = Start-Process powershell -ArgumentList $Arguments -PassThru -WindowStyle Hidden
+        $null = $Process.Handle   # so that its exit code can be read once it ends
+        $Running += [pscustomobject]@{ Language = $Item.Language; Process = $Process; Log = $ItemLog }
     }
+    $Failed = @()
+    foreach ($Job in $Running) {
+        $Job.Process.WaitForExit()
+        if (Test-Path $Job.Log) { Get-Content $Job.Log *>> $Log }
+        if ($Job.Process.ExitCode -ne 0) { $Failed += $Job.Language }
+    }
+    if ($Failed.Count) { Fail "draw the pictures of $($Failed -join ', ')" }
 }
 
 # ---- song names and lyrics in romaji, made here from this copy of the game. The game runs

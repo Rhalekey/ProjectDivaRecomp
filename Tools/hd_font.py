@@ -166,10 +166,27 @@ def shape_hash(pixels):
     return h
 
 
-# Letters the game's font has no place for, drawn over half-width kana, which it never shows.
-# src/host/translation.c puts the same bytes in the text.
-OVER_KANA = {'\uff61': '\u00e4', '\uff62': '\u00f6', '\uff63': '\u00fc', '\uff64': '\u00c4',
-             '\uff65': '\u00d6', '\uff66': '\u00dc', '\uff67': '\u00df'}
+# Letters the game's font has no place for, drawn over half-width kana, which it never shows:
+# lang/letters.txt, from which src/host/ui_text.c puts the same bytes in the text.
+LETTERS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lang', 'letters.txt')
+
+
+def read_letters(path=LETTERS_FILE):
+    """{byte: letter} of lang/letters.txt."""
+    letters = {}
+    with open(path, encoding='utf-8-sig') as f:
+        for line in f:
+            line = line.rstrip('\r\n')
+            if not line or line.startswith('#'):
+                continue
+            byte, letter = line.split(' ', 1)
+            if 0xA1 <= int(byte, 16) <= 0xDF and letter:
+                letters[int(byte, 16)] = letter[0]
+    return letters
+
+
+# The kana each byte is in the game's font list, and the letter drawn there instead.
+OVER_KANA = {bytes((b,)).decode('cp932'): letter for b, letter in read_letters().items()}
 FREE_FONT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'fonts', 'MPLUSRounded1c-Medium.ttf')
 
 
@@ -251,9 +268,8 @@ def write_atlas(archive, name, half_w, cell_h, cells, main_drawer, fallback, out
 
 def letters_of_half_cells():
     """Each byte that is a half-width letter, with the letter."""
-    over = {'\uff61': 0xA1, '\uff62': 0xA2, '\uff63': 0xA3, '\uff64': 0xA4, '\uff65': 0xA5, '\uff66': 0xA6, '\uff67': 0xA7}
     letters = [(b, bytes((b,)).decode('cp932')) for b in range(0x20, 0x7F)]
-    return letters + [(byte, OVER_KANA[kana]) for kana, byte in over.items()]
+    return letters + sorted(read_letters().items())
 
 
 def write_widths(path, measured):

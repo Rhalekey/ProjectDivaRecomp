@@ -23,6 +23,7 @@
 #include "screen_kit.h"
 #include "song_sort.h"
 #include "timing.h"
+#include "ui_text.h"
 
 #include <psprecomp/cpu.h>
 #include <psprecomp/dispatch.h>
@@ -351,12 +352,6 @@ const char *controls_disc(void) { return g_disc; }
 
 /* ---- which button confirms ---------------------------------------------------------- */
 
-static const wchar_t *const ASK_QUESTION[UI_COUNT] = {L"Which button confirms?", L"\x6c7a\x5b9a\x30dc\x30bf\x30f3\x3092\x9078\x3093\x3067\x304f\x3060\x3055\x3044", L"Welche Taste best\x00e4tigt?"};
-static const wchar_t *const ASK_NOTE[UI_COUNT] = {L"You can change this later in Options.", L"\x5f8c\x3067\x30aa\x30d7\x30b7\x30e7\x30f3\x304b\x3089\x5909\x66f4\x3067\x304d\x307e\x3059\x3002", L"Sp\x00e4ter in den Optionen \x00e4nderbar."};
-static const wchar_t *const ASK_CIRCLE[UI_COUNT] = {L"East, as the game was made", L"\x53f3\x30dc\x30bf\x30f3\xff08\x30aa\x30ea\x30b8\x30ca\x30eb\xff09", L"Ost, wie im Original"};
-static const wchar_t *const ASK_CROSS[UI_COUNT] = {L"South", L"\x4e0b\x30dc\x30bf\x30f3", L"S\x00fc" L"d"};
-static const wchar_t *const WORD_SELECT[UI_COUNT] = {L"Select", L"\x6c7a\x5b9a", L"Ausw\x00e4hlen"};
-static const wchar_t *const WORD_MOVE[UI_COUNT] = {L"Move", L"\x79fb\x52d5", L"Bewegen"};
 
 #define ASK_X 24
 #define ASK_Y 104
@@ -373,8 +368,8 @@ static const wchar_t *const WORD_MOVE[UI_COUNT] = {L"Move", L"\x79fb\x52d5", L"B
 #define ASK_CARD_H 104
 
 static void draw_ask(int selected, int ui) {
-    kit_clear(ASK_QUESTION[ui]);
-    const wchar_t *const rows[2] = {ASK_CIRCLE[ui], ASK_CROSS[ui]};
+    kit_clear(ui_wtext_in(ui, "confirm.question"));
+    const wchar_t *const rows[2] = {ui_wtext_in(ui, "confirm.east"), ui_wtext_in(ui, "confirm.south")};
     const int glyphs[2] = {KIT_GLYPH_CIRCLE, KIT_GLYPH_CROSS};
     kit_panel(ASK_X, ASK_Y, ASK_W, ASK_PAD * 2 + 2 * ASK_H + ASK_GAP);
     const int row_x = ASK_X + ASK_PAD, row_w = ASK_W - ASK_PAD * 2;
@@ -393,32 +388,16 @@ static void draw_ask(int selected, int ui) {
     kit_panel(card_x, ASK_CARD_Y, ASK_CARD_W, ASK_CARD_H);
     kit_mark(card_x + 24, ASK_CARD_Y + 22);
     kit_text(card_x + 24, ASK_CARD_Y + 48, 14, 0, KIT_SOFT, rows[selected], KIT_LEFT);
-    kit_text(card_x + 24, ASK_CARD_Y + 76, 16, 0, KIT_TEXT, ASK_NOTE[ui], KIT_LEFT);
+    kit_text(card_x + 24, ASK_CARD_Y + 76, 16, 0, KIT_TEXT, ui_wtext_in(ui, "confirm.note"), KIT_LEFT);
 
     int right = kit_width() - 32;
     /* Either face button confirms here, as the choice is not made yet: the game's own is shown. */
-    right = g_from_pad ? kit_hint(right, KIT_GLYPH_CIRCLE, WORD_SELECT[ui]) : kit_hint_key(right, L"Enter", WORD_SELECT[ui]);
-    kit_hint(right, KIT_GLYPH_DPAD, WORD_MOVE[ui]);
+    right = g_from_pad ? kit_hint(right, KIT_GLYPH_CIRCLE, ui_wtext_in(ui, "common.select")) : kit_hint_key(right, L"Enter", ui_wtext_in(ui, "common.select"));
+    kit_hint(right, KIT_GLYPH_DPAD, ui_wtext_in(ui, "common.move"));
 }
 
 /* ---- how the buttons and the notes look ------------------------------------------------ */
 
-static const wchar_t *const ICONS_QUESTION[UI_COUNT] = {
-    L"Which button icons?", L"\x30dc\x30bf\x30f3\x306e\x8868\x793a\x3092\x9078\x3093\x3067\x304f\x3060\x3055\x3044", L"Welche Tastensymbole?"};
-static const wchar_t *const NOTES_QUESTION[UI_COUNT] = {
-    L"How should the notes look?", L"\x30ce\x30fc\x30c4\x306e\x898b\x305f\x76ee\x3092\x9078\x3093\x3067\x304f\x3060\x3055\x3044",
-    L"Wie sollen die Noten aussehen?"};
-static const wchar_t *const WORD_ORIGINAL[UI_COUNT] = {L"PlayStation, as the game was made", L"PlayStation\xff08\x30aa\x30ea\x30b8\x30ca\x30eb\xff09",
-                                                       L"PlayStation, wie im Original"};
-static const wchar_t *const WORD_KEYS[UI_COUNT] = {L"Keyboard arrows", L"\x30ad\x30fc\x30dc\x30fc\x30c9", L"Tastatur-Pfeile"};
-static const wchar_t *const WORD_OK[UI_COUNT] = {L"Confirm", L"\x6c7a\x5b9a", L"Best\x00e4tigen"};
-static const wchar_t *const WORD_GO_BACK[UI_COUNT] = {L"Back", L"\x623b\x308b", L"Zur\x00fc\x0063k"};
-static const wchar_t *const ICONS_NOTE[UI_COUNT] = {
-    L"Xbox and Nintendo pads have A and B the other way round.", L"Xbox\x3068Nintendo\x3067\x306f A \x3068 B \x304c\x9006\x3067\x3059\x3002",
-    L"Bei Xbox und Nintendo sind A und B vertauscht."};
-static const wchar_t *const NOTES_NOTE[UI_COUNT] = {
-    L"As the notes and their targets will look in songs.", L"\x66f2\x306e\x4e2d\x3067\x306e\x30ce\x30fc\x30c4\x3068\x30bf\x30fc\x30b2\x30c3\x30c8\x3067\x3059\x3002",
-    L"So sehen Noten und Ziele in den Liedern aus."};
 
 /* The pictures the renderer draws the notes from, for the style being looked at. */
 static kit_picture g_note_pictures[4], g_targets, g_hand;
@@ -489,8 +468,8 @@ static void draw_notes_preview(int cx, int cy, int style) {
 
 static void draw_styles(int page, int selected, int ui) {
     const int notes = page == 2;
-    kit_clear(notes ? NOTES_QUESTION[ui] : ICONS_QUESTION[ui]);
-    const wchar_t *rows[4] = {WORD_ORIGINAL[ui], L"Xbox", L"Nintendo", WORD_KEYS[ui]};
+    kit_clear(notes ? ui_wtext_in(ui, "notes.question") : ui_wtext_in(ui, "icons.question"));
+    const wchar_t *rows[4] = {ui_wtext_in(ui, "icons.original"), L"Xbox", L"Nintendo", ui_wtext_in(ui, "notes.keys")};
     const int count = notes ? 4 : 3;
     kit_panel(ASK_X, ASK_Y, ASK_W, ASK_PAD * 2 + count * ASK_H + (count - 1) * ASK_GAP);
     const int row_x = ASK_X + ASK_PAD, row_w = ASK_W - ASK_PAD * 2;
@@ -510,24 +489,24 @@ static void draw_styles(int page, int selected, int ui) {
         const int ok = cross ? KIT_GLYPH_CROSS : KIT_GLYPH_CIRCLE, back = cross ? KIT_GLYPH_CIRCLE : KIT_GLYPH_CROSS;
         kit_glyph(hero_x - 90, ASK_HERO_Y, 56, ok, KIT_TEXT, KIT_ACCENT);
         kit_glyph(hero_x + 90, ASK_HERO_Y, 56, back, KIT_TEXT, KIT_ACCENT);
-        kit_text(hero_x - 90, ASK_HERO_Y + 82, 16, 1, KIT_TEXT, WORD_OK[ui], KIT_CENTRE);
-        kit_text(hero_x + 90, ASK_HERO_Y + 82, 16, 1, KIT_TEXT, WORD_GO_BACK[ui], KIT_CENTRE);
+        kit_text(hero_x - 90, ASK_HERO_Y + 82, 16, 1, KIT_TEXT, ui_wtext_in(ui, "common.confirm"), KIT_CENTRE);
+        kit_text(hero_x + 90, ASK_HERO_Y + 82, 16, 1, KIT_TEXT, ui_wtext_in(ui, "common.back"), KIT_CENTRE);
     }
     kit_panel(card_x, ASK_CARD_Y, ASK_CARD_W, ASK_CARD_H);
     kit_mark(card_x + 24, ASK_CARD_Y + 22);
-    kit_text(card_x + 24, ASK_CARD_Y + 48, 14, 0, KIT_SOFT, notes ? NOTES_NOTE[ui] : ICONS_NOTE[ui], KIT_LEFT);
-    kit_text(card_x + 24, ASK_CARD_Y + 76, 16, 0, KIT_TEXT, ASK_NOTE[ui], KIT_LEFT);
+    kit_text(card_x + 24, ASK_CARD_Y + 48, 14, 0, KIT_SOFT, notes ? ui_wtext_in(ui, "notes.note") : ui_wtext_in(ui, "icons.note"), KIT_LEFT);
+    kit_text(card_x + 24, ASK_CARD_Y + 76, 16, 0, KIT_TEXT, ui_wtext_in(ui, "confirm.note"), KIT_LEFT);
 
     int right = kit_width() - 32;
     const int cross = g_options.confirm_cross == 1;
     if (g_from_pad) {
-        right = kit_hint(right, cross ? KIT_GLYPH_CIRCLE : KIT_GLYPH_CROSS, WORD_GO_BACK[ui]);
-        right = kit_hint(right, cross ? KIT_GLYPH_CROSS : KIT_GLYPH_CIRCLE, WORD_SELECT[ui]);
+        right = kit_hint(right, cross ? KIT_GLYPH_CIRCLE : KIT_GLYPH_CROSS, ui_wtext_in(ui, "common.back"));
+        right = kit_hint(right, cross ? KIT_GLYPH_CROSS : KIT_GLYPH_CIRCLE, ui_wtext_in(ui, "common.select"));
     } else {
-        right = kit_hint_key(right, L"Esc", WORD_GO_BACK[ui]);
-        right = kit_hint_key(right, L"Enter", WORD_SELECT[ui]);
+        right = kit_hint_key(right, L"Esc", ui_wtext_in(ui, "common.back"));
+        right = kit_hint_key(right, L"Enter", ui_wtext_in(ui, "common.select"));
     }
-    kit_hint(right, KIT_GLYPH_DPAD, WORD_MOVE[ui]);
+    kit_hint(right, KIT_GLYPH_DPAD, ui_wtext_in(ui, "common.move"));
 }
 
 /* The buttons' icons, then the confirm button, drawn in the icons chosen, then the notes, going
@@ -537,7 +516,7 @@ void controls_ask_confirm(void) {
         if (g_options.confirm_cross < 0) g_options.confirm_cross = 0;
         return;
     }
-    const int ui = language_ui();
+    const int ui = ui_text_language();
     static const int ASKS[3] = {1, 0, 2};
     int page = 0;
     /* A note skin is not among this screen's styles: it starts from the game's own, and stays if left so. */
@@ -589,23 +568,10 @@ void controls_ask_confirm(void) {
 /* ---- the buttons ---------------------------------------------------------------------- */
 
 /* In the window's order. */
-static const wchar_t *const BUTTON_NAME[UI_COUNT][PSP_BIND_COUNT] = {
-    [UI_ENGLISH] = {L"Up", L"Right", L"Down", L"Left", L"South", L"East", L"West", L"North", L"L", L"R", L"Start", L"Select"},
-    [UI_JAPANESE] = {L"\x4e0a", L"\x53f3", L"\x4e0b", L"\x5de6", L"\x4e0b\x30dc\x30bf\x30f3", L"\x53f3\x30dc\x30bf\x30f3", L"\x5de6\x30dc\x30bf\x30f3", L"\x4e0a\x30dc\x30bf\x30f3", L"L", L"R", L"\x30b9\x30bf\x30fc\x30c8", L"\x30bb\x30ec\x30af\x30c8"},
-    [UI_GERMAN] = {L"Hoch", L"Rechts", L"Runter", L"Links", L"S\x00fc" L"d", L"Ost", L"West", L"Nord", L"L", L"R", L"Start", L"Select"},
-};
-static const wchar_t *const WORD_KEYBOARD[UI_COUNT] = {L"Keyboard", L"\x30ad\x30fc\x30dc\x30fc\x30c9", L"Tastatur"};
-static const wchar_t *const WORD_KEYBOARD2[UI_COUNT] = {L"Second key", L"\x7b2c\xff12\x30ad\x30fc", L"Zweite Taste"};
-static const wchar_t *const WORD_CONTROLLER[UI_COUNT] = {L"Controller", L"\x30b3\x30f3\x30c8\x30ed\x30fc\x30e9\x30fc", L"Controller"};
-static const wchar_t *const WORD_RESET[UI_COUNT] = {L"Back to how they were", L"\x521d\x671f\x8a2d\x5b9a\x306b\x623b\x3059", L"Zur\x00fc\x0063ksetzen"};
-static const wchar_t *const WORD_DONE[UI_COUNT] = {L"Done", L"\x7d42\x4e86", L"Fertig"};
-static const wchar_t *const WORD_PRESS[UI_COUNT] = {L"Press the new one, or wait to keep it as it is", L"\x65b0\x3057\x3044\x30dc\x30bf\x30f3\x3092\x62bc\x3057\x3066\x304f\x3060\x3055\x3044", L"Neue Taste dr\x00fc\x0063ken, oder warten"};
-static const wchar_t *const WORD_PRESS2[UI_COUNT] = {L"Press the new one, or the same one to take it off", L"\x65b0\x3057\x3044\x30ad\x30fc\x3092\x62bc\x3057\x3066\x304f\x3060\x3055\x3044\xff08\x540c\x3058\x30ad\x30fc\x3067\x89e3\x9664\xff09", L"Neue Taste dr\x00fc\x0063ken, gleiche Taste entfernt sie"};
-static const wchar_t *const WORD_TITLE[UI_COUNT] = {L"Controls", L"\x30dc\x30bf\x30f3\x8a2d\x5b9a", L"Steuerung"};
-static const wchar_t *const WORD_BUTTON[UI_COUNT] = {L"Button", L"\x30dc\x30bf\x30f3", L"Taste"};
-static const wchar_t *const WORD_CHANGE[UI_COUNT] = {L"Change", L"\x5909\x66f4", L"\x00c4ndern"};
-static const wchar_t *const WORD_RESTART[UI_COUNT] = {L"Quick restart", L"\x30af\x30a4\x30c3\x30af\x30ea\x30b9\x30bf\x30fc\x30c8", L"Schnellneustart"};
-static const wchar_t *const WORD_BACK[UI_COUNT] = {L"Back", L"\x623b\x308b", L"Zur\x00fc\x0063k"};
+/* The buttons' names, by key in lang\<code>_ui.txt. */
+static const char *const BUTTON_NAME[PSP_BIND_COUNT] = {"controls.up", "controls.right", "controls.down", "controls.left", "controls.south",
+                                                        "controls.east", "controls.west", "controls.north", "controls.l", "controls.r",
+                                                        "controls.start", "controls.select"};
 
 /* Where the buttons are, not what is printed on them, so that it holds for every controller. */
 static const struct {
@@ -680,9 +646,9 @@ static void draw_buttons(int row, int column, int waiting, int ui) {
         cell_x[c] = LIST_X + (CELL_X[c] - LIST_X) * list_w / LIST_W;
         cell_w[c] = CELL_W[c] * list_w / LIST_W;
     }
-    kit_clear(WORD_TITLE[ui]);
-    const wchar_t *const heads[COLUMN_COUNT] = {WORD_KEYBOARD[ui], WORD_KEYBOARD2[ui], WORD_CONTROLLER[ui]};
-    kit_text(NAME_X, HEAD_Y, 13, 1, KIT_SOFT, WORD_BUTTON[ui], KIT_LEFT);
+    kit_clear(ui_wtext_in(ui, "controls.title"));
+    const wchar_t *const heads[COLUMN_COUNT] = {ui_wtext_in(ui, "controls.keyboard"), ui_wtext_in(ui, "controls.second_key"), ui_wtext_in(ui, "controls.controller")};
+    kit_text(NAME_X, HEAD_Y, 13, 1, KIT_SOFT, ui_wtext_in(ui, "controls.button"), KIT_LEFT);
     for (int c = 0; c < COLUMN_COUNT; c++) {
         kit_text(cell_x[c] + CELL_PAD, HEAD_Y, 13, 1, c == column ? KIT_ACCENT : KIT_SOFT, heads[c], KIT_LEFT);
     }
@@ -691,16 +657,16 @@ static void draw_buttons(int row, int column, int waiting, int ui) {
         const int y = row_y(i), mid = y + LIST_ROW_H / 2, on = i == row;
         if (i == ROW_RESET || i == ROW_DONE) {
             if (on) kit_selected((kit_width() - END_W) / 2, y, END_W, LIST_ROW_H);
-            kit_text(kit_width() / 2, mid, CELL_TEXT, 1, on ? KIT_INK : KIT_TEXT, i == ROW_RESET ? WORD_RESET[ui] : WORD_DONE[ui], KIT_CENTRE);
+            kit_text(kit_width() / 2, mid, CELL_TEXT, 1, on ? KIT_INK : KIT_TEXT, i == ROW_RESET ? ui_wtext_in(ui, "controls.reset") : ui_wtext_in(ui, "controls.done"), KIT_CENTRE);
             continue;
         }
         if (on) kit_faint(LIST_X + 8, y, list_w - 16, LIST_ROW_H);
         else if (i + 1 != row && i + 1 < ROW_RESET) kit_rule(LIST_X + 24, y + LIST_ROW_H + LIST_ROW_GAP / 2, list_w - 48);
-        kit_text(NAME_X, mid, CELL_TEXT, 1, KIT_TEXT, i == ROW_RESTART ? WORD_RESTART[ui] : BUTTON_NAME[ui][i], KIT_LEFT);
+        kit_text(NAME_X, mid, CELL_TEXT, 1, KIT_TEXT, i == ROW_RESTART ? ui_wtext_in(ui, "controls.restart") : ui_wtext_in(ui, BUTTON_NAME[i]), KIT_LEFT);
         /* The face buttons, in the window's order, with their signs drawn after the name. */
         static const int FACE[4] = {KIT_GLYPH_CROSS, KIT_GLYPH_CIRCLE, KIT_GLYPH_SQUARE, KIT_GLYPH_TRIANGLE};
         if (i >= 4 && i < 8) {
-            kit_glyph(NAME_X + kit_text_width(CELL_TEXT, 1, BUTTON_NAME[ui][i]) + 18, mid, 9, FACE[i - 4], KIT_SOFT, KIT_ACCENT);
+            kit_glyph(NAME_X + kit_text_width(CELL_TEXT, 1, ui_wtext_in(ui, BUTTON_NAME[i])) + 18, mid, 9, FACE[i - 4], KIT_SOFT, KIT_ACCENT);
         }
         for (int c = 0; c < COLUMN_COUNT; c++) {
             wchar_t name[64];
@@ -728,18 +694,18 @@ static void draw_buttons(int row, int column, int waiting, int ui) {
         }
     }
     if (waiting) {
-        kit_hint_note(column == COLUMN_KEY2 ? WORD_PRESS2[ui] : WORD_PRESS[ui]);
+        kit_hint_note(column == COLUMN_KEY2 ? ui_wtext_in(ui, "controls.press_key") : ui_wtext_in(ui, "controls.press"));
     } else {
         int right = kit_width() - 32;
         if (g_from_pad) {
             const int cross = g_options.confirm_cross == 1;
-            right = kit_hint(right, cross ? KIT_GLYPH_CIRCLE : KIT_GLYPH_CROSS, WORD_BACK[ui]);
-            right = kit_hint(right, cross ? KIT_GLYPH_CROSS : KIT_GLYPH_CIRCLE, WORD_CHANGE[ui]);
+            right = kit_hint(right, cross ? KIT_GLYPH_CIRCLE : KIT_GLYPH_CROSS, ui_wtext_in(ui, "common.back"));
+            right = kit_hint(right, cross ? KIT_GLYPH_CROSS : KIT_GLYPH_CIRCLE, ui_wtext_in(ui, "controls.change"));
         } else {
-            right = kit_hint_key(right, L"Esc", WORD_BACK[ui]);
-            right = kit_hint_key(right, L"Enter", WORD_CHANGE[ui]);
+            right = kit_hint_key(right, L"Esc", ui_wtext_in(ui, "common.back"));
+            right = kit_hint_key(right, L"Enter", ui_wtext_in(ui, "controls.change"));
         }
-        kit_hint(right, KIT_GLYPH_DPAD, WORD_MOVE[ui]);
+        kit_hint(right, KIT_GLYPH_DPAD, ui_wtext_in(ui, "common.move"));
     }
 }
 
@@ -872,7 +838,7 @@ void controls_change_buttons(void) {
         fprintf(stderr, "controls: the Controls screen could not open\n");
         return;
     }
-    const int ui = language_ui();
+    const int ui = ui_text_language();
     int row = 0, column = 0;
     menu_input was = {1, 1, 1, 1, 1, 1};
     draw_buttons(row, column, 0, ui);

@@ -9,6 +9,7 @@
 #include "options.h"
 #include "settings.h"
 #include "translation.h"
+#include "ui_text.h"
 
 #include <psprecomp/render.h>
 
@@ -22,12 +23,6 @@ void language_start(const char *data_dir) {
 }
 
 const char *language_data_dir(void) { return g_data_dir; }
-
-int language_ui(void) {
-    if (!strcmp(g_options.language, "ja")) return UI_JAPANESE;
-    if (!strcmp(g_options.language, "de")) return UI_GERMAN;
-    return UI_ENGLISH;
-}
 
 static int g_vectors_off;
 
@@ -78,6 +73,7 @@ void language_apply(const char *code) {
     snprintf(g_options.language, sizeof g_options.language, "%s", chosen);
 
     const int japanese = !strcmp(chosen, "ja");
+    ui_text_set_language(chosen);
     translation_set_language(chosen);
     char pictures[1200];
     snprintf(pictures, sizeof pictures, "%s\\..\\lang\\%s", g_data_dir, chosen);

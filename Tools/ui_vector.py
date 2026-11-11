@@ -104,6 +104,22 @@ TEXTURE_FROM = (120, 108, 132, 96)  # how far right, on the same row, the window
 BUTTON_WORD_AT = 18    # where a button's word starts, after its sign and colon
 WINDOW_ROUND = 3.5       # the message window's corners, round
 
+def ui_words(language):
+    """{key: text} of lang/<language>_ui.txt, the project's words in that language."""
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lang', '%s_ui.txt' % language)
+    words = {}
+    if not os.path.exists(path):
+        return words
+    with open(path, encoding='utf-8-sig') as f:
+        for line in f:
+            line = line.rstrip('\r\n')
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            key, text = line.split('=', 1)
+            words[key.strip()] = text[1:] if text.startswith(' ') else text
+    return words
+
+
 # Letters on a grid of three by six, so that all of them on any sign are the same size.
 LETTERS = {
     'S': ('###', '#.#', '#..', '###', '..#', '###'),
@@ -723,10 +739,7 @@ TITLES = (
 
 # ---- the title screen: its menu's words and PRESS START drawn in each language in the game's
 # squared letters, the notice below them in the font, and the logo traced from its own pixels.
-TITLE_WORDS = {
-    'en': ('NEW GAME', 'LOAD GAME', 'ADHOC MODE', 'PRESS START BUTTON'),
-    'de': ('NEUES SPIEL', 'SPIEL LADEN', 'AD-HOC-MODUS', 'START DRÜCKEN'),
-}
+TITLE_WORDS = ('pictures.title.new_game', 'pictures.title.load_game', 'pictures.title.adhoc', 'pictures.title.press_start')
 TITLE_NOTICE = '©SEGA / ©Crypton Future Media, Inc.'
 TITLE_NAVY = (36, 67, 85)
 TITLE_DIM = (70, 100, 118)
@@ -796,7 +809,7 @@ def title_sheet(archive, drawer, folder, words):
 
 # ---- the demo after the title, with PRESS START in its corner. The makers' logos before it are left as
 # the game has them: traced, they came out with too many flaws.
-DEMO_WORDS = {'en': 'PRESS START BUTTON', 'de': 'START DRÜCKEN'}
+DEMO_WORD = 'pictures.title.press_start'
 DEMO_LINE = 'Project DIVA Start...'
 DEMO_SHADOW = (40, 40, 40)
 
@@ -2411,10 +2424,7 @@ HINT_ROWS = 11   # a hint's height on the sheet
 # says so (psp_render_gl_footer_extras), or, with "extra_with <number> <u> <v>", whenever the game's
 # hint at that place on the sheet is shown, from its first frame. In order: sorting with Select, the
 # module with L and R; both come with the song list's PV hint, which no other screen has.
-EXTRA_HINTS = {
-    'en': (('basic_sele_sort', 'Sort'), ('basic_lr_module', 'Module'), ('basic_start_practice', 'Practice')),
-    'de': (('basic_sele_sort', 'Sortieren'), ('basic_lr_module', 'Modul'), ('basic_start_practice', 'Übung')),
-}
+EXTRA_HINTS = ('basic_sele_sort', 'basic_lr_module', 'basic_start_practice')   # their words: pictures.hint.<last part>
 EXTRA_WITH = {'basic_sele_sort': 'basic_tri_pvappr.png', 'basic_lr_module': 'basic_tri_pvappr.png',
               'basic_start_practice': 'basic_tri_pvappr.png'}
 
@@ -2451,7 +2461,9 @@ def sheet_of_hints(archive, labels, drawer, out, sign_set):
             pieces.append('hint %d %d %d %d %d %d %d %d' % (x, y, bw, bh, whole[0], whole[1], natural, bh + SPARE_BELOW))
             spare_x += natural + SPARE_GAP
     language = os.path.basename(os.path.normpath(out)).split('_')[0]
-    for number, (name, text) in enumerate(EXTRA_HINTS.get(language, ())):
+    words = ui_words(language)
+    hints = [(name, words.get('pictures.hint.' + name.split('_', 2)[2])) for name in EXTRA_HINTS]
+    for number, (name, text) in enumerate((name, text) for name, text in hints if text):
         start = signs_of(name, sign_set)[1]
         natural = hint_width(name, start, text, drawer)
         bh = HINT_ROWS
@@ -3150,14 +3162,15 @@ def main():
             card_signs(sign_set, folder)
     titles(archive, out)
     language = os.path.basename(os.path.normpath(out))
-    if language in TITLE_WORDS:
-        title_sheet(archive, drawer, out, TITLE_WORDS[language])
+    words = ui_words(language)
+    if all(k in words for k in TITLE_WORDS):
+        title_sheet(archive, drawer, out, tuple(words[k] for k in TITLE_WORDS))
         # Japanese has no pictures of its own here, and its title has these words in English.
-        demo_start_sheet(archive, family, out, DEMO_WORDS[language])
+        demo_start_sheet(archive, family, out, words[DEMO_WORD])
         if language == 'en':
             everyone = os.path.dirname(os.path.dirname(os.path.normpath(out)))
-            title_sheet(archive, drawer, everyone, TITLE_WORDS['en'])
-            demo_start_sheet(archive, family, everyone, DEMO_WORDS['en'])
+            title_sheet(archive, drawer, everyone, tuple(words[k] for k in TITLE_WORDS))
+            demo_start_sheet(archive, family, everyone, words[DEMO_WORD])
     sheet_of_arrows(archive, out)
     sheet_of_icons(archive, family, out)
     sheet_of_card(archive, out)

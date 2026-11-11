@@ -1,7 +1,8 @@
 /* The question of which language to play in, before the game's title.
  *
  * The game is held while this shows, in a window of its own over the game's, drawn by
- * screen_kit.c. To add a language, add a line to LANGUAGES and a function for its flag.
+ * screen_kit.c. The languages and their words are those of lang\languages.txt and <code>_ui.txt
+ * (ui_text.c); a language's flag is a function here, in FLAGS.
  *
  * Set language_prompt = 0 to see it only when no choice has been saved.
  */
@@ -10,6 +11,7 @@
 
 #include "options.h"
 #include "screen_kit.h"
+#include "ui_text.h"
 
 #include <psprecomp/window.h>
 
@@ -64,30 +66,33 @@ static void flag_austria(double x, double y, double *r, double *g, double *b) {
     else set(r, g, b, 255, 255, 255);
 }
 
+/* A language with no flag here has a plain one. */
+static void flag_none(double x, double y, double *r, double *g, double *b) {
+    (void)x;
+    (void)y;
+    set(r, g, b, 200, 200, 210);
+}
+
 static const struct {
     const char *code;
-    const wchar_t *name;
     kit_flag_fn flag;
-    const wchar_t *question;
-    const wchar_t *note[4];
-    const wchar_t *select, *move;
-} LANGUAGES[] = {
-    {"en", L"English", flag_uk, L"Select a language",
-     {L"Menus and dialogue will use this", L"language. Songs keep their", L"Japanese audio.", L"You can change it later in Options."},
-     L"Select", L"Move"},
-    {"ja", L"日本語", flag_japan, L"言語を選択してください",
-     {L"メニューと会話の言語を設定します。", L"楽曲の音声は日本語のままです。", L"", L"オプションで後から変更できます。"},
-     L"決定", L"移動"},
-    {"de", L"Deutsch", flag_austria, L"Sprache wählen",
-     {L"Menüs und Dialoge nutzen diese", L"Sprache. Die Lieder bleiben", L"auf Japanisch.", L"Später unter Optionen änderbar."},
-     L"Auswählen", L"Bewegen"},
-};
-#define NUM_LANGUAGES ((int)(sizeof LANGUAGES / sizeof LANGUAGES[0]))
+} FLAGS[] = {{"en", flag_uk}, {"ja", flag_japan}, {"de", flag_austria}};
+
+static kit_flag_fn flag_of(int language) {
+    for (size_t i = 0; i < sizeof FLAGS / sizeof FLAGS[0]; i++)
+        if (!strcmp(FLAGS[i].code, ui_text_code(language))) return FLAGS[i].flag;
+    return flag_none;
+}
+
+#define NUM_LANGUAGES ui_text_languages()
 
 static void draw_screen(int selected) {
-    kit_clear(LANGUAGES[selected].question);
-    /* The same question in another language, for whoever cannot read this one. */
-    kit_text(LIST_X + 16, 82, 14, 0, KIT_SOFT, LANGUAGES[selected == 0 ? 1 : 0].question, KIT_LEFT);
+    kit_clear(ui_wtext_in(selected, "language.question"));
+    /* The same question in another language, for whoever cannot read this one: English, or Japanese
+     * when English is the one chosen. */
+    const int english = ui_text_find("en"), japanese = ui_text_find("ja");
+    const int other = selected == english && japanese >= 0 ? japanese : english;
+    kit_text(LIST_X + 16, 82, 14, 0, KIT_SOFT, ui_wtext_in(other, "language.question"), KIT_LEFT);
 
     kit_panel(LIST_X, LIST_Y, LIST_W, ROW_PAD * 2 + NUM_LANGUAGES * (ROW_H + ROW_GAP) - ROW_GAP);
     const int row_x = LIST_X + ROW_PAD, row_w = LIST_W - ROW_PAD * 2;
@@ -95,32 +100,33 @@ static void draw_screen(int selected) {
         const int y = LIST_Y + ROW_PAD + i * (ROW_H + ROW_GAP), on = i == selected;
         if (on) kit_selected(row_x, y, row_w, ROW_H);
         else if (i + 1 != selected && i + 1 < NUM_LANGUAGES) kit_rule(row_x + 16, y + ROW_H + ROW_GAP / 2, row_w - 32);
-        kit_flag(row_x + 30, y + ROW_H / 2, FLAG_R, LANGUAGES[i].flag);
-        kit_text(row_x + 58, y + ROW_H / 2, 19, 1, on ? KIT_INK : KIT_TEXT, LANGUAGES[i].name, KIT_LEFT);
+        kit_flag(row_x + 30, y + ROW_H / 2, FLAG_R, flag_of(i));
+        kit_text(row_x + 58, y + ROW_H / 2, 19, 1, on ? KIT_INK : KIT_TEXT, ui_text_native_name(i), KIT_LEFT);
     }
 
     /* The list keeps to the left edge, and what it shows to the right one. */
     const int hero_x = kit_right(HERO_X), card_x = kit_right(CARD_X);
     kit_halo(hero_x, HERO_Y, HERO_R * 2);
-    kit_flag(hero_x, HERO_Y, HERO_R, LANGUAGES[selected].flag);
+    kit_flag(hero_x, HERO_Y, HERO_R, flag_of(selected));
 
     kit_panel(card_x, CARD_Y, CARD_W, CARD_H);
     kit_mark(card_x + 24, CARD_Y + 22);
-    kit_text(card_x + 24, CARD_Y + 48, 14, 0, KIT_SOFT, LANGUAGES[selected].name, KIT_LEFT);
+    kit_text(card_x + 24, CARD_Y + 48, 14, 0, KIT_SOFT, ui_text_native_name(selected), KIT_LEFT);
+    static const char *const NOTE[4] = {"language.note1", "language.note2", "language.note3", "language.note4"};
     for (int i = 0; i < 4; i++) {
-        kit_text(card_x + 24, CARD_Y + 78 + i * 22, 16, 0, KIT_TEXT, LANGUAGES[selected].note[i], KIT_LEFT);
+        kit_text(card_x + 24, CARD_Y + 78 + i * 22, 16, 0, KIT_TEXT, ui_wtext_in(selected, NOTE[i]), KIT_LEFT);
     }
 
     int right = kit_width() - 32;
     /* The button the player confirms with, Circle until they have chosen. */
-    right = kit_hint(right, g_options.confirm_cross == 1 ? KIT_GLYPH_CROSS : KIT_GLYPH_CIRCLE, LANGUAGES[selected].select);
-    kit_hint(right, KIT_GLYPH_DPAD, LANGUAGES[selected].move);
+    right = kit_hint(right, g_options.confirm_cross == 1 ? KIT_GLYPH_CROSS : KIT_GLYPH_CIRCLE, ui_wtext_in(selected, "common.select"));
+    kit_hint(right, KIT_GLYPH_DPAD, ui_wtext_in(selected, "common.move"));
 }
 
 const char *language_screen_run(const char *current, const char *disc) {
     int selected = 0;
     for (int i = 0; i < NUM_LANGUAGES; i++) {
-        if (!strcmp(LANGUAGES[i].code, current)) selected = i;
+        if (!strcmp(ui_text_code(i), current)) selected = i;
     }
     if (!kit_open(disc)) return current;
     fprintf(stderr, "language screen: shown\n");
@@ -150,5 +156,5 @@ const char *language_screen_run(const char *current, const char *disc) {
     /* The press that answered is not for the title screen that comes next. */
     kit_wait_for_release();
     kit_close();
-    return LANGUAGES[selected].code;
+    return ui_text_code(selected);
 }

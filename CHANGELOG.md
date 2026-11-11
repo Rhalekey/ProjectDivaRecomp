@@ -6,6 +6,13 @@ The recompiler's own changes are in the [psprecomp fork](https://github.com/Rhal
 
 ## 2026-11-11
 
+### Languages
+- **This project's own words in files**: the words of its menus, screens and messages, about 170 in each language, were in ten C files in four encodings. They are now in `lang\<code>_ui.txt`, `key = text` in UTF-8, read by `src/host/ui_text.c`, which gives each word as the game's font, the screens or the messages need it. The words drawn into the title screen's and the song list's pictures are there too, out of `Tools/ui_vector.py`. A word missing from a language shows in English.
+- **One list of languages**: `lang\languages.txt`, read by the language screen, the translation tables and the build. A language is added with its files and a flag.
+- **Accented letters**: `lang\letters.txt` lists the letters the game's font lacks and the characters it never shows that they are drawn over, read by the game and by `Tools/hd_font.py`. It has German's and those French, Spanish and Italian need, 53 in all. Before, German's seven were written out in four places.
+- The game's memory keeps the translation and the Options rows' words of the language being played only, where it kept those of every language, so more languages take nothing from the game.
+- The build draws the pictures of several languages at once, as many as the computer has processors and free memory for (about 400 MB each), in `Tools/lang_pictures.ps1`; on one processor, one at a time as before. English and German took 5 minutes in place of 11 on four.
+
 ### System screens
 - **Ad Hoc over the local network**: Send Data and Receive Data reach other computers on the same network, or another copy of the game on the same computer, instead of the PSP's own wireless. Each copy says on the network who it is and which room it is in, a few times a second; rooms are found by those messages, and Edits go straight to the other computer, sent again until it confirms them. Others see the computer's name. `Tools\build.ps1 -Second` starts a second copy, with its own Memory Stick holding a copy of the main save and the options only, to try it on one computer.
 - For it, in the recompiler: `sceNet`, `sceNetAdhoc`, `sceNetAdhocctl` and `sceNetAdhocMatching` over UDP, and Netconf's ad hoc dialog joining its room. The game's handlers are called at a frame's wait of the thread that uses the network: called at any wait, one ran inside the game's own allocator and the game crashed once the last data arrived.

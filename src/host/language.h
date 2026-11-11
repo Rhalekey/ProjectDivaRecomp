@@ -1,17 +1,11 @@
 #ifndef DIVA_LANGUAGE_H
 #define DIVA_LANGUAGE_H
 
-/* The languages the project's own words are written in. */
-enum { UI_ENGLISH, UI_JAPANESE, UI_GERMAN, UI_COUNT };
-
-/* The one being played, which is English for any it has no words in. */
-int language_ui(void);
-
 void language_start(const char *data_dir);
 /* The folder the saves and the made pictures are found from, as given to language_start. */
 const char *language_data_dir(void);
 
-/* Play in this language from now on: "ja", "en" or "de". It does not save the choice. */
+/* Play in this language from now on, by its code in lang\languages.txt. It does not save the choice. */
 void language_apply(const char *code);
 
 /* Whether the menus' pieces are drawn from vectors or are the game's own. */
