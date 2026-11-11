@@ -38,6 +38,8 @@ int model_load_pmx(const char *path, model *m, char *err, size_t errlen);
 /* Collapses edges until at most `target` triangles are left (or no more can go without tearing or
  * turning a triangle over). Returns how many are left. */
 int model_simplify(model *m, int target);
+/* The model's head bone, matched by name as the conversion matches it; -1 if none. */
+int model_head_bone(const model *m);
 void model_free(model *m);
 
 /* Decompresses zlib data (as FBX arrays are) into out, of the size expected; nonzero if done. */

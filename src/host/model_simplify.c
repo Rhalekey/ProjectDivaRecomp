@@ -174,6 +174,31 @@ int model_simplify(model *m, int target) {
     free(next);
 
     quadric *Q = (quadric *)calloc((size_t)nv, sizeof(quadric));
+    /* Each vertex's share of the area around it, and the model's height: a collapse costs the
+     * picture's moving too, or a flat face full of detail (eyes, a mouth) would be flattened into a
+     * smear, its shape kept and its picture not. */
+    double *area = (double *)calloc((size_t)(nv ? nv : 1), sizeof(double));
+    float low = 1e30f, high = -1e30f;
+    for (int v = 0; v < nv; v++) {
+        if (vs[v].c.pos[1] < low) low = vs[v].c.pos[1];
+        if (vs[v].c.pos[1] > high) high = vs[v].c.pos[1];
+    }
+    const double uv_weight = (high > low ? (high - low) : 1.0) * (high > low ? (high - low) : 1.0) * 0.25;
+    /* What the head moves weighs more: the camera comes close to the face, and its eyes and mouth
+     * are small parts on a flat face that would go first. */
+    double *importance = (double *)malloc((size_t)(nv ? nv : 1) * sizeof(double));
+    uint8_t *in_head = (uint8_t *)calloc((size_t)(m->nbones ? m->nbones : 1), 1);
+    const int head_bone = model_head_bone(m);
+    for (int b = 0; b < m->nbones && head_bone >= 0; b++)
+        for (int a = b, guard = 0; a >= 0 && guard < 256; a = m->bones[a].parent, guard++)
+            if (a == head_bone) { in_head[b] = 1; break; }
+    for (int v = 0; v < nv; v++) {
+        double share = 0;
+        for (int k = 0; k < MODEL_WEIGHTS; k++)
+            if (vs[v].c.bone[k] >= 0 && vs[v].c.bone[k] < m->nbones && in_head[vs[v].c.bone[k]]) share += vs[v].c.weight[k];
+        importance[v] = 1.0 + 5.0 * (share > 1 ? 1 : share);
+    }
+    free(in_head);
     for (int t = 0; t < ntri; t++) {
         triangle *tr = &ts[t];
         for (int k = 0; k < 3; k++) tr->v[k] = vid[t * 3 + k];
@@ -189,6 +214,7 @@ int model_simplify(model *m, int target) {
         const float *p = vs[tr->v[0]].c.pos;
         const double d = -(a * p[0] + b * p[1] + c * p[2]);
         for (int k = 0; k < 3; k++) q_add_plane(&Q[tr->v[k]], a, b, c, d, len * 0.5);
+        for (int k = 0; k < 3; k++) area[tr->v[k]] += len * 0.5 / 3.0;
     }
     free(vid);
     /* Open edges, of only one triangle: their ends marked, and a plane standing on each, across
@@ -222,7 +248,9 @@ int model_simplify(model *m, int target) {
         const int f_ = (from), t_ = (to);                                                                                    \
         if (!vs[f_].gone && !vs[t_].gone && (!vs[f_].locked || vs[t_].locked) &&                                             \
             (!vs[f_].boundary || (vs[t_].boundary && sharing(vs, ts, f_, t_) == 1))) {                                       \
-            collapse c_ = {q_error(&Q[f_], &Q[t_], vs[t_].c.pos), f_, t_, vs[f_].version, vs[t_].version};                   \
+            const double du_ = vs[f_].c.uv[0] - vs[t_].c.uv[0], dv_ = vs[f_].c.uv[1] - vs[t_].c.uv[1];                      \
+            const double cost_ = importance[f_] * (q_error(&Q[f_], &Q[t_], vs[t_].c.pos) + uv_weight * area[f_] * (du_ * du_ + dv_ * dv_)); \
+            collapse c_ = {cost_, f_, t_, vs[f_].version, vs[t_].version};                                                   \
             heap_push(&h, c_);                                                                                               \
         }                                                                                                                    \
     } while (0)
@@ -298,6 +326,7 @@ int model_simplify(model *m, int target) {
             u->gone = 1;
             v->version++;
             for (int i = 0; i < 10; i++) Q[to[j]].q[i] += Q[from[j]].q[i];
+            area[to[j]] += area[from[j]];
             /* Out of its ring of twins. */
             int p = from[j];
             while (twin[p] != from[j]) p = twin[p];
@@ -335,6 +364,8 @@ int model_simplify(model *m, int target) {
     free(vs);
     free(ts);
     free(Q);
+    free(importance);
+    free(area);
     free(twin);
     free(h.a);
     if (!corners || !material) { free(corners); free(material); return ntri; }

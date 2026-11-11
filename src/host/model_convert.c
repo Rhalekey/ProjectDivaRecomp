@@ -142,6 +142,20 @@ static void stem_of(const char *name, char *out, size_t size, int *side) {
     }
 }
 
+int model_head_bone(const model *m) {
+    for (int r = 0; r < NRULES; r++) {
+        if (strcmp(RULES[r].miku, "head")) continue;
+        for (int k = 0; RULES[r].names[k]; k++)
+            for (int i = 0; i < m->nbones; i++) {
+                char stem[96];
+                int side;
+                stem_of(m->bones[i].name, stem, sizeof stem, &side);
+                if (!side && !strcmp(stem, RULES[r].names[k])) return i;
+            }
+    }
+    return -1;
+}
+
 /* Her bone's full name for a rule and a side. */
 static void miku_name(const bone_rule *r, int side, char *out, size_t size) {
     if (!sided(r->miku)) snprintf(out, size, "%s", r->miku);
@@ -199,6 +213,30 @@ enum {
     BODY_SET = 25, BODY_ATTRS = 27, BODY_ATTRS_MEM = 36, BODY_TEXBIND = 21, BODY_TEXATTR = 19, BODY_MIPMAPS = 20, BODY_CLUT = 64,
     SKINNED_KIDS = 272          /* the skinned graph's children: body3 and the sleeves */
 };
+
+/* Slots of module 0's head file: hair1, the attribute set her skinned hair is drawn with, under the
+ * skinned graph whose blend matrices are her head skeleton's (0 is head_o), and what it holds. */
+enum {
+    H_SET = 82, H_NODES = 83, H_NODES_MEM = 0, H_ATTRS = 84, H_ATTRS_MEM = 163, H_TEXBIND = 30, H_TEXATTR = 29, H_MIPMAPS = 294,
+    H_IMAGE = 201, H_CLUT = 42, H_GEOMETRY = 301, H_EMPTY_NODES = 1, H_GEO_ATTRS = 278, H_GEO_ATTRS_MEM = 202, H_GA = 375,
+    H_VA = 356, H_COMPS = 374, H_POS = 393, H_NRM = 394, H_COL = 395, H_UV = 397, H_W = 396, H_IX = 392,
+    HEAD_KIDS = 338, H_KIDS_MEM = 339
+};
+
+static int head_template_is_known(const igb *g) {
+    static const struct { int slot; const char *cls; } CHECK[] = {
+        {H_SET, "igAttrSet"}, {H_NODES, "igNodeList"}, {H_ATTRS, "igAttrList"}, {H_TEXBIND, "igTextureBindAttr"}, {H_TEXATTR, "igTextureAttr"},
+        {H_MIPMAPS, "igImageMipMapList"}, {H_IMAGE, "igImage"}, {H_CLUT, "igClut"}, {H_GEOMETRY, "igGeometry"}, {H_EMPTY_NODES, "igNodeList"},
+        {H_GEO_ATTRS, "igAttrList"}, {H_GA, "igGeometryAttr1_5"}, {H_VA, "igVertexArray1_1"}, {HEAD_KIDS, "igNodeList"}};
+    for (size_t i = 0; i < sizeof CHECK / sizeof CHECK[0]; i++) {
+        const char *c = igb_class(g, CHECK[i].slot);
+        if (!c || strcmp(c, CHECK[i].cls)) return 0;
+    }
+    static const int MEMORY[] = {H_NODES_MEM, H_ATTRS_MEM, H_GEO_ATTRS_MEM, H_COMPS, H_POS, H_NRM, H_COL, H_UV, H_W, H_IX, H_KIDS_MEM};
+    for (size_t i = 0; i < sizeof MEMORY / sizeof MEMORY[0]; i++)
+        if (igb_is_object(g, MEMORY[i])) return 0;
+    return 1;
+}
 
 static int template_is_known(const igb *g) {
     static const struct { int slot; const char *cls; } CHECK[] = {
@@ -284,18 +322,20 @@ static void shrink_all(igb *g, int upto) {
                 igb_set_memory(g, block, three, 4);
             }
         } else if (!strcmp(c, "igVec3fList")) {
-            if ((uint32_t)igb_field_i32(g, s, 0) != HAND_VERTICES) continue;
+            /* A pose's moves of every vertex (her hands' and her face's). */
+            if (igb_field_i32(g, s, 0) <= 3) continue;
             const int block = igb_field_i32(g, s, 2);
             const uint8_t zero[36] = {0};
             if (block >= 0 && !igb_is_object(g, block)) igb_set_memory(g, block, zero, 36);
             igb_set_i32(g, s, 0, 3);
             igb_set_i32(g, s, 1, 3);
         } else if (!strcmp(c, "igIntList")) {
-            /* The vertices each pose moves, and an end mark after them. */
-            if ((uint32_t)igb_field_i32(g, s, 0) != HAND_VERTICES + 1) continue;
+            /* The vertices each pose moves, and an end mark after them (0x40000000). */
+            if (igb_field_i32(g, s, 0) <= 4) continue;
             const int block = igb_field_i32(g, s, 2);
             if (block < 0 || igb_is_object(g, block) || g->items[block].memory.size < 4) continue;
             const uint8_t *old = g->items[block].memory.data;
+            if (s32(old + g->items[block].memory.size - 4) != 0x40000000) continue;
             uint8_t four[16];
             for (int i = 0; i < 3; i++) put_i32(four + i * 4, i);
             memcpy(four + 12, old + g->items[block].memory.size - 4, 4);
@@ -303,25 +343,26 @@ static void shrink_all(igb *g, int upto) {
             igb_set_i32(g, s, 0, 4);
             igb_set_i32(g, s, 1, 4);
         } else if (!strcmp(c, "igGeometryAttr1_5")) {
-            /* Triangles of the hands: one. */
-            if (igb_field_i32(g, s, 3) == 3 && igb_field_i32(g, s, 4) == (int)(HAND_VERTICES / 3)) igb_set_i32(g, s, 4, 1);
+            /* Triangles (of her hands and face): one. */
+            if (igb_field_i32(g, s, 3) == 3 && igb_field_i32(g, s, 4) > 1) igb_set_i32(g, s, 4, 1);
         } else if (!strcmp(c, "igMorphBase")) {
-            if (igb_field_i32(g, s, 8) == 3 && igb_field_i32(g, s, 9) == (int)(HAND_VERTICES / 3)) igb_set_i32(g, s, 9, 1);
+            if (igb_field_i32(g, s, 8) == 3 && igb_field_i32(g, s, 9) > 1) igb_set_i32(g, s, 9, 1);
         }
     }
-    /* The sleeves' picture, which nothing shows now. */
-    const char *c = igb_class(g, SLEEVES_IMAGE);
-    if (c && !strcmp(c, "igImage")) {
-        const int block = igb_field_i32(g, SLEEVES_IMAGE, 11);
-        const uint8_t zero[64] = {0};
-        if (block >= 0 && !igb_is_object(g, block)) {
-            igb_set_memory(g, block, zero, 64);
-            igb_set_i32(g, SLEEVES_IMAGE, 0, 8);
-            igb_set_i32(g, SLEEVES_IMAGE, 1, 8);
-            igb_set_i32(g, SLEEVES_IMAGE, 10, 64);
-            igb_set_i32(g, SLEEVES_IMAGE, 17, 8);
-        }
-    }
+}
+
+/* A picture nothing shows made 8 by 8. */
+static void shrink_image(igb *g, int image) {
+    const char *c = igb_class(g, image);
+    if (!c || strcmp(c, "igImage")) return;
+    const int block = igb_field_i32(g, image, 11);
+    const uint8_t zero[64] = {0};
+    if (block < 0 || igb_is_object(g, block)) return;
+    igb_set_memory(g, block, zero, 64);
+    igb_set_i32(g, image, 0, 8);
+    igb_set_i32(g, image, 1, 8);
+    igb_set_i32(g, image, 10, 64);
+    igb_set_i32(g, image, 17, 8);
 }
 
 static void put_i32(uint8_t *p, int32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)((uint32_t)v >> 8); p[2] = (uint8_t)((uint32_t)v >> 16); p[3] = (uint8_t)((uint32_t)v >> 24); }
@@ -392,11 +433,23 @@ static int make_texture(const uint8_t *pixels, unsigned w, unsigned h, unsigned 
     for (int y = 0; y < H; y++)
         for (int x = 0; x < W; x++) {
             const unsigned x0 = (unsigned)x * w / W, x1 = ((unsigned)x + 1) * w / W, y0 = (unsigned)y * h / H, y1 = ((unsigned)y + 1) * h / H;
-            unsigned long sum[4] = {0}, n = 0;
+            /* The colour weighed by how opaque each pixel is, and the most opaque pixel's alpha: thin
+             * lines on a clear ground (eyelids, eyebrows) would otherwise fade to almost clear when
+             * made smaller, and the game does not draw what is almost clear. */
+            unsigned long sum[3] = {0}, weight = 0, n = 0, plain[3] = {0};
+            unsigned most_alpha = 0;
             for (unsigned yy = y0; yy < (y1 > y0 ? y1 : y0 + 1); yy++)
-                for (unsigned xx = x0; xx < (x1 > x0 ? x1 : x0 + 1); xx++, n++)
-                    for (int k = 0; k < 4; k++) sum[k] += pixels[((size_t)yy * w + xx) * 4 + k];
-            for (int k = 0; k < 4; k++) small[y * W + x].c[k] = (uint8_t)(sum[k] / (n ? n : 1));
+                for (unsigned xx = x0; xx < (x1 > x0 ? x1 : x0 + 1); xx++, n++) {
+                    const uint8_t *px = pixels + ((size_t)yy * w + xx) * 4;
+                    for (int k = 0; k < 3; k++) {
+                        sum[k] += (unsigned long)px[k] * px[3];
+                        plain[k] += px[k];
+                    }
+                    weight += px[3];
+                    if (px[3] > most_alpha) most_alpha = px[3];
+                }
+            for (int k = 0; k < 3; k++) small[y * W + x].c[k] = (uint8_t)(weight ? sum[k] / weight : plain[k] / (n ? n : 1));
+            small[y * W + x].c[3] = (uint8_t)most_alpha;
         }
     memcpy(sorted, small, (size_t)W * H * sizeof(rgba));
     rgba palette[256];
@@ -495,7 +548,9 @@ int model_convert(const model *m, const model_picture *pictures, const model_tem
         if (len(d) < 1e-6f) continue;
         pl[i].t = turn_between(d, d2);
         pl[i].axis = norm(d);
-        pl[i].ratio = len(d2) / len(d);
+        /* Stretched at most twice, or to half: a bone placed oddly (an MMD toe at the ground's level
+         * under the heel) must not make a part far longer or shorter. */
+        pl[i].ratio = fminf(fmaxf(len(d2) / len(d), 0.5f), 2.0f);
         pl[i].measured = 1;
     }
     for (int i = 0; i < m->nbones; i++) {
@@ -529,10 +584,18 @@ int model_convert(const model *m, const model_picture *pictures, const model_tem
                 if (other_side == side && !strcmp(other, stem)) follows[i] = j;
             }
         }
-        if (follows[i] >= 0) continue;
-        int b = i, guard = 0;
-        while (b >= 0 && pl[b].miku < 0 && guard++ < 256) b = m->bones[b].parent;
-        follows[i] = b >= 0 && pl[b].miku >= 0 ? b : matched[0][0];
+    }
+    /* Any other follows what its parent follows, the D bones' choice included (MMD's toe tips hang
+     * from 足首D, which follows 足首): parents first, as far up as needed. */
+    for (int i = 0; i < m->nbones; i++) {
+        int chain[256], n = 0, b = i;
+        while (b >= 0 && follows[b] < 0 && pl[b].miku < 0 && n < 256) {
+            chain[n++] = b;
+            b = m->bones[b].parent;
+        }
+        const int to = b < 0 ? matched[0][0] : pl[b].miku >= 0 ? b : follows[b] >= 0 ? follows[b] : matched[0][0];
+        for (int k2 = 0; k2 < n; k2++) follows[chain[k2]] = to;
+        if (pl[i].miku >= 0) follows[i] = i;
     }
 
     /* The corners, on her skeleton. */
@@ -604,6 +667,7 @@ int model_convert(const model *m, const model_picture *pictures, const model_tem
     const int original = g->nitems;
     hide_all(g, original);
     shrink_all(g, original);
+    shrink_image(g, SLEEVES_IMAGE);
 
     /* Materials showing the same picture are made one. */
     const int nmat = m->nmaterials > 0 ? m->nmaterials : 1;
@@ -617,12 +681,31 @@ int model_convert(const model *m, const model_picture *pictures, const model_tem
         }
     }
 
-    /* Pieces of at most eight of her bones each, and of one material, triangles taken in order. */
+    /* The triangles the head alone moves go to the head's file: all their corners on her head bone
+     * only. What the neck moves too stays in the body, so that nothing parts where they meet. */
     const int ntri = m->ncorners / 3;
+    uint8_t *in_head = (uint8_t *)calloc((size_t)(ntri ? ntri : 1), 1);
+    {
+        const miku_bone *hb = miku(mb, nmb, "head");
+        for (int tri = 0; hb && tri < ntri; tri++) {
+            int all = 1;
+            for (int c = 0; c < 3 && all; c++) {
+                const corner *o = &cs[tri * 3 + c];
+                if (o->blend[0] != hb->blend || (o->w[1] > 0 && o->blend[1] != hb->blend)) all = 0;
+            }
+            in_head[tri] = (uint8_t)all;
+        }
+    }
+
+    /* Pieces of at most eight of her bones each, and of one material, triangles taken in order. */
     int *piece_of = (int *)malloc((size_t)(ntri ? ntri : 1) * sizeof(int));
     int (*piece_bones)[8] = NULL;
     int *piece_nb = NULL, *piece_mat = NULL, *piece_tris = NULL, npieces = 0, cap = 0;
     for (int tri = 0; tri < ntri; tri++) {
+        if (in_head[tri]) {
+            piece_of[tri] = -1;
+            continue;
+        }
         int want[6], nw = 0;
         for (int c = 0; c < 3; c++)
             for (int q = 0; q < 2; q++) {
@@ -738,10 +821,24 @@ int model_convert(const model *m, const model_picture *pictures, const model_tem
         new_bms[p] = bms;
     }
     int *piece_of_saved = piece_of;
+    /* How much of each material the head moves: its pictures are given more room. */
+    double *head_share = (double *)calloc((size_t)nmat, sizeof(double));
+    {
+        const miku_bone *hb = miku(mb, nmb, "head");
+        int *mat_count = (int *)calloc((size_t)nmat, sizeof(int));
+        for (int tri = 0; tri < ntri; tri++) {
+            if (piece_of[tri] < 0) continue;
+            const int mt = piece_mat[piece_of[tri]];
+            mat_count[mt] += 3;
+            for (int c = 0; c < 3; c++)
+                if (hb && cs[tri * 3 + c].blend[0] == hb->blend) head_share[mt] += 1;
+        }
+        for (int i = 0; i < nmat; i++) head_share[i] = mat_count[i] ? head_share[i] / mat_count[i] : 0;
+        free(mat_count);
+    }
     free(piece_bones);
     free(piece_nb);
     free(piece_tris);
-    free(cs);
 
     /* The materials used, in the order first met: the first is drawn with body3, each other with a
      * copy of body3 showing its own picture. Pictures get smaller as there are more of them, to
@@ -758,7 +855,7 @@ int model_convert(const model *m, const model_picture *pictures, const model_tem
     double total_area = 0;
     for (int u = 0; u < nused; u++) {
         const model_picture *pic = pictures && used[u] < m->nmaterials ? &pictures[used[u]] : NULL;
-        if (pic && pic->pixels) total_area += fmin((double)pic->w * pic->h, 1024.0 * 1024.0);
+        if (pic && pic->pixels) total_area += fmin((double)pic->w * pic->h, 1024.0 * 1024.0) * (1.0 + 5.0 * head_share[used[u]]);
     }
     const int old_set_kids = igb_field_i32(g, SKINNED_KIDS, 0), old_set_list = igb_field_i32(g, SKINNED_KIDS, 2);
     uint8_t *sets = (uint8_t *)malloc((size_t)(old_set_kids + nused) * 4);
@@ -774,7 +871,7 @@ int model_convert(const model *m, const model_picture *pictures, const model_tem
         const model_picture *pic = pictures && mat >= 0 && mat < m->nmaterials ? &pictures[mat] : NULL;
         int tw = 0, th = 0;
         uint8_t *indices = NULL, clut[1024];
-        const double share = pic && pic->pixels && total_area > 0 ? fmin((double)pic->w * pic->h, 1024.0 * 1024.0) / total_area : 1;
+        const double share = pic && pic->pixels && total_area > 0 ? fmin((double)pic->w * pic->h, 1024.0 * 1024.0) * (1.0 + 5.0 * head_share[mat]) / total_area : 1;
         unsigned most = 32;
         while (most < 256 && (double)(most * 2) * (most * 2) <= 262144.0 * share * 1.5) most *= 2;
         const int have = pic && pic->pixels && make_texture(pic->pixels, pic->w, pic->h, most, &tw, &th, &indices, clut);
@@ -817,9 +914,9 @@ int model_convert(const model *m, const model_picture *pictures, const model_tem
         uint8_t *list = (uint8_t *)malloc((size_t)(kids ? kids : 1) * 4);
         if (old_count && old_list >= 0 && !igb_is_object(g, old_list) && g->items[old_list].memory.size >= (uint32_t)old_count * 4)
             memcpy(list, g->items[old_list].memory.data, (size_t)old_count * 4);
-        int k = old_count;
+        int at_kid = old_count;
         for (int p = 0; p < npieces; p++)
-            if (piece_mat[p] == mat) put_i32(list + (k++) * 4, new_bms[p]);
+            if (piece_mat[p] == mat) put_i32(list + (at_kid++) * 4, new_bms[p]);
         const int m_list = igb_add_memory(g, LIKE_NODES_MEM, list, (uint32_t)kids * 4);
         igb_set_i32(g, nodes_obj, 0, kids);
         igb_set_i32(g, nodes_obj, 1, kids);
@@ -844,17 +941,171 @@ int model_convert(const model *m, const model_picture *pictures, const model_tem
     free(sets);
     free(used);
     free(piece_of_saved);
-    free(canon);
+    free(head_share);
     free(piece_mat);
     free(new_bms);
     igb_collect(g);
     *body = igb_write(g, body_size);
     igb_free(g);
 
-    /* Her head, drawn at a point. */
+    /* Her head, drawn at a point, holding the model's head: the triangles the head alone moves,
+     * in a file of its own, with room of its own (each file has about 1 MB). Each is moved by her
+     * head file's first bone (head_o, where her body's head is), in the body's space. */
     igb *hg = igb_read(t->head, t->head_size);
-    if (!hg) { snprintf(err, errlen, "module 0's head is not as expected"); free(*body); *body = NULL; return 0; }
-    hide_all(hg, hg->nitems);
+    if (!hg || !head_template_is_known(hg)) {
+        snprintf(err, errlen, "module 0's head is not as expected");
+        igb_free(hg);
+        free(*body);
+        *body = NULL;
+        free(cs);
+        free(in_head);
+        free(canon);
+        return 0;
+    }
+    const int horiginal = hg->nitems;
+    hide_all(hg, horiginal);
+    shrink_all(hg, horiginal);
+    for (int i = 0; i < horiginal; i++) shrink_image(hg, i);
+    int *hused = (int *)malloc((size_t)nmat * sizeof(int)), nh = 0;
+    for (int tri = 0; tri < ntri; tri++) {
+        if (!in_head[tri]) continue;
+        const int raw = m->material ? m->material[tri] : 0, mat = raw >= 0 && raw < nmat ? canon[raw] : 0;
+        int seen = 0;
+        for (int u = 0; u < nh; u++)
+            if (hused[u] == mat) seen = 1;
+        if (!seen) hused[nh++] = mat;
+    }
+    double harea = 0;
+    for (int u = 0; u < nh; u++) {
+        const model_picture *pic = pictures && hused[u] < m->nmaterials ? &pictures[hused[u]] : NULL;
+        if (pic && pic->pixels) harea += fmin((double)pic->w * pic->h, 1024.0 * 1024.0);
+    }
+    const int hold = igb_field_i32(hg, HEAD_KIDS, 0), hold_list = igb_field_i32(hg, HEAD_KIDS, 2);
+    uint8_t *hsets = (uint8_t *)malloc((size_t)(hold + nh) * 4);
+    if (hold_list >= 0 && !igb_is_object(hg, hold_list) && hg->items[hold_list].memory.size >= (uint32_t)hold * 4)
+        memcpy(hsets, hg->items[hold_list].memory.data, (size_t)hold * 4);
+    int nhsets = hold;
+    int *chunk = (int *)malloc((size_t)(ntri ? ntri : 1) * sizeof(int));
+    for (int u = 0; u < nh; u++) {
+        const int mat = hused[u];
+        /* A copy of hair1 with its own picture. */
+        const int texattr = igb_add_object(hg, H_TEXATTR), mips = igb_add_object(hg, H_MIPMAPS);
+        igb_set_i32(hg, texattr, 12, mips);
+        const int image = igb_add_object(hg, H_IMAGE), clut_obj = igb_add_object(hg, H_CLUT);
+        igb_set_i32(hg, image, 15, clut_obj);
+        const int image_mem = igb_field_i32(hg, H_IMAGE, 11), clut_mem = igb_field_i32(hg, H_CLUT, 3);
+        igb_set_i32(hg, image, 11, igb_add_memory(hg, image_mem, hg->items[image_mem].memory.data, hg->items[image_mem].memory.size));
+        igb_set_i32(hg, clut_obj, 3, igb_add_memory(hg, clut_mem, hg->items[clut_mem].memory.data, hg->items[clut_mem].memory.size));
+        char name[48];
+        snprintf(name, sizeof name, "skinmod_head%d.png", u);
+        igb_set_i32(hg, image, 20, igb_add_string(hg, name));
+        igb_set_i32(hg, texattr, 8, image);
+        const int texbind = igb_add_object(hg, H_TEXBIND);
+        igb_set_i32(hg, texbind, 1, texattr);
+        const igb_bytes *attrs_mem = &hg->items[H_ATTRS_MEM].memory;
+        uint8_t attrs[64];
+        const uint32_t na = attrs_mem->size < sizeof attrs ? attrs_mem->size : (uint32_t)sizeof attrs;
+        memcpy(attrs, attrs_mem->data, na);
+        for (uint32_t i = 0; i + 4 <= na; i += 4)
+            if (s32(attrs + i) == H_TEXBIND) put_i32(attrs + i, texbind);
+        const int attr_list = igb_add_object(hg, H_ATTRS);
+        igb_set_i32(hg, attr_list, 2, igb_add_memory(hg, H_ATTRS_MEM, attrs, na));
+        /* Its picture, sized by its share of the head's pictures. */
+        const model_picture *pic = pictures && mat < m->nmaterials ? &pictures[mat] : NULL;
+        if (pic && pic->pixels) {
+            const double share = harea > 0 ? fmin((double)pic->w * pic->h, 1024.0 * 1024.0) / harea : 1;
+            unsigned most = 32;
+            while (most < 256 && (double)(most * 2) * (most * 2) <= 262144.0 * share * 1.5) most *= 2;
+            int tw, th;
+            uint8_t *indices = NULL, clut[1024];
+            if (make_texture(pic->pixels, pic->w, pic->h, most, &tw, &th, &indices, clut)) {
+                igb_set_i32(hg, image, 0, tw);
+                igb_set_i32(hg, image, 1, th);
+                igb_set_i32(hg, image, 10, tw * th);
+                igb_set_i32(hg, image, 17, tw);
+                igb_set_memory(hg, igb_field_i32(hg, image, 11), indices, (uint32_t)(tw * th));
+                igb_set_memory(hg, igb_field_i32(hg, clut_obj, 3), clut, 1024);
+                free(indices);
+            }
+        }
+        /* Its geometries, of at most PIECE_TRIANGLES each. */
+        int ngeo = 0, nchunk = 0;
+        uint8_t *geos = (uint8_t *)malloc((size_t)(ntri / PIECE_TRIANGLES + 2) * 4);
+        for (int tri = 0; tri <= ntri; tri++) {
+            const int take = tri < ntri && in_head[tri] && canon[m->material && m->material[tri] >= 0 && m->material[tri] < nmat ? m->material[tri] : 0] == mat;
+            if (take) chunk[nchunk++] = tri;
+            if (nchunk && (nchunk == PIECE_TRIANGLES || tri == ntri)) {
+                const int n = nchunk * 3;
+                float *pos = malloc((size_t)n * 12), *nrm = malloc((size_t)n * 12), *uv = malloc((size_t)n * 8), *w = malloc((size_t)n * 8);
+                uint8_t *col = malloc((size_t)n * 4), *ix = calloc((size_t)n, 2);
+                for (int q = 0; q < nchunk; q++)
+                    for (int c = 0; c < 3; c++) {
+                        const corner *o = &cs[chunk[q] * 3 + c];
+                        const int at = q * 3 + c;
+                        memcpy(pos + at * 3, o->pos, 12);
+                        memcpy(nrm + at * 3, o->normal, 12);
+                        memcpy(uv + at * 2, o->uv, 8);
+                        w[at * 2] = 1.0f;
+                        w[at * 2 + 1] = 0.0f;
+                        memset(col + at * 4, 0xFF, 4);
+                    }
+                const int m_pos = igb_add_memory(hg, H_POS, pos, (uint32_t)n * 12), m_nrm = igb_add_memory(hg, H_NRM, nrm, (uint32_t)n * 12);
+                const int m_col = igb_add_memory(hg, H_COL, col, (uint32_t)n * 4), m_uv = igb_add_memory(hg, H_UV, uv, (uint32_t)n * 8);
+                const int m_w = igb_add_memory(hg, H_W, w, (uint32_t)n * 8), m_ix = igb_add_memory(hg, H_IX, ix, (uint32_t)n * 2);
+                free(pos); free(nrm); free(uv); free(w); free(col); free(ix);
+                uint8_t comps[80];
+                for (int z = 0; z < 20; z++) put_i32(comps + z * 4, -1);
+                put_i32(comps + 0, m_pos);
+                put_i32(comps + 4, m_nrm);
+                put_i32(comps + 8, m_col);
+                put_i32(comps + 44, m_uv);
+                const int va = igb_add_object(hg, H_VA);
+                igb_set_i32(hg, va, 0, igb_add_memory(hg, H_COMPS, comps, 80));
+                igb_set_i32(hg, va, 1, n);
+                igb_set_i32(hg, va, 5, m_w);
+                igb_set_i32(hg, va, 6, m_ix);
+                const int ga = igb_add_object(hg, H_GA);
+                igb_set_i32(hg, ga, 1, va);
+                igb_set_i32(hg, ga, 3, 3);
+                igb_set_i32(hg, ga, 4, n / 3);
+                igb_set_i32(hg, ga, 10, -1);
+                uint8_t ref[4];
+                put_i32(ref, ga);
+                const int al = igb_add_object(hg, H_GEO_ATTRS);
+                igb_set_i32(hg, al, 0, 1);
+                igb_set_i32(hg, al, 1, 1);
+                igb_set_i32(hg, al, 2, igb_add_memory(hg, H_GEO_ATTRS_MEM, ref, 4));
+                const int geometry = igb_add_object(hg, H_GEOMETRY);
+                igb_set_i32(hg, geometry, 3, H_EMPTY_NODES);
+                igb_set_i32(hg, geometry, 4, al);
+                put_i32(geos + ngeo * 4, geometry);
+                ngeo++;
+                nchunk = 0;
+            }
+        }
+        const int nodes = igb_add_object(hg, H_NODES);
+        igb_set_i32(hg, nodes, 0, ngeo);
+        igb_set_i32(hg, nodes, 1, ngeo);
+        igb_set_i32(hg, nodes, 2, igb_add_memory(hg, H_NODES_MEM, geos, (uint32_t)ngeo * 4));
+        free(geos);
+        const int set = igb_add_object(hg, H_SET);
+        igb_set_i32(hg, set, 3, nodes);
+        igb_set_i32(hg, set, 4, attr_list);
+        put_i32(hsets + nhsets * 4, set);
+        nhsets++;
+    }
+    if (nhsets > hold) {
+        igb_set_i32(hg, HEAD_KIDS, 0, nhsets);
+        igb_set_i32(hg, HEAD_KIDS, 1, nhsets);
+        igb_set_i32(hg, HEAD_KIDS, 2, igb_add_memory(hg, H_KIDS_MEM, hsets, (uint32_t)nhsets * 4));
+    }
+    free(hsets);
+    free(chunk);
+    free(hused);
+    free(cs);
+    free(in_head);
+    free(canon);
+    igb_collect(hg);
     *head = igb_write(hg, head_size);
     igb_free(hg);
     return *body && *head;

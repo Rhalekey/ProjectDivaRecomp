@@ -218,9 +218,10 @@ static int find_picture(const char *dir, const char *model_path, const char *own
 
 /* ---- converting, once, into a cache ---------------------------------------------------------- */
 
-#define CONVERTER_VERSION 7
-#define BODY_ROOM 960000u          /* a body file's most bytes: 985 KB loaded, 1.03 MB wrecked the memory */
-#define DEFAULT_TRIANGLES 8000
+#define CONVERTER_VERSION 14
+#define BOTH_ROOM 1450000u         /* body and head together: 985 + 501 KB loaded, 1030 + 501 and 675 + 940 KB did not */
+#define BODY_ROOM 960000u          /* a body file's most bytes: each file has room of about 1 MB (985 KB loaded; 1.03 MB, and 1.4 MB with a head of 24 KB, wrecked the memory) */
+#define DEFAULT_TRIANGLES 10000
 
 static void file_mark(const char *path, char *out, size_t size) {
     WIN32_FILE_ATTRIBUTE_DATA a;
@@ -311,18 +312,23 @@ static int convert(const char *model_path, const char *dir, const char *cache, c
     uint8_t *body = NULL, *head = NULL;
     size_t bn = 0, hn = 0;
     int ok = model_convert(&m, pics, &g_templates, &body, &bn, &head, &hn, err, sizeof err);
-    /* The game reads a model into room of about 1 MB: past it, fewer triangles, until it fits. */
-    for (int tries = 0; ok && bn > BODY_ROOM && tries < 6; tries++) {
-        const int now = m.ncorners / 3, want = (int)((double)now * BODY_ROOM / (double)bn * 0.9);
+    /* The game reads each file into room of about 1 MB, and both into about 1.5 MB: past either,
+     * fewer triangles, until they fit. */
+#define TOO_BIG(b, h) ((b) > BODY_ROOM || (h) > BODY_ROOM || (b) + (h) > BOTH_ROOM)
+    for (int tries = 0; ok && TOO_BIG(bn, hn) && tries < 6; tries++) {
+        double fit = (double)BODY_ROOM / (double)(bn > hn ? bn : hn);
+        if ((double)BOTH_ROOM / (double)(bn + hn) < fit) fit = (double)BOTH_ROOM / (double)(bn + hn);
+        const int now = m.ncorners / 3, want = (int)((double)now * fit * 0.9);
         if (want < 300) break;
-        fprintf(stderr, "module skins: \"%s\": %zu bytes, too big for the game; %d triangles made %d\n", name, bn, now, model_simplify(&m, want));
+        fprintf(stderr, "module skins: \"%s\": body %zu and head %zu bytes, too big for the game; %d triangles made %d\n", name, bn, hn, now,
+                model_simplify(&m, want));
         free(body);
         free(head);
         body = head = NULL;
         ok = model_convert(&m, pics, &g_templates, &body, &bn, &head, &hn, err, sizeof err);
     }
-    if (ok && bn > BODY_ROOM) {
-        snprintf(err, sizeof err, "still %zu bytes after making it simpler; its pictures may be too many", bn);
+    if (ok && TOO_BIG(bn, hn)) {
+        snprintf(err, sizeof err, "still %zu and %zu bytes after making it simpler; its pictures may be too many", bn, hn);
         free(body);
         free(head);
         ok = 0;
